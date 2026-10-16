@@ -27,6 +27,7 @@ class FetchResult:
 class ParsedPoint:
     observed_at: date
     value: float | None   # None = provider reported a missing value (e.g. holiday '.')
+    fields: dict[str, float] | None = None  # multi-field records (e.g. COT position breakdown)
 
 
 class ProviderError(RuntimeError):
@@ -89,9 +90,13 @@ def with_retries(
 
 
 def get_adapter(provider_id: str) -> ProviderAdapter:
+    from atlas.ingestion.cftc import CftcAdapter
     from atlas.ingestion.fred import FredAdapter
+    from atlas.ingestion.worldbank import WorldBankAdapter
 
-    adapters: dict[str, Callable[[], ProviderAdapter]] = {"fred": FredAdapter}
+    adapters: dict[str, Callable[[], ProviderAdapter]] = {
+        "fred": FredAdapter, "cftc": CftcAdapter, "worldbank": WorldBankAdapter,
+    }
     if provider_id not in adapters:
         raise ProviderError(f"no adapter registered for provider '{provider_id}'")
     return adapters[provider_id]()

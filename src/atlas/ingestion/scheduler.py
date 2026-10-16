@@ -15,10 +15,16 @@ log = logging.getLogger("atlas.scheduler")
 
 
 def run_once() -> int:
+    """Refresh due datasets, then start any scheduled reports that are due (so they use fresh data)."""
+    from atlas.schedules import run_due
+
     due = due_datasets()
     if due:
         log.info("refreshing %d due dataset(s)", len(due))
         ingest(due)
+    started = run_due()
+    if started:
+        log.info("started %d scheduled report(s)", len(started))
     return len(due)
 
 

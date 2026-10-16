@@ -485,3 +485,48 @@ def scenario(
         },
         "fingerprint": reg["fingerprint"],
     }
+
+
+# ---------------------------------------------------------------- positioning
+
+
+def positioning_stats(df: pd.DataFrame, lookback_years: float = 3) -> dict[str, Any]:
+    """Speculative positioning summary from a COT frame (see data.access.get_positioning).
+
+    The COT index places the latest net non-commercial position within its trailing range
+    (0 = most net-short, 100 = most net-long in the window).
+    """
+    last_date = df.index[-1]
+    window = df[df.index > last_date - pd.DateOffset(months=int(lookback_years * 12))]
+    last, prev = df.iloc[-1], df.iloc[-2] if len(df) > 1 else df.iloc[-1]
+    net = window["noncomm_net"]
+    lo, hi = float(net.min()), float(net.max())
+    cot_index = (float(last["noncomm_net"]) - lo) / (hi - lo) * 100 if hi > lo else None
+    std = float(net.std(ddof=1)) if len(net) > 2 else 0.0
+    z = (float(last["noncomm_net"]) - float(net.mean())) / std if std > 0 else None
+    oi = float(last["open_interest"])
+    four_weeks = df[df.index <= last_date - pd.Timedelta(days=28)]
+    return {
+        "report_date": last_date.date().isoformat(),
+        "open_interest": _r(oi, 0),
+        "open_interest_change_1w": _r(oi - float(prev["open_interest"]), 0),
+        "noncomm_net": _r(float(last["noncomm_net"]), 0),
+        "noncomm_net_change_1w": _r(float(last["noncomm_net"] - prev["noncomm_net"]), 0),
+        "noncomm_net_change_4w": _r(float(last["noncomm_net"] - four_weeks["noncomm_net"].iloc[-1]), 0) if len(four_weeks) else None,
+        "noncomm_net_pct_oi": _r(float(last["noncomm_net"]) / oi * 100, 2) if oi else None,
+        "comm_net": _r(float(last["comm_net"]), 0),
+        "comm_net_pct_oi": _r(float(last["comm_net"]) / oi * 100, 2) if oi else None,
+        "cot_index": _r(cot_index, 1),
+        "net_zscore": _r(z, 2),
+        "window_net_min": _r(lo, 0),
+        "window_net_max": _r(hi, 0),
+        "positioning_extreme": None if cot_index is None else ("crowded long" if cot_index >= 90 else "crowded short" if cot_index <= 10 else None),
+        "method": {
+            "net": "non-commercial long − non-commercial short (contracts); legacy futures-only report",
+            "cot_index": f"position of latest net within its {lookback_years:g}-year min–max range, 0–100",
+            "zscore": f"(latest net − {lookback_years:g}y mean) / {lookback_years:g}y stdev",
+            "caveat": "Positions are as of the Tuesday report date and published the following Friday. Crowded positioning is a risk condition, not a timing signal.",
+            "n_reports_in_window": int(len(window)),
+        },
+        "fingerprint": fingerprint(df["noncomm_net"].rename("noncomm_net"), df["open_interest"].rename("open_interest")),
+    }

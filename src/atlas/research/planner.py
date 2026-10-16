@@ -11,7 +11,7 @@ import re
 import uuid
 from typing import Any
 
-from atlas.instruments import datasets, extract_entities, get_dataset
+from atlas.instruments import country_indicators, datasets, extract_countries, extract_entities, get_dataset, positioning_for
 
 # Known cross-asset drivers for flagship workflows (spec §9, §21).
 DRIVERS: dict[str, list[str]] = {
@@ -91,9 +91,17 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
     horizon = horizon_months or _horizon_months(q)
     lookback = lookback_years or _lookback_years(q)
 
-    if not entities and "macro_overview" in intents:
+    country_codes = extract_countries(query)
+    if re.search(r"global economy|world economy|across the world", q) and not country_codes:
+        country_codes = [c for c in extract_countries("g20")]
+    positioning_entities = [e for e in entities if get_dataset(e) and get_dataset(e).kind == "positioning"]  # type: ignore[union-attr]
+    entities = [e for e in entities if e not in positioning_entities]
+    if re.search(r"positioning|speculat|\bcot\b|commitments of traders|crowded", q):
+        intents.append("positioning")
+
+    if not entities and "macro_overview" in intents and not country_codes:
         entities = list(MACRO_DASHBOARD)
-    if not entities and "anomaly_screen" not in intents and "comparison" not in intents:
+    if not entities and not country_codes and not positioning_entities and "anomaly_screen" not in intents and "comparison" not in intents:
         entities = MACRO_DASHBOARD[:3] + MACRO_MARKETS[:3]
         intents.append("macro_overview")
 
@@ -105,6 +113,10 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
 
     primary = [e for e in entities if get_dataset(e) and get_dataset(e).kind == "market"][:5]  # type: ignore[union-attr]
     macro = [e for e in entities if get_dataset(e) and get_dataset(e).kind == "macro"]  # type: ignore[union-attr]
+    if country_codes and "USA" not in country_codes:
+        # Keyword hits like "inflation" resolve to U.S. series; drop them when the question is about other countries.
+        macro = [e for e in macro if not e.startswith("US.")]
+        entities = [e for e in entities if not e.startswith("US.")]
     steps: list[dict[str, Any]] = []
     gaps: list[str] = []
 
@@ -118,6 +130,8 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
     for e in primary:
         ds = get_dataset(e)
         assert ds is not None
+        if depth != "quick" and positioning_for(e):
+            add("get_positioning", dataset_id=positioning_for(e))
         if not ds.has_source:
             gaps.append(e)
             continue
@@ -125,12 +139,24 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
         add("get_price_history", dataset_id=e, lookback_years=lookback)
         if depth != "quick":
             add("detect_anomalies", dataset_id=e)
+    for e in positioning_entities:
+        add("get_positioning", dataset_id=e)
     for e in macro:
         add("get_macro_series", series_id=e, lookback_years=lookback)
-    if "macro_overview" in intents and not macro:
+    if country_codes:
+        wanted = [i["key"] for i in country_indicators() if any(k in q for k in i.get("keywords", []))]
+        if re.search(r"vulnerab|stronger dollar|external|crisis", q):
+            wanted += ["CURRENT_ACCOUNT", "RESERVES", "DEBT", "INFLATION"]
+        indicators = list(dict.fromkeys(wanted)) or ["GDP_GROWTH", "INFLATION", "UNEMPLOYMENT"]
+        if len(country_codes) == 1 and not primary:
+            add("get_country_profile", country=country_codes[0])
+        else:
+            add("compare_countries", countries=country_codes[:20], indicators=indicators[:5])
+    us_focus = not country_codes or "USA" in country_codes
+    if "macro_overview" in intents and us_focus:
         for e in MACRO_DASHBOARD:
             add("get_macro_series", series_id=e, lookback_years=lookback)
-    if "macro_overview" in intents:
+    if "macro_overview" in intents and us_focus:
         add("compare_performance", dataset_ids=MACRO_MARKETS)
 
     sourced = [e for e in primary if get_dataset(e).has_source]  # type: ignore[union-attr]
@@ -159,7 +185,7 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
     if "anomaly_screen" in intents:
         ac = next((c for c in ("commodity", "fx", "rates", "equity") if c in q or (c == "commodity" and "commodit" in q)), None)
         add("screen_anomalies", **({"asset_class": ac} if ac else {}))
-    if "comparison" in intents and not sourced:
+    if "comparison" in intents and not sourced and not country_codes:
         ac = "commodity" if "commodit" in q else "fx" if "currenc" in q else None
         add("compare_performance", **({"asset_class": ac} if ac else {}))
     if any(get_dataset(e).meta.get("asset_class") == "commodity" for e in primary):  # type: ignore[union-attr]
@@ -179,7 +205,8 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
             "dataset_id": first.dataset_id, "name": first.name,
             "asset_class": first.meta.get("asset_class"), "price_basis": first.meta.get("price_basis"),
         },
-        "entities": entities,
+        "entities": entities + positioning_entities,
+        "countries": country_codes,
         "coverage_gaps": gaps,
         "timeframe": {"lookback_years": lookback, "horizon_months": horizon, "focus": "latest_available"},
         "depth": depth,

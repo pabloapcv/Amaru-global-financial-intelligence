@@ -16,8 +16,16 @@ import numpy as np
 import pandas as pd
 
 from atlas import analytics
-from atlas.data.access import DataUnavailable, data_status, get_series, latest_quote, series_meta
-from atlas.instruments import datasets, get_dataset, resolve
+from atlas.data.access import DataUnavailable, data_status, get_positioning, get_series, latest_quote, series_meta
+from atlas.instruments import (
+    countries,
+    country_indicators,
+    country_series_id,
+    datasets,
+    get_dataset,
+    positioning_for,
+    resolve,
+)
 
 
 class ToolError(ValueError):
@@ -361,6 +369,160 @@ def t_run_scenario(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     return {"evidence_id": label, **res}
 
 
+def t_get_positioning(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    dsid = args["dataset_id"]
+    ds = _ds(dsid)
+    if ds.kind != "positioning":
+        cot = positioning_for(dsid)
+        if cot is None:
+            raise ToolError(f"No CFTC positioning series is linked to {dsid}.")
+        dsid = cot
+    lb = _lookback(args, default=3)
+    start = (pd.Timestamp.today() - pd.DateOffset(years=max(lb, 1) + 1)).date()
+    try:
+        df, meta = get_positioning(dsid, start=start)
+    except DataUnavailable as exc:
+        raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap.") from exc
+    stats = analytics.positioning_stats(df, lookback_years=lb)
+    pds = get_dataset(dsid)
+    result = {
+        "dataset_id": dsid, "name": pds.name, "linked_instrument": pds.meta.get("instrument_id"),  # type: ignore[union-attr]
+        "description": pds.meta.get("description"), "freshness": meta.freshness, **stats,  # type: ignore[union-attr]
+    }
+    window = df[df.index > df.index[-1] - pd.DateOffset(months=int(lb * 12))]
+    chart = {
+        "type": "line", "title": f"{pds.name} — net positions", "unit": "contracts",  # type: ignore[union-attr]
+        "series": [
+            {"name": "Non-commercial (speculators) net", "points": _downsample(window["noncomm_net"])},
+            {"name": "Commercial (hedgers) net", "points": _downsample(window["comm_net"])},
+        ],
+    }
+    label = ctx.add("get_positioning", args, result, _cite([meta]), [_source(meta)], chart)
+    return {"evidence_id": label, **result}
+
+
+def _country_codes(args: dict[str, Any]) -> list[str]:
+    known = {c["iso3"]: c for c in countries()}
+    codes = [str(c).upper() for c in args.get("countries") or []]
+    group = args.get("group")
+    if group:
+        codes += [c["iso3"] for c in countries() if group in c["groups"] and c["iso3"] not in codes]
+    bad = [c for c in codes if c not in known]
+    if bad:
+        raise ToolError(f"unknown country code(s) {bad}; available: {', '.join(sorted(known))}")
+    if not codes:
+        raise ToolError("provide countries (ISO3 codes) or a group ('latam' or 'g20')")
+    return list(dict.fromkeys(codes))
+
+
+def _indicator_keys(args: dict[str, Any], default: list[str]) -> list[str]:
+    known = {i["key"]: i for i in country_indicators()}
+    keys = [str(k).upper() for k in args.get("indicators") or default]
+    bad = [k for k in keys if k not in known]
+    if bad:
+        raise ToolError(f"unknown indicator(s) {bad}; available: {', '.join(known)}")
+    return keys
+
+
+STALE_YEARS = 3
+
+
+def t_compare_countries(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    codes = _country_codes(args)
+    keys = _indicator_keys(args, ["GDP_GROWTH", "INFLATION", "UNEMPLOYMENT"])
+    names = {c["iso3"]: c["name"] for c in countries()}
+    ind_meta = {i["key"]: i for i in country_indicators()}
+    rows, metas, gaps, history = [], [], [], {}
+    for iso in codes:
+        row: dict[str, Any] = {"country": iso, "name": names[iso]}
+        for key in keys:
+            sid = country_series_id(iso, key)
+            try:
+                s, m = get_series(sid)
+            except DataUnavailable:
+                row[key] = None
+                gaps.append({"country": iso, "indicator": key, "reason": "no observations"})
+                continue
+            metas.append(m)
+            last5 = s.iloc[-5:]
+            row[key] = {"latest": round(float(s.iloc[-1]), 3), "year": int(s.index[-1].year),
+                        "avg_5obs": round(float(last5.mean()), 3), "first_year_of_avg": int(last5.index[0].year)}
+            history.setdefault(key, {})[iso] = s
+        rows.append(row)
+    # Flag values far older than the freshest peer for the same indicator; they are not comparable.
+    stale = []
+    for key in keys:
+        newest = max((r[key]["year"] for r in rows if r.get(key)), default=None)
+        for r in rows:
+            if r.get(key):
+                r[key]["stale"] = newest - r[key]["year"] > STALE_YEARS
+                if r[key]["stale"]:
+                    stale.append({"country": r["country"], "indicator": key, "year": r[key]["year"], "peer_latest_year": newest})
+    ranks = {}
+    for key in keys:
+        vals = [(r["country"], r[key]["latest"]) for r in rows if r.get(key) and not r[key]["stale"]]
+        ranks[key] = [c for c, _ in sorted(vals, key=lambda x: -x[1])]
+    years = {r[k]["year"] for r in rows for k in keys if r.get(k)}
+    result = {
+        "indicators": {k: {"name": ind_meta[k]["name"], "unit": ind_meta[k]["unit"]} for k in keys},
+        "rows": rows,
+        "rank_high_to_low": ranks,
+        "reference_years": sorted(years),
+        "unavailable": gaps,
+        "stale_values": stale,
+        "method": {
+            "source": "World Bank WDI, annual; latest available year per country (years can differ across countries).",
+            "staleness": f"Values more than {STALE_YEARS} years older than the freshest peer are flagged stale and excluded from rankings.",
+            "harmonization": "WDI definitions are harmonized across countries; inflation is CPI (annual %), unemployment is the ILO modeled estimate.",
+            "caveat": "Annual data published with a lag; mixed reference years are not strictly comparable.",
+        },
+    }
+    first = keys[0]
+    chart = {
+        "type": "line", "title": f"{ind_meta[first]['name']} by country", "unit": ind_meta[first]["unit"],
+        "series": [
+            {"name": names[iso], "points": _downsample(s[s.index.year >= s.index[-1].year - 15])}
+            for iso, s in list(history.get(first, {}).items())[:12]
+        ],
+    }
+    label = ctx.add("compare_countries", args, result, "; ".join(dict.fromkeys(m.citation for m in metas)) or "World Bank WDI",
+                    [_source(m) for m in metas], chart)
+    return {"evidence_id": label, **result}
+
+
+def t_get_country_profile(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    iso = _country_codes({"countries": [args["country"]]})[0]
+    names = {c["iso3"]: c["name"] for c in countries()}
+    profile, metas, gaps, hist = {}, [], [], {}
+    for ind in country_indicators():
+        sid = country_series_id(iso, ind["key"])
+        try:
+            s, m = get_series(sid)
+        except DataUnavailable:
+            gaps.append(ind["key"])
+            continue
+        metas.append(m)
+        recent = s.iloc[-6:]
+        profile[ind["key"]] = {
+            "name": ind["name"], "unit": ind["unit"],
+            "recent": [{"year": int(d.year), "value": round(float(v), 3)} for d, v in recent.items()],
+            "avg_10y": round(float(s.iloc[-10:].mean()), 3),
+        }
+        hist[ind["key"]] = s
+    result = {"country": iso, "name": names[iso], "indicators": profile, "unavailable": gaps,
+              "method": {"source": "World Bank WDI, annual", "caveat": "Latest year typically lags by 1–2 years."}}
+    chart = {
+        "type": "line", "title": f"{names[iso]}: growth and inflation", "unit": "percent",
+        "series": [
+            {"name": k.replace("_", " ").title(), "points": _downsample(hist[k][hist[k].index.year >= hist[k].index[-1].year - 20])}
+            for k in ("GDP_GROWTH", "INFLATION") if k in hist
+        ],
+    }
+    label = ctx.add("get_country_profile", args, result, "; ".join(m.citation for m in metas) or "World Bank WDI",
+                    [_source(m) for m in metas], chart)
+    return {"evidence_id": label, **result}
+
+
 def _unavailable(kind: str, needed: str) -> Callable[[ToolContext, dict[str, Any]], dict[str, Any]]:
     def tool(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         result = {
@@ -454,6 +616,25 @@ TOOLS: dict[str, dict[str, Any]] = {
         "schema": {"type": "object", "properties": {
             "asset": _ID, "driver": _ID, "shock": {"type": "number"}, "lookback_years": _LB,
         }, "required": ["asset", "driver", "shock"]},
+    },
+    "get_positioning": {
+        "fn": t_get_positioning,
+        "description": "CFTC Commitments of Traders positioning for a market (pass the instrument id, e.g. CMD.SUGAR.ISA, or a COT.* id): speculator and hedger net positions, weekly/4-week changes, % of open interest, COT index (0–100 within the lookback range) and z-score. Works for gold and silver even though their prices are not connected.",
+        "schema": {"type": "object", "properties": {"dataset_id": _ID, "lookback_years": {"type": "number", "description": "Range for COT index/z-score (default 3)."}}, "required": ["dataset_id"]},
+    },
+    "compare_countries": {
+        "fn": t_compare_countries,
+        "description": "Cross-country comparison of annual World Bank indicators (latest value, its year, 5-observation average, ranking). Indicators: GDP_GROWTH, INFLATION, UNEMPLOYMENT, GDP_PC, CURRENT_ACCOUNT, EXPORTS, RESERVES, DEBT. Countries by ISO3 code or group 'latam' / 'g20'.",
+        "schema": {"type": "object", "properties": {
+            "countries": {"type": "array", "items": {"type": "string"}},
+            "group": {"type": "string", "enum": ["latam", "g20"]},
+            "indicators": {"type": "array", "items": {"type": "string"}},
+        }, "required": []},
+    },
+    "get_country_profile": {
+        "fn": t_get_country_profile,
+        "description": "Standardized economic profile of one country (ISO3 code): recent annual growth, inflation, unemployment, income, external accounts, reserves and debt from World Bank WDI.",
+        "schema": {"type": "object", "properties": {"country": {"type": "string", "description": "ISO3 code, e.g. BRA, BOL"}}, "required": ["country"]},
     },
     "get_fundamentals": {
         "fn": _unavailable("fundamentals", "USDA PSD / UNICA / ISO / ICSG supply-demand connectors"),

@@ -22,6 +22,7 @@ from atlas.data.db import (
     MacroObservation,
     MarketObservation,
     PipelineRun,
+    PositioningObservation,
     RawPayload,
     session_scope,
     utcnow,
@@ -51,10 +52,12 @@ class DatasetResult:
     execution_id: str | None = None
 
 
-def _store_raw(provider_id: str, symbol: str, payload: bytes) -> tuple[str, str]:
+def _store_raw(provider_id: str, symbol: str, payload: bytes, content_type: str = "text/csv") -> tuple[str, str]:
     digest = hashlib.sha256(payload).hexdigest()
     stamp = utcnow().strftime("%Y%m%dT%H%M%S%f")
-    path = Path(settings.object_store) / "raw" / provider_id / symbol / f"{stamp}_{digest[:12]}.csv"
+    ext = "json" if "json" in content_type else "csv"
+    safe_symbol = symbol.replace(":", "_").replace("/", "_")
+    path = Path(settings.object_store) / "raw" / provider_id / safe_symbol / f"{stamp}_{digest[:12]}.{ext}"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(payload)
     return str(path), digest
@@ -68,6 +71,8 @@ def _previous_values(session: Session, ds: Dataset) -> list[float]:
             .order_by(MarketObservation.observed_at.desc())
             .limit(60)
         ).scalars().all()
+    elif ds.kind == "positioning":
+        return []
     else:
         rows = session.execute(
             select(MacroObservation.value)
@@ -104,6 +109,36 @@ def _publish_market(session: Session, ds: Dataset, points: list[ParsedPoint], ru
         elif abs(cur.value - p.value) > 1e-9 * max(1.0, abs(cur.value)):
             # Market corrections overwrite in place; the prior value stays recoverable from raw storage.
             cur.value, cur.pipeline_run_id, cur.raw_id, cur.ingested_at = p.value, run_id, raw_id, utcnow()
+            revised += 1
+    return inserted, revised
+
+
+def _publish_positioning(session: Session, ds: Dataset, points: list[ParsedPoint], run_id: str, raw_id: str) -> tuple[int, int]:
+    if not points:
+        return 0, 0
+    existing = {
+        o.report_date: o
+        for o in session.execute(
+            select(PositioningObservation).where(
+                PositioningObservation.series_id == ds.dataset_id,
+                PositioningObservation.report_date >= points[0].observed_at,
+            )
+        ).scalars()
+    }
+    inserted = revised = 0
+    for p in points:
+        fields = p.fields or {}
+        cur = existing.get(p.observed_at)
+        if cur is None:
+            session.add(PositioningObservation(
+                series_id=ds.dataset_id, report_date=p.observed_at, provider_id=ds.provider_id,
+                pipeline_run_id=run_id, raw_id=raw_id, **fields,
+            ))
+            inserted += 1
+        elif any(abs(getattr(cur, k) - v) > 1e-9 for k, v in fields.items()):
+            for k, v in fields.items():
+                setattr(cur, k, v)
+            cur.pipeline_run_id, cur.raw_id, cur.ingested_at = run_id, raw_id, utcnow()
             revised += 1
     return inserted, revised
 
@@ -170,7 +205,7 @@ def ingest_dataset(
     result = DatasetResult(ds.dataset_id, status="running", execution_id=run_id)
     try:
         fetched = replay or adapter.fetch(ds.provider_symbol, since=since)  # type: ignore[arg-type]
-        storage_uri, digest = _store_raw(ds.provider_id, ds.provider_symbol, fetched.payload)  # type: ignore[arg-type]
+        storage_uri, digest = _store_raw(ds.provider_id, ds.provider_symbol, fetched.payload, fetched.content_type)  # type: ignore[arg-type]
         points = adapter.parse(ds.provider_symbol, fetched.payload)  # type: ignore[arg-type]
         result.rows_fetched = len(points)
 
@@ -186,8 +221,9 @@ def ingest_dataset(
             clean, findings, metrics = quality.run_checks(
                 points,
                 frequency=ds.frequency,
-                allow_non_positive=ds.kind == "macro" or asset_class in NON_POSITIVE_OK,
-                previous_values=_previous_values(s, ds),
+                allow_non_positive=ds.kind in ("macro", "positioning") or asset_class in NON_POSITIVE_OK,
+                # Level-ratio unit checks are meaningless for series that cross zero (net positions, growth rates).
+                previous_values=None if ds.kind == "positioning" or "percent" in ds.unit else _previous_values(s, ds),
             )
             result.findings = quality.to_json(findings)
             run_row = s.get(PipelineRun, run_id)
@@ -205,7 +241,7 @@ def ingest_dataset(
                 state.last_error = result.error
                 state.consecutive_failures = (state.consecutive_failures or 0) + 1
             else:
-                publish = _publish_market if ds.kind == "market" else _publish_macro
+                publish = {"market": _publish_market, "macro": _publish_macro, "positioning": _publish_positioning}[ds.kind]
                 ins, rev = publish(s, ds, clean, run_id, raw.raw_id)
                 result.rows_inserted, result.rows_revised = ins, rev
                 run_row.rows_inserted, run_row.rows_revised = ins, rev
@@ -271,7 +307,7 @@ def replay_raw(raw_id: str) -> DatasetResult:
     return ingest_dataset(ds, backfill=True, replay=replay)
 
 
-REFRESH_INTERVAL = {"daily_poll": timedelta(hours=6), "none": None}
+REFRESH_INTERVAL = {"daily_poll": timedelta(hours=6), "weekly_poll": timedelta(days=7), "none": None}
 
 
 def due_datasets(now: datetime | None = None) -> list[str]:

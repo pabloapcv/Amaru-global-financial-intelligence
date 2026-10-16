@@ -314,6 +314,91 @@ def download_report(report_id: str, format: Literal["html", "xlsx", "pdf"] = "ht
                         headers={"Content-Disposition": "inline"} if inline else None)
 
 
+# ---------------------------------------------------------------- scheduled reports
+
+
+class ScheduleRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    query: str = Field(..., min_length=3, max_length=2000)
+    cadence: Literal["daily", "weekly", "monthly"] = "weekly"
+    depth: Literal["quick", "standard", "deep"] = "standard"
+    engine: Literal["auto", "llm", "deterministic"] = "auto"
+    formats: list[Literal["html", "pdf", "xlsx"]] = Field(default_factory=lambda: ["html", "xlsx"])
+
+
+@app.post(f"{V1}/schedules", status_code=201)
+def create_schedule(req: ScheduleRequest) -> dict[str, Any]:
+    from atlas import schedules
+
+    return schedules.create_schedule(req.name, req.query, req.cadence,
+                                     {"depth": req.depth, "engine": req.engine, "formats": req.formats})
+
+
+@app.get(f"{V1}/schedules")
+def list_schedules() -> list[dict[str, Any]]:
+    from atlas import schedules
+
+    return schedules.list_schedules()
+
+
+@app.post(f"{V1}/schedules/{{schedule_id}}/run", status_code=202)
+def run_schedule_now(schedule_id: str) -> dict[str, Any]:
+    from atlas import schedules
+
+    try:
+        return {"run_id": schedules.run_schedule(schedule_id)}
+    except KeyError:
+        _404("schedule")
+
+
+@app.delete(f"{V1}/schedules/{{schedule_id}}", status_code=204)
+def delete_schedule(schedule_id: str) -> None:
+    from atlas import schedules
+
+    if not schedules.delete_schedule(schedule_id):
+        _404("schedule")
+
+
+# ---------------------------------------------------------------- countries & positioning
+
+
+@app.get(f"{V1}/countries")
+def list_countries() -> dict[str, Any]:
+    from atlas.instruments import countries, country_indicators
+
+    return {"countries": countries(), "indicators": country_indicators()}
+
+
+@app.get(f"{V1}/countries/compare")
+def compare_countries_endpoint(indicators: str = "GDP_GROWTH,INFLATION,UNEMPLOYMENT", group: str | None = None,
+                               countries: str | None = None) -> dict[str, Any]:
+    import json
+
+    args: dict[str, Any] = {"indicators": [i for i in indicators.split(",") if i]}
+    if group:
+        args["group"] = group
+    if countries:
+        args["countries"] = [c for c in countries.split(",") if c]
+    ctx = T.ToolContext()
+    out, err = T.execute(ctx, "compare_countries", args)
+    if err:
+        raise HTTPException(422, json.loads(out).get("error"))
+    ev = ctx.evidence[-1]
+    return {"result": json.loads(out), "chart": ev.chart, "sources": ev.sources}
+
+
+@app.get(f"{V1}/positioning")
+def positioning(id: str, lookback_years: float = 3) -> dict[str, Any]:
+    import json
+
+    ctx = T.ToolContext()
+    out, err = T.execute(ctx, "get_positioning", {"dataset_id": id, "lookback_years": lookback_years})
+    if err:
+        raise HTTPException(404 if "No CFTC" in out else 409, json.loads(out).get("error"))
+    ev = ctx.evidence[-1]
+    return {"result": json.loads(out), "chart": ev.chart, "citation": ev.citation}
+
+
 # ---------------------------------------------------------------- alerts
 
 
