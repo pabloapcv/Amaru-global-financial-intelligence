@@ -94,3 +94,18 @@ def test_no_source_dataset_is_disclosed(seeded):
     res = pipeline.ingest_dataset(get_dataset("CMD.GOLD"))
     assert res.status == "no_source"
     assert series_meta("CMD.GOLD").freshness == "no_source"
+
+
+def test_failed_datasets_retry_before_normal_cadence(seeded):
+    from datetime import timedelta
+
+    class Down(FakeFred):
+        def fetch(self, symbol, since=None):
+            raise ConnectionError("quota exceeded")
+
+    ds = get_dataset("TRADE.BOL.USA")  # weekly cadence
+    pipeline.ingest_dataset(ds, adapter=Down())
+    soon = utcnow() + timedelta(hours=2)
+    assert "TRADE.BOL.USA" in pipeline.due_datasets(soon)
+    pipeline.ingest_dataset(ds, adapter=seeded)  # recover
+    assert "TRADE.BOL.USA" not in pipeline.due_datasets(soon)

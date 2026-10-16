@@ -332,6 +332,7 @@ def replay_raw(raw_id: str) -> DatasetResult:
     return ingest_dataset(ds, backfill=True, replay=replay)
 
 
+FAILURE_RETRY = timedelta(hours=1)
 REFRESH_INTERVAL = {"daily_poll": timedelta(hours=6), "weekly_poll": timedelta(days=7), "none": None}
 
 
@@ -347,6 +348,9 @@ def due_datasets(now: datetime | None = None) -> list[str]:
         if interval is None:
             continue
         st = states.get(ds.dataset_id)
+        if st is not None and st.consecutive_failures:
+            # Failed refreshes (outages, quota limits) retry sooner than the normal cadence, backing off per failure.
+            interval = min(interval, FAILURE_RETRY * min(st.consecutive_failures, 6))
         if st is None or st.last_checked_at is None or now - st.last_checked_at >= interval:
             due.append(ds.dataset_id)
     return due
