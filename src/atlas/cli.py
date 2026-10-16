@@ -28,10 +28,16 @@ def main(argv: list[str] | None = None) -> None:
     rs.add_argument("--depth", choices=["quick", "standard", "deep"], default="standard")
     rs.add_argument("--engine", choices=["auto", "llm", "deterministic"], default="auto")
     sub.add_parser("llm-check", help="verify Anthropic credentials with a minimal API request")
+    cu = sub.add_parser("create-user", help="create a user account (prompts for the password)")
+    cu.add_argument("email")
+    cu.add_argument("--name", default="")
+    cu.add_argument("--workspace", help="join an existing workspace id (e.g. 'local' to own pre-existing data)")
+    cu.add_argument("--plan", default="explorer", help="plan for a new workspace")
+    cu.add_argument("--password-stdin", action="store_true", help="read the password from stdin (for scripts)")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    if args.cmd in ("init-db", "ingest", "schedule", "research"):
+    if args.cmd in ("init-db", "ingest", "schedule", "research", "create-user"):
         init_db()
         with session_scope() as s:
             sync_registry(s)
@@ -53,6 +59,23 @@ def main(argv: list[str] | None = None) -> None:
         import uvicorn
 
         uvicorn.run("atlas.api.main:app", host=args.host, port=args.port)
+    elif args.cmd == "create-user":
+        import getpass
+        import sys
+
+        from atlas import auth
+
+        if args.password_stdin:
+            password = sys.stdin.readline().rstrip("\n")
+        else:
+            password = getpass.getpass("Password (min 10 characters): ")
+            if getpass.getpass("Repeat password: ") != password:
+                raise SystemExit("passwords do not match")
+        try:
+            uid, ws = auth.create_user(args.email, password, args.name, workspace_id=args.workspace, plan=args.plan)
+        except auth.ValidationError as exc:
+            raise SystemExit(str(exc))
+        print(f"created user {args.email} in workspace {ws}")
     elif args.cmd == "llm-check":
         import os
 

@@ -16,6 +16,7 @@ def isolated_env(tmp_path_factory):
     os.environ["ATLAS_DATABASE_URL"] = f"sqlite:///{root / 'test.db'}"
     os.environ["ATLAS_OBJECT_STORE"] = str(root / "objects")
     os.environ["ATLAS_LLM"] = "off"
+    os.environ["ATLAS_AUTH"] = "off"  # auth tests opt in explicitly
     import importlib
 
     import atlas.config as config

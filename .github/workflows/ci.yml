@@ -12,8 +12,8 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -31,8 +31,8 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -42,3 +42,17 @@ jobs:
         run: npx tsc --noEmit
       - name: Build
         run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build API image
+        run: docker build -f infrastructure/docker/api.Dockerfile -t atlas-api:ci .
+      - name: Build web image
+        run: docker build -f infrastructure/docker/web.Dockerfile -t atlas-web:ci .
+      - name: Smoke-test API image
+        run: |
+          docker run -d --name api -p 8010:8010 -e ATLAS_DATABASE_URL=sqlite:////data/atlas.db atlas-api:ci
+          for i in $(seq 1 30); do curl -sf localhost:8010/health && exit 0; sleep 1; done
+          docker logs api; exit 1

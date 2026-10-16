@@ -7,7 +7,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from atlas.data.db import ResearchEvidence, ResearchRun, session_scope, utcnow
+from atlas.data.db import LOCAL_WORKSPACE, ResearchEvidence, ResearchRun, session_scope, utcnow
 from atlas.research import llm, tools as T, verify, writer
 from atlas.research.planner import build_plan, validate_plan
 
@@ -36,16 +36,19 @@ def _set(run_id: str, **fields: Any) -> None:
             setattr(run, k, v)
 
 
-def create_run(query: str, config: dict[str, Any] | None = None, user_id: str = "local") -> str:
+def create_run(query: str, config: dict[str, Any] | None = None, user_id: str = "local",
+               workspace_id: str = LOCAL_WORKSPACE) -> str:
     with session_scope() as s:
-        run = ResearchRun(query=query, config=config or {}, user_id=user_id, status="queued", progress=[])
+        run = ResearchRun(query=query, config=config or {}, user_id=user_id, workspace_id=workspace_id,
+                          status="queued", progress=[])
         s.add(run)
         s.flush()
         return run.run_id
 
 
-def submit(query: str, config: dict[str, Any] | None = None, user_id: str = "local") -> str:
-    run_id = create_run(query, config, user_id)
+def submit(query: str, config: dict[str, Any] | None = None, user_id: str = "local",
+           workspace_id: str = LOCAL_WORKSPACE) -> str:
+    run_id = create_run(query, config, user_id, workspace_id)
     _executor.submit(execute_run, run_id)
     return run_id
 
@@ -165,13 +168,14 @@ def execute_run(run_id: str) -> dict[str, Any]:
         return {"error": str(exc)}
 
 
-def get_run(run_id: str) -> dict[str, Any] | None:
+def get_run(run_id: str, workspace_id: str | None = None) -> dict[str, Any] | None:
+    """Fetch a run. With `workspace_id`, runs from other workspaces are invisible (treated as missing)."""
     with session_scope() as s:
         run = s.get(ResearchRun, run_id)
-        if run is None:
+        if run is None or (workspace_id is not None and run.workspace_id != workspace_id):
             return None
         return {
-            "run_id": run.run_id, "query": run.query, "config": run.config, "status": run.status,
+            "run_id": run.run_id, "workspace_id": run.workspace_id, "query": run.query, "config": run.config, "status": run.status,
             "engine": run.engine, "model_version": run.model_version, "plan": run.plan, "result": run.result,
             "progress": run.progress, "error": run.error,
             "created_at": run.created_at.isoformat(timespec="seconds") + "Z",
@@ -179,11 +183,14 @@ def get_run(run_id: str) -> dict[str, Any] | None:
         }
 
 
-def list_runs(limit: int = 50) -> list[dict[str, Any]]:
+def list_runs(limit: int = 50, workspace_id: str | None = None) -> list[dict[str, Any]]:
     from sqlalchemy import select
 
     with session_scope() as s:
-        runs = s.execute(select(ResearchRun).order_by(ResearchRun.created_at.desc()).limit(limit)).scalars().all()
+        q = select(ResearchRun)
+        if workspace_id is not None:
+            q = q.where(ResearchRun.workspace_id == workspace_id)
+        runs = s.execute(q.order_by(ResearchRun.created_at.desc()).limit(limit)).scalars().all()
         return [
             {"run_id": r.run_id, "query": r.query, "status": r.status, "engine": r.engine,
              "title": (r.result or {}).get("title"), "report_id": (r.result or {}).get("report_id"),

@@ -21,6 +21,20 @@ Run a question from the terminal:
 
 To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login`). Without credentials, ATLAS uses its deterministic planner and writer. The deterministic writer restates the evidence but doesn't interpret it.
 
+## Accounts
+
+The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, reports, alerts and schedules belong to a workspace and are invisible to other workspaces; market and macro data are shared.
+
+- **Web:** create an account on the sign-in page (`ATLAS_ALLOW_SIGNUP=true`), or create one from the CLI.
+- **Existing local data** lives in the `local` workspace. To own it: `atlas create-user you@example.com --workspace local`.
+- **API keys:** create on the Account page; send `Authorization: Bearer atk_…`. Keys are shown once and stored hashed.
+- **Plans and quotas:** explorer / investor / research_pro / pro limits on daily research runs (and Claude runs), schedules, alerts and keys; over-limit requests get HTTP 429.
+- **Single-user mode:** `ATLAS_AUTH=off` skips sign-in and uses the `local` workspace.
+
+## Deployment
+
+`infrastructure/docker/docker-compose.yml` runs TimescaleDB, the API, the ingestion/report scheduler and the web app; the file header lists the bootstrap commands. CI builds both images and smoke-tests the API image on every push.
+
 ## What's in the MVP
 
 | Spec area | Implementation |
@@ -57,8 +71,8 @@ To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login
   - Plain CSS instead of Tailwind.
   - All interfaces are modular so these can be swapped.
 - **Not built yet:**
-  - authentication and multi-tenant isolation;
-  - billing;
+  - billing and plan upgrades (plans are set by an operator);
+  - password reset and email verification;
   - higher-frequency non-US data (IMF/BIS connectors);
   - USDA/EIA connectors (need free API keys);
   - licensed market data;

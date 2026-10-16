@@ -1,15 +1,55 @@
-# Optional production-like services. The MVP runs without them (SQLite + in-process jobs).
+# Production-like stack: TimescaleDB, API, ingestion/report scheduler, web.
+#   cp .env.example .env   # set ANTHROPIC_API_KEY, POSTGRES_PASSWORD
+#   docker compose -f infrastructure/docker/docker-compose.yml --env-file .env up -d --build
+#   docker compose -f infrastructure/docker/docker-compose.yml exec api atlas ingest   # first backfill
+#   docker compose -f infrastructure/docker/docker-compose.yml exec api atlas create-user you@example.com --workspace local --plan pro
+x-atlas-env: &atlas-env
+  ATLAS_DATABASE_URL: postgresql+psycopg://atlas:${POSTGRES_PASSWORD:-atlas}@db:5432/atlas
+  ATLAS_OBJECT_STORE: /data/objects
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  ATLAS_AUTH: ${ATLAS_AUTH:-required}
+  ATLAS_ALLOW_SIGNUP: ${ATLAS_ALLOW_SIGNUP:-true}
+  ATLAS_COOKIE_SECURE: ${ATLAS_COOKIE_SECURE:-false}
+  ATLAS_CORS_ORIGINS: ${ATLAS_CORS_ORIGINS:-http://localhost:3010}
+
 services:
   db:
     image: timescale/timescaledb:2.17.2-pg16
     environment:
       POSTGRES_USER: atlas
-      POSTGRES_PASSWORD: atlas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas}
       POSTGRES_DB: atlas
-    ports: ["5432:5432"]
     volumes: [atlas-db:/var/lib/postgresql/data]
-  redis:
-    image: redis:7.4-alpine
-    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlas"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: { context: ../.., dockerfile: infrastructure/docker/api.Dockerfile }
+    environment: *atlas-env
+    volumes: [atlas-objects:/data]
+    ports: ["8010:8010"]
+    depends_on: { db: { condition: service_healthy } }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/health')"]
+      interval: 15s
+
+  scheduler:
+    build: { context: ../.., dockerfile: infrastructure/docker/api.Dockerfile }
+    command: ["atlas", "schedule"]
+    environment: *atlas-env
+    volumes: [atlas-objects:/data]
+    depends_on: { api: { condition: service_healthy } }
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args: { NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8010}" }
+    ports: ["3010:3010"]
+    depends_on: [api]
+
 volumes:
   atlas-db:
+  atlas-objects:

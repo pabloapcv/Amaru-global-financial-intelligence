@@ -38,6 +38,10 @@ def new_id() -> str:
     return uuid.uuid4().hex
 
 
+# Workspace that owns data created before accounts existed and by local CLI runs.
+LOCAL_WORKSPACE = "local"
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -248,6 +252,7 @@ class ResearchRun(Base):
 
     run_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(64), default="local")
+    workspace_id: Mapped[str] = mapped_column(String(32), default=LOCAL_WORKSPACE, index=True)
     query: Mapped[str] = mapped_column(Text)
     config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(16), default="queued")
@@ -293,6 +298,7 @@ class ReportSchedule(Base):
 
     schedule_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(64), default="local")
+    workspace_id: Mapped[str] = mapped_column(String(32), default=LOCAL_WORKSPACE, index=True)
     name: Mapped[str] = mapped_column(String(200))
     query: Mapped[str] = mapped_column(Text)
     config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -309,6 +315,7 @@ class Alert(Base):
 
     alert_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(64), default="local")
+    workspace_id: Mapped[str] = mapped_column(String(32), default=LOCAL_WORKSPACE, index=True)
     name: Mapped[str] = mapped_column(String(200))
     rule: Mapped[dict[str, Any]] = mapped_column(JSON)
     schedule: Mapped[str] = mapped_column(String(32), default="on_ingest")
@@ -326,6 +333,74 @@ class AlertEvent(Base):
     triggered_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     message: Mapped[str] = mapped_column(Text)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+# ---------------------------------------------------------------- accounts
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    user_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), default="")
+    password_hash: Mapped[str] = mapped_column(String(256))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    workspace_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(200))
+    plan: Mapped[str] = mapped_column(String(32), default="explorer")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Membership(Base):
+    __tablename__ = "memberships"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.workspace_id"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(16), default="member")  # owner | admin | member
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.workspace_id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    key_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    prefix: Mapped[str] = mapped_column(String(16), index=True)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(200))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"))
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.workspace_id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class AuditEvent(Base):
+    """Security-relevant actions (spec §15: audit logs)."""
+
+    __tablename__ = "audit_events"
+
+    event_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    user_id: Mapped[str | None] = mapped_column(String(32))
+    workspace_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    action: Mapped[str] = mapped_column(String(64))
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
 # ---------------------------------------------------------------- engine/session
@@ -359,9 +434,33 @@ def get_engine(url: str | None = None):
     return _engine
 
 
+# Columns added after the first release: (table, column, DDL type, default). create_all() does not alter
+# existing tables, so these are added in place on startup.
+_ADDED_COLUMNS = [
+    ("research_runs", "workspace_id", "VARCHAR(32)", LOCAL_WORKSPACE),
+    ("report_schedules", "workspace_id", "VARCHAR(32)", LOCAL_WORKSPACE),
+    ("alerts", "workspace_id", "VARCHAR(32)", LOCAL_WORKSPACE),
+]
+
+
+def _migrate(engine) -> None:
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    tables = set(insp.get_table_names())
+    with engine.begin() as conn:
+        for table, column, ddl, default in _ADDED_COLUMNS:
+            if table in tables and column not in {c["name"] for c in insp.get_columns(table)}:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl} DEFAULT '{default}'"))
+
+
 def init_db(url: str | None = None) -> None:
     engine = get_engine(url)
+    _migrate(engine)
     Base.metadata.create_all(engine)
+    with session_scope() as s:
+        if s.get(Workspace, LOCAL_WORKSPACE) is None:
+            s.add(Workspace(workspace_id=LOCAL_WORKSPACE, name="Local workspace", plan="pro"))
 
 
 @contextmanager

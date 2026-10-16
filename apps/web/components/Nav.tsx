@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { api, type Account } from "@/lib/api";
 
 const ITEMS = [
   { href: "/", label: "Overview", hint: "Global market dashboard" },
@@ -16,6 +18,11 @@ const ITEMS = [
 
 export default function Nav() {
   const path = usePathname();
+  const [account, setAccount] = useState<Account | null>(null);
+  useEffect(() => {
+    if (path !== "/login") api<Account>("/api/v1/account").then(setAccount).catch(() => {});
+  }, [path]);
+  if (path === "/login") return null;
   return (
     <nav className="nav">
       <div className="brand">
@@ -34,6 +41,12 @@ export default function Nav() {
           );
         })}
       </ul>
+      {account && (
+        <Link href="/account" className={`nav-account ${path.startsWith("/account") ? "active" : ""}`}>
+          <span>{account.user.name || account.user.email}</span>
+          <small>{account.workspace?.name} · {account.workspace?.plan.replace("_", " ")}</small>
+        </Link>
+      )}
       <p className="nav-foot">Research and decision support only. Not investment advice.</p>
     </nav>
   );
