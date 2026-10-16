@@ -46,3 +46,35 @@ def test_holdings_validation():
         validate_holdings([{"dataset_id": "CMD.GOLD", "weight": 0.5}])
     with pytest.raises(PortfolioError, match="twice"):
         validate_holdings([{"dataset_id": "CMD.CRUDE.WTI", "weight": 0.5}, {"dataset_id": "CMD.CRUDE.WTI", "weight": 0.2}])
+
+
+def test_policy_events_from_fed_funds_steps():
+    idx = pd.bdate_range("2021-01-01", "2023-12-29")
+    ff = pd.Series(0.08, index=idx)
+    ff[ff.index >= "2022-03-17"] = 0.33   # +25bp, visible the day after the 2022-03-16 decision
+    ff[ff.index >= "2022-06-16"] = 1.58   # +125bp... merged only if within 5 days of the prior event
+    ev = analytics.policy_events(ff)
+    assert [e["date"] for e in ev] == ["2022-03-16", "2022-06-15"]
+    assert ev[0]["type"] == "hike" and ev[0]["change_bp"] == 25
+
+
+def test_event_study_detects_injected_reaction():
+    rng = np.random.default_rng(11)
+    idx = pd.bdate_range("2015-01-01", periods=2000)
+    r = rng.normal(0, 0.002, len(idx))
+    events = [idx[i] for i in range(300, 1900, 150)]
+    for t in events:
+        r[idx.get_loc(t)] += 0.02  # +2% on each event day
+    s = pd.Series(100 * np.exp(np.cumsum(r)), index=idx)
+    res = analytics.event_study(s, [t.date().isoformat() for t in events], unit="usd")
+    assert res["n_events"] == len(events)
+    assert res["reaction"]["mean"] == pytest.approx(2.0, abs=0.3)
+    assert res["reaction"]["p_value"] < 0.001
+
+
+def test_event_time_chart_axis_labels():
+    from atlas.reporting import svg_chart
+
+    pts = [{"date": (pd.Timestamp("2000-01-03") + pd.offsets.BDay(d)).date().isoformat(), "value": float(d)} for d in range(-5, 11)]
+    svg = svg_chart({"type": "line", "title": "t", "series": [{"name": "mean CAR", "points": pts}], "x_is_event_time": True})
+    assert "day -5" in svg and "day 10" in svg and ">2000<" not in svg

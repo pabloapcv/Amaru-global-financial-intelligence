@@ -402,6 +402,16 @@ class ApiKey(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
 class AuditEvent(Base):
     """Security-relevant actions (spec §15: audit logs)."""
 

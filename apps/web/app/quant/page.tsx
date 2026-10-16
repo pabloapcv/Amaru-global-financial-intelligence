@@ -5,7 +5,7 @@ import Chart from "@/components/Chart";
 import { api, type ChartSpec, type Instrument } from "@/lib/api";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
-type Analysis = "correlation" | "regression" | "forecast" | "scenario" | "anomalies" | "seasonality" | "regime";
+type Analysis = "correlation" | "regression" | "forecast" | "scenario" | "anomalies" | "seasonality" | "regime" | "event_study";
 
 const HELP: Record<Analysis, string> = {
   correlation: "Correlation of period changes, aligned to the coarsest frequency, with confidence intervals and rolling stability.",
@@ -15,6 +15,7 @@ const HELP: Record<Analysis, string> = {
   anomalies: "Robust z-score of the latest change against a trailing median/MAD.",
   seasonality: "Average change by calendar month with hit rates.",
   regime: "Volatility regime: realized-vol percentile plus a 2-state Markov-switching model's probability of the high-volatility state.",
+  event_study: "Average cumulative abnormal move around Fed decisions (inferred from the effective fed funds rate since 2009). Daily series only.",
 };
 
 export default function QuantLab() {
@@ -24,6 +25,7 @@ export default function QuantLab() {
   const [lookback, setLookback] = useState(5);
   const [horizon, setHorizon] = useState(3);
   const [shock, setShock] = useState(-50);
+  const [eventType, setEventType] = useState("fed_cut");
   const [result, setResult] = useState<{ result: any; citation: string; chart: ChartSpec | null } | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -40,7 +42,7 @@ export default function QuantLab() {
     setError(null);
     setResult(null);
     try {
-      const body: Record<string, unknown> = { analysis, lookback_years: lookback, horizon_months: horizon };
+      const body: Record<string, unknown> = { analysis, lookback_years: lookback, horizon_months: horizon, event_type: eventType };
       if (analysis === "regression") Object.assign(body, { dependent: ids[0], explanatory: ids.slice(1) });
       else if (analysis === "scenario") Object.assign(body, { asset: ids[0], driver: ids[1], shock });
       else body.dataset_ids = multi ? ids : [ids[0]];
@@ -81,6 +83,13 @@ export default function QuantLab() {
             <div><label>Lookback (years)</label><input type="number" min={1} max={40} value={lookback} onChange={(e) => setLookback(+e.target.value)} /></div>
             {analysis === "forecast" && <div><label>Horizon (months)</label><input type="number" min={1} max={24} value={horizon} onChange={(e) => setHorizon(+e.target.value)} /></div>}
             {analysis === "scenario" && <div><label>Shock (% or bp)</label><input type="number" value={shock} onChange={(e) => setShock(+e.target.value)} /></div>}
+            {analysis === "event_study" && (
+              <div><label>Events</label>
+                <select value={eventType} onChange={(e) => setEventType(e.target.value)}>
+                  <option value="fed_cut">Fed cuts</option><option value="fed_hike">Fed hikes</option><option value="fed_change">All Fed changes</option>
+                </select>
+              </div>
+            )}
           </div>
           <button style={{ marginTop: 14 }} onClick={run} disabled={busy}>{busy ? "Running…" : "Run"}</button>
         </Card>

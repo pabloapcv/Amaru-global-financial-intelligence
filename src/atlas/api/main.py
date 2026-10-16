@@ -117,15 +117,15 @@ def _unavailable(exc: Exception):
 
 
 class SignupRequest(BaseModel):
-    email: str
-    password: str
-    name: str = ""
-    workspace_name: str | None = None
+    email: str = Field(..., max_length=320)
+    password: str = Field(..., max_length=500)
+    name: str = Field("", max_length=200)
+    workspace_name: str | None = Field(None, max_length=200)
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(..., max_length=320)
+    password: str = Field(..., max_length=500)
 
 
 def _set_session(response: Response, token: str) -> None:
@@ -157,6 +157,35 @@ def login(req: LoginRequest, request: Request, response: Response) -> dict[str, 
     return {"token": token, **auth.account(p)}
 
 
+class ResetRequest(BaseModel):
+    email: str = Field(..., max_length=320)
+
+
+class ResetConfirm(BaseModel):
+    token: str = Field(..., max_length=200)
+    password: str = Field(..., max_length=500)
+
+
+@app.post(f"{V1}/auth/password-reset/request", status_code=202)
+def password_reset_request(req: ResetRequest, request: Request) -> dict[str, Any]:
+    try:
+        auth.request_password_reset(req.email, request.client.host if request.client else "")
+    except auth.AuthError as exc:  # throttled
+        raise HTTPException(429, str(exc)) from exc
+    # Same response whether or not the account exists.
+    return {"status": "accepted", "message": "If an account exists for that email, a reset link has been sent."}
+
+
+@app.post(f"{V1}/auth/password-reset/confirm", status_code=204)
+def password_reset_confirm(req: ResetConfirm) -> None:
+    try:
+        auth.reset_password(req.token, req.password)
+    except auth.AuthError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except auth.ValidationError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @app.post(f"{V1}/auth/logout", status_code=204)
 def logout(request: Request, response: Response) -> None:
     token = request.cookies.get(SESSION_COOKIE)
@@ -177,6 +206,24 @@ def health() -> dict[str, Any]:
 @api.get("/account")
 def get_account(p: Principal = Depends(principal)) -> dict[str, Any]:
     return auth.account(p)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(..., max_length=500)
+    new_password: str = Field(..., max_length=500)
+
+
+@api.post("/account/password", status_code=204)
+def change_password(req: PasswordChange, response: Response, p: Principal = Depends(principal)) -> None:
+    if p.via != "session":
+        raise HTTPException(403, "sign in to change your password")
+    try:
+        auth.change_password(p, req.current_password, req.new_password)
+    except auth.AuthError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except auth.ValidationError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    response.delete_cookie(SESSION_COOKIE, path="/")
 
 
 class ApiKeyRequest(BaseModel):
@@ -376,7 +423,7 @@ def cancel_research(run_id: str, p: Principal = Depends(principal)) -> dict[str,
 
 
 class QuantRequest(BaseModel):
-    analysis: Literal["correlation", "regression", "anomalies", "forecast", "scenario", "seasonality", "performance", "regime"]
+    analysis: Literal["correlation", "regression", "anomalies", "forecast", "scenario", "seasonality", "performance", "regime", "event_study"]
     dataset_ids: list[str] = Field(default_factory=list)
     dependent: str | None = None
     explanatory: list[str] = Field(default_factory=list)
@@ -386,6 +433,8 @@ class QuantRequest(BaseModel):
     lookback_years: float = 5
     horizon_months: int = 3
     threshold: float = 3.5
+    event_type: Literal["fed_hike", "fed_cut", "fed_change", "custom"] = "fed_change"
+    dates: list[str] = Field(default_factory=list)
 
 
 @api.post(f"/quant/analyze")
@@ -401,6 +450,8 @@ def quant_analyze(req: QuantRequest) -> dict[str, Any]:
         "seasonality": ("get_seasonality", {"dataset_id": (req.dataset_ids or [None])[0]}),
         "performance": ("compare_performance", {"dataset_ids": req.dataset_ids}),
         "regime": ("detect_regime", {"dataset_id": (req.dataset_ids or [None])[0]}),
+        "event_study": ("run_event_study", {"dataset_id": (req.dataset_ids or [None])[0], "event_type": req.event_type,
+                                            **({"dates": req.dates} if req.dates else {})}),
     }
     tool, args = calls[a]
     import json

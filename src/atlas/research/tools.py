@@ -641,6 +641,45 @@ def t_analyze_portfolio(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any
     return {"evidence_id": label, **result}
 
 
+def t_run_event_study(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    dsid = args["dataset_id"]
+    ds = _ds(dsid)
+    if ds.frequency != "daily":
+        raise ToolError(f"{dsid} is {ds.frequency}; event studies need daily data")
+    etype = args.get("event_type", "fed_change")
+    series, metas = _load([dsid])
+    if etype == "custom":
+        dates = [str(d) for d in args.get("dates") or []]
+        if len(dates) < 3:
+            raise ToolError("custom event studies need at least 3 dates (YYYY-MM-DD)")
+        events = [{"date": d, "type": "custom"} for d in dates]
+        label_events = "user-supplied dates"
+    else:
+        ff, ffm = _load(["RATE.US.FEDFUNDS"])
+        metas += ffm
+        events = analytics.policy_events(ff["RATE.US.FEDFUNDS"])
+        if etype in ("fed_hike", "fed_cut"):
+            events = [e for e in events if e["type"] == etype.removeprefix("fed_")]
+        label_events = f"Fed policy-rate {etype.removeprefix('fed_').replace('change', 'changes')} inferred from the effective fed funds rate"
+    try:
+        res = analytics.event_study(series[dsid], [e["date"] for e in events], unit=ds.unit,
+                                    pre=int(args.get("pre", 5)), post=int(args.get("post", 10)))
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
+    by_date = {e["date"]: e for e in events}
+    for e in res["events"]:
+        e.update({k: v for k, v in by_date.get(e["date"], {}).items() if k not in ("date",)})
+    result = {"dataset_id": dsid, "name": ds.name, "event_type": etype, "event_source": label_events, **res}
+    chart = {"type": "line", "title": f"{ds.name}: average cumulative abnormal move around {etype.replace('_', ' ')}s",
+             "unit": res["unit"], "series": [{"name": "mean CAR", "points": [
+                 {"date": (pd.Timestamp("2000-01-03") + pd.offsets.BDay(p["day"])).date().isoformat(), "value": p["mean_car"]}
+                 for p in res["car_path"]]}],
+             "x_is_event_time": True}
+    label = ctx.add("run_event_study", args, result, "ATLAS quant engine (event study) on: " + _cite(metas),
+                    [_source(m) for m in metas], chart)
+    return {"evidence_id": label, **result}
+
+
 def _unavailable(kind: str, needed: str) -> Callable[[ToolContext, dict[str, Any]], dict[str, Any]]:
     def tool(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         result = {
@@ -776,6 +815,16 @@ TOOLS: dict[str, dict[str, Any]] = {
             "portfolio_name": {"type": "string"},
             "lookback_years": {"type": "number"},
         }, "required": []},
+    },
+    "run_event_study": {
+        "fn": t_run_event_study,
+        "description": "Event study on a daily dataset: average cumulative abnormal move from day -pre to +post around events. event_type: fed_hike, fed_cut, fed_change (Fed decisions inferred from the effective fed funds rate since 2009) or custom with dates. Reports CAR path, reaction mean/median, hit rate, t-stat.",
+        "schema": {"type": "object", "properties": {
+            "dataset_id": _ID,
+            "event_type": {"type": "string", "enum": ["fed_hike", "fed_cut", "fed_change", "custom"]},
+            "dates": {"type": "array", "items": {"type": "string"}},
+            "pre": {"type": "integer"}, "post": {"type": "integer"},
+        }, "required": ["dataset_id"]},
     },
     "get_fundamentals": {
         "fn": _unavailable("fundamentals", "USDA PSD / UNICA / ISO / ICSG supply-demand connectors"),

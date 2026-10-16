@@ -20,6 +20,8 @@ export default function AccountPage() {
   const [keyName, setKeyName] = useState("Notebook");
   const [newKey, setNewKey] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [pw, setPw] = useState({ current: "", next: "" });
+  const [pwError, setPwError] = useState<unknown>(null);
 
   const load = useCallback(() => {
     api<Account>("/api/v1/account").then(setAccount).catch(setError);
@@ -34,6 +36,13 @@ export default function AccountPage() {
       setNewKey(k.key);
       load();
     } catch (e) { setError(e); }
+  };
+  const changePassword = async () => {
+    setPwError(null);
+    try {
+      await api("/api/v1/account/password", { method: "POST", body: JSON.stringify({ current_password: pw.current, new_password: pw.next }) });
+      window.location.href = "/login";
+    } catch (e) { setPwError(e); }
   };
   const logout = async () => {
     await api("/api/v1/auth/logout", { method: "POST" }).catch(() => {});
@@ -80,6 +89,20 @@ export default function AccountPage() {
         </div>
       )}
       <div style={{ height: 14 }} />
+      {account?.auth === "session" && (
+        <>
+          <Card title="Password">
+            <div className="row" style={{ alignItems: "flex-end" }}>
+              <div><label htmlFor="cur">Current</label><input id="cur" type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></div>
+              <div><label htmlFor="new">New (10+ characters)</label><input id="new" type="password" autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></div>
+              <button onClick={changePassword}>Change password</button>
+            </div>
+            <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>Changing your password signs you out on every device.</p>
+            <ErrorNote error={pwError} />
+          </Card>
+          <div style={{ height: 14 }} />
+        </>
+      )}
       <Card title="API keys">
         <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
           Use a key from scripts and notebooks: <code>Authorization: Bearer atk_…</code>. Keys act on this workspace and are shown only once.

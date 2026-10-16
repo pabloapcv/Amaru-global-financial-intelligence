@@ -130,3 +130,29 @@ def test_portfolios_are_workspace_scoped_and_analyzable(secured):
     _signup(secured, "ivy@example.test", "Ivy")
     assert secured.get(f"/api/v1/portfolios/{pid}/risk").status_code == 404
     assert pid not in {p["portfolio_id"] for p in secured.get("/api/v1/portfolios").json()}
+
+
+def test_password_reset_flow_and_no_enumeration(secured):
+    _signup(secured, "jules@example.test", "Jules")
+    unknown = secured.post("/api/v1/auth/password-reset/request", json={"email": "nobody@example.test"})
+    known = secured.post("/api/v1/auth/password-reset/request", json={"email": "jules@example.test"})
+    assert unknown.status_code == known.status_code == 202 and unknown.json() == known.json()
+
+    token = auth.request_password_reset("jules@example.test", client="test")
+    assert secured.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "short"}).status_code == 422
+    assert secured.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "a brand new passphrase"}).status_code == 204
+    # single use; old sessions are revoked
+    assert secured.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "another new passphrase"}).status_code == 400
+    assert secured.get("/api/v1/account").status_code == 401
+    assert secured.post("/api/v1/auth/login", json={"email": "jules@example.test", "password": "correct horse battery"}).status_code == 401
+    assert secured.post("/api/v1/auth/login", json={"email": "jules@example.test", "password": "a brand new passphrase"}).status_code == 200
+
+
+def test_change_password_requires_current(secured):
+    _signup(secured, "kim@example.test", "Kim")
+    bad = secured.post("/api/v1/account/password", json={"current_password": "wrong wrong wrong", "new_password": "next passphrase ok"})
+    assert bad.status_code == 400
+    ok = secured.post("/api/v1/account/password", json={"current_password": "correct horse battery", "new_password": "next passphrase ok"})
+    assert ok.status_code == 204
+    assert secured.get("/api/v1/account").status_code == 401  # signed out everywhere
+    assert secured.post("/api/v1/auth/login", json={"email": "kim@example.test", "password": "next passphrase ok"}).status_code == 200

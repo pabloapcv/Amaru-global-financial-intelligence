@@ -14,7 +14,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     cache: "no-store",
   });
   const body = res.status === 204 ? null : await res.json().catch(() => null);
-  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/v1/auth/") && window.location.pathname !== "/login") {
+  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/v1/auth/") && !["/login", "/reset"].includes(window.location.pathname)) {
     window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
   }
   if (!res.ok) throw new ApiError(res.status, body?.detail ?? body ?? res.statusText);
@@ -72,6 +72,8 @@ export interface ChartSpec {
   evidence?: string;
   series: { name: string; points: Point[] }[];
   band?: { date: string; low: number | null; high: number | null }[];
+  /** Points are event-relative business days anchored at 2000-01-03 = day 0 (event studies). */
+  x_is_event_time?: boolean;
 }
 
 export interface History {
