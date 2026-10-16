@@ -75,6 +75,39 @@ def _quota(workspace_id: str, resource: str) -> None:
 api = APIRouter(dependencies=[Depends(principal)])
 
 
+@app.middleware("http")
+async def _metrics_middleware(request: Request, call_next):
+    import time as _time
+
+    from atlas import observability
+
+    start = _time.perf_counter()
+    response = await call_next(request)
+    route = request.scope.get("route")
+    template = getattr(route, "path", None) or "unmatched"  # route template keeps label cardinality bounded
+    if template != "unmatched" and request.url.path.startswith(V1) and not template.startswith(V1):
+        template = V1 + template  # routes on the included router report their template without the prefix
+    observability.record(request.method, template, response.status_code, _time.perf_counter() - start)
+    return response
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics(request: Request):
+    """Prometheus scrape endpoint. Set ATLAS_METRICS_TOKEN to require `Authorization: Bearer <token>`."""
+    import hmac
+
+    from fastapi.responses import PlainTextResponse
+
+    from atlas import observability
+
+    expected = os.getenv("ATLAS_METRICS_TOKEN")
+    if expected:
+        given = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+        if not hmac.compare_digest(given, expected):
+            raise HTTPException(401, "metrics token required")
+    return PlainTextResponse(observability.render(), media_type="text/plain; version=0.0.4")
+
+
 def _404(what: str):
     raise HTTPException(status_code=404, detail=f"{what} not found")
 
@@ -478,6 +511,63 @@ def delete_schedule(schedule_id: str, p: Principal = Depends(principal)) -> None
 
     if not schedules.delete_schedule(schedule_id, p.workspace_id):
         _404("schedule")
+
+
+# ---------------------------------------------------------------- portfolios
+
+
+class PortfolioRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    holdings: list[dict[str, Any]]
+
+
+@api.get("/portfolios")
+def list_portfolios(p: Principal = Depends(principal)) -> list[dict[str, Any]]:
+    from atlas import portfolios
+
+    return portfolios.list_portfolios(p.workspace_id)
+
+
+@api.post("/portfolios", status_code=201)
+def create_portfolio(req: PortfolioRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import portfolios
+
+    try:
+        return portfolios.save(req.name, req.holdings, p.workspace_id, p.user_id)
+    except portfolios.PortfolioError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@api.put("/portfolios/{portfolio_id}")
+def update_portfolio(portfolio_id: str, req: PortfolioRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import portfolios
+
+    try:
+        return portfolios.save(req.name, req.holdings, p.workspace_id, p.user_id, portfolio_id)
+    except KeyError:
+        _404("portfolio")
+    except portfolios.PortfolioError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@api.delete("/portfolios/{portfolio_id}", status_code=204)
+def delete_portfolio(portfolio_id: str, p: Principal = Depends(principal)) -> None:
+    from atlas import portfolios
+
+    if not portfolios.delete(portfolio_id, p.workspace_id):
+        _404("portfolio")
+
+
+@api.get("/portfolios/{portfolio_id}/risk")
+def portfolio_risk(portfolio_id: str, lookback_years: float = 5, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import portfolios
+
+    port = portfolios.get(portfolio_id, p.workspace_id) or _404("portfolio")
+    try:
+        res, metas = portfolios.analyze(port["holdings"], lookback_years)
+    except (portfolios.PortfolioError, ValueError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"portfolio": port, "risk": res, "sources": [m.citation for m in metas]}
 
 
 # ---------------------------------------------------------------- countries & positioning

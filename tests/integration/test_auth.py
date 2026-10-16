@@ -116,3 +116,17 @@ def test_login_throttling(secured):
         secured.post("/api/v1/auth/login", json={"email": "victim@example.test", "password": "guess guess guess"})
     r = secured.post("/api/v1/auth/login", json={"email": "victim@example.test", "password": "guess guess guess"})
     assert r.status_code == 401 and "too many attempts" in r.json()["detail"]
+
+
+def test_portfolios_are_workspace_scoped_and_analyzable(secured):
+    _signup(secured, "hank@example.test", "Hank")
+    body = {"name": "Commodity tilt", "holdings": [{"dataset_id": "CMD.CRUDE.WTI", "weight": 0.5}, {"dataset_id": "CMD.COPPER.LME", "weight": 0.3}, {"dataset_id": "FX.USDBRL", "weight": -0.2}]}
+    pid = secured.post("/api/v1/portfolios", json=body).json()["portfolio_id"]
+    risk = secured.get(f"/api/v1/portfolios/{pid}/risk").json()["risk"]
+    assert risk["annualized_vol_pct"] > 0 and len(risk["holdings"]) == 3
+    bad = secured.post("/api/v1/portfolios", json={"name": "x", "holdings": [{"dataset_id": "RATE.UST.10Y", "weight": 1}]})
+    assert bad.status_code == 422
+    secured.cookies.clear()
+    _signup(secured, "ivy@example.test", "Ivy")
+    assert secured.get(f"/api/v1/portfolios/{pid}/risk").status_code == 404
+    assert pid not in {p["portfolio_id"] for p in secured.get("/api/v1/portfolios").json()}

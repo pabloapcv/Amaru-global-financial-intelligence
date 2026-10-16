@@ -20,6 +20,9 @@ SKIP_CONTEXT = re.compile(
 )
 
 
+CONFIDENCE_LEVELS = {90.0, 95.0, 97.5, 99.0, 99.5, 99.9}
+
+
 def _collect_numbers(obj: Any, out: list[float]) -> None:
     if isinstance(obj, bool):
         return
@@ -95,6 +98,8 @@ def verify(narrative: str, evidence: list[dict[str, Any]], question: str = "") -
             continue  # small integers are almost always counts or ordinals
         if abs(value) in question_nums:
             continue
+        if value in CONFIDENCE_LEVELS and tail.lstrip().startswith("%") and re.search(r"\bat\s*$", text[max(0, m.start() - 6): m.start()]):
+            continue  # "VaR at 95%": a confidence level, not a data claim
         checked += 1
         if not _matches(value, decimals, pool):
             start = max(0, m.start() - 50)

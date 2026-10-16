@@ -202,6 +202,8 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
             targets = [e for e in sourced if e != driver] or ["CMD.COPPER.LME", "FX.USDBRL", "EQ.US.SP500"]
             for e in targets[:5]:
                 add("run_scenario", asset=e, driver=driver, shock=size, lookback_years=10)
+    if re.search(r"\bportfolio|\bmy (holdings|positions|book)\b|value at risk|\bvar\b|stress test", q):
+        add("analyze_portfolio")
     if "anomaly_screen" in intents:
         ac = next((c for c in ("commodity", "fx", "rates", "equity") if c in q or (c == "commodity" and "commodit" in q)), None)
         add("screen_anomalies", **({"asset_class": ac} if ac else {}))

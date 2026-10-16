@@ -25,6 +25,33 @@ jobs:
           ATLAS_LLM: "off"
         run: python -m pytest -q
 
+  backend-postgres:
+    # Same suite against TimescaleDB, the production database.
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: timescale/timescaledb:2.17.2-pg16
+        env:
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: atlas
+          POSTGRES_DB: atlas_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U atlas" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev,postgres]"
+      - name: Test on PostgreSQL
+        env:
+          ATLAS_LLM: "off"
+          ATLAS_TEST_DATABASE_URL: postgresql+psycopg://atlas:atlas@localhost:5432/atlas_test
+        run: python -m pytest -q
+
   web:
     runs-on: ubuntu-latest
     defaults:

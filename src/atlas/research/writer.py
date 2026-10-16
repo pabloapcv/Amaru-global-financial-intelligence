@@ -228,6 +228,33 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
                 lines.append(f"- No dataset's latest move exceeded |z| ≥ {_fmt(e['result']['threshold'], 1)} [{e['label']}].")
         lines.append("")
 
+    # Portfolio ---------------------------------------------------------------------
+    for e in by_tool.get("analyze_portfolio", []):
+        r = e["result"]
+        v = r["var"]
+        lines += [f"## Portfolio risk: {r.get('portfolio_name') or 'portfolio'}", ""]
+        lines.append(
+            f"- Annualized volatility {_fmt(r['annualized_vol_pct'])}% from {r['n_observations']} {r['frequency']} returns; "
+            f"diversification ratio {_fmt(r['diversification_ratio'], 3)}; max drawdown {_fmt(r['max_drawdown_pct'])}% [{e['label']}]."
+        )
+        lines.append(
+            f"- Value at risk over {v['horizon']}: {_fmt(v['historical_95_pct'])}% at 95% (expected shortfall {_fmt(v['cvar_95_pct'])}%), "
+            f"{_fmt(v['historical_99_pct'])}% at 99% [{e['label']}]."
+        )
+        top = sorted(r["holdings"], key=lambda h: -(h["risk_contribution_pct"] or 0))[:3]
+        lines.append("- Largest risk contributors: " + "; ".join(
+            f"{h['name']} {_fmt(h['risk_contribution_pct'])}% of risk at weight {_fmt(h['weight'], 4)}" for h in top) + f" [{e['label']}].")
+        fx = r.get("factor_exposures")
+        if fx:
+            sig = [b for b in fx["betas"] if b["p_value"] is not None and b["p_value"] < 0.05]
+            lines.append(f"- Factor exposures (R² {_fmt(fx['r_squared'], 4)}): " + ("; ".join(
+                f"{_name(b['factor'])} beta {_fmt(b['beta'], 4)}" for b in sig) or "none significant at 5%") + f" [{e['label']}].")
+        for st in r["stress_tests"]:
+            if st["portfolio_return_pct"] is not None:
+                cov = "" if st["weight_coverage_pct"] == 100 else f" (covers {_fmt(st['weight_coverage_pct'], 1)}% of weight)"
+                lines.append(f"- Stress, {st['name']}: {_fmt(st['portfolio_return_pct'])}%{cov} [{e['label']}].")
+        lines.append("")
+
     # Regimes -----------------------------------------------------------------------
     rg = by_tool.get("detect_regime", [])
     if rg:

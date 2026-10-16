@@ -310,6 +310,18 @@ class ReportSchedule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class Portfolio(Base):
+    __tablename__ = "portfolios"
+
+    portfolio_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(String(32), default=LOCAL_WORKSPACE, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), default="local")
+    name: Mapped[str] = mapped_column(String(200))
+    holdings: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{dataset_id, weight}]
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class Alert(Base):
     __tablename__ = "alerts"
 

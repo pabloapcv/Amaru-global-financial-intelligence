@@ -36,7 +36,7 @@ class CftcAdapter(ProviderAdapter):
 
     def __init__(self, client: httpx.Client | None = None):
         self._client = client or httpx.Client(
-            timeout=settings.http_timeout, headers={"User-Agent": "ATLAS-research-platform/0.1"}
+            timeout=settings.http_timeout, headers={"User-Agent": settings.user_agent}
         )
 
     def fetch(self, symbol: str, since: date | None = None) -> FetchResult:

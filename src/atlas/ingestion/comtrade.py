@@ -41,7 +41,7 @@ class ComtradeAdapter(ProviderAdapter):
 
     def __init__(self, client: httpx.Client | None = None, pacing: float = PACING_SECONDS):
         self._client = client or httpx.Client(
-            timeout=settings.http_timeout, headers={"User-Agent": "ATLAS-research-platform/0.1"}
+            timeout=settings.http_timeout, headers={"User-Agent": settings.user_agent}
         )
         self._pacing = pacing
         self._last_call = 0.0

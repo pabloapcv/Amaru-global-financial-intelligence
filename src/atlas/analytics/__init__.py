@@ -605,3 +605,146 @@ def volatility_regime(series: pd.Series, *, unit: str, frequency: str, years: in
         },
         "fingerprint": fingerprint(series),
     }
+
+
+# ---------------------------------------------------------------- portfolio risk
+
+STRESS_WINDOWS = [
+    {"name": "Global financial crisis", "start": "2008-09-01", "end": "2008-12-31"},
+    {"name": "COVID crash", "start": "2020-02-14", "end": "2020-04-30"},
+    {"name": "2022 energy shock", "start": "2022-02-18", "end": "2022-06-30"},
+    {"name": "2022 rate shock (H2)", "start": "2022-07-01", "end": "2022-10-31"},
+]
+
+
+def portfolio_risk(
+    series: dict[str, pd.Series],
+    weights: dict[str, float],
+    frequencies: dict[str, str],
+    factors: dict[str, pd.Series] | None = None,
+    factor_units: dict[str, str] | None = None,
+    factor_frequencies: dict[str, str] | None = None,
+    lookback_years: float = 5,
+    full_history: dict[str, pd.Series] | None = None,
+) -> dict[str, Any]:
+    """Risk of a long/short portfolio of price-like instruments.
+
+    Weights are fractions of capital (negative = short). Returns are simple returns at the
+    coarsest frequency among holdings, so monthly benchmarks and daily prices are comparable.
+    """
+    ids = list(weights)
+    freq = coarsest([frequencies[i] for i in ids])
+    ppy = PERIODS_PER_YEAR.get(freq, 12)
+    levels = pd.DataFrame({i: resample(series[i], freq, "mean") if frequencies[i] != freq else series[i] for i in ids}).dropna()
+    levels = levels[levels.index > levels.index[-1] - pd.DateOffset(months=int(lookback_years * 12))]
+    rets = levels.pct_change().dropna()
+    if len(rets) < 24:
+        raise ValueError(f"only {len(rets)} overlapping {freq} returns; need at least 24")
+    w = np.array([weights[i] for i in ids], dtype=float)
+    port = rets.to_numpy() @ w
+    port_s = pd.Series(port, index=rets.index)
+    cov = rets.cov().to_numpy() * ppy
+    vol = float(np.sqrt(w @ cov @ w))
+    marginal = cov @ w / vol if vol > 0 else np.zeros_like(w)
+    contrib = w * marginal
+    asset_vol = np.sqrt(np.diag(cov))
+    standalone = float(np.sum(np.abs(w) * asset_vol))
+
+    def var_cvar(level: float) -> tuple[float, float]:
+        q = float(np.quantile(port, 1 - level))
+        tail = port[port <= q]
+        return -q, -float(tail.mean()) if len(tail) else -q
+
+    v95, c95 = var_cvar(0.95)
+    v99, c99 = var_cvar(0.99)
+    z95 = 1.6448536269514722
+    mu, sd = float(np.mean(port)), float(np.std(port, ddof=1))
+    wealth = (1 + port_s).cumprod()
+    dd = wealth / wealth.cummax() - 1
+
+    holdings = []
+    for k, i in enumerate(ids):
+        holdings.append({
+            "dataset_id": i, "weight": _r(float(w[k]), 4),
+            "annualized_vol_pct": _r(float(asset_vol[k]) * 100, 2),
+            "risk_contribution_pct": _r(float(contrib[k] / vol * 100), 2) if vol > 0 else None,
+            "marginal_vol_pct": _r(float(marginal[k]) * 100, 3),
+        })
+    corr = rets.corr()
+
+    exposures = None
+    if factors:
+        fa_changes, _, kinds = align(
+            {**factors, "__port__": wealth}, {**(factor_frequencies or {}), "__port__": freq},
+            {**(factor_units or {}), "__port__": "index"}, lookback_years,
+        )
+        if len(fa_changes) >= 24:
+            import statsmodels.api as sm
+
+            X = sm.add_constant(fa_changes[list(factors)])
+            fit = sm.OLS(fa_changes["__port__"], X).fit(cov_type="HAC", cov_kwds={"maxlags": 3})
+            exposures = {
+                "frequency": coarsest([freq, *(factor_frequencies or {}).values()]),
+                "r_squared": _r(float(fit.rsquared), 4),
+                "betas": [
+                    {"factor": f, "beta": _r(float(fit.params[f]), 4), "p_value": _r(float(fit.pvalues[f]), 4),
+                     "factor_transform": kinds[f]}
+                    for f in factors
+                ],
+                "n_observations": int(len(fa_changes)),
+                "interpretation": "Beta on log-return factors = % portfolio move per 1% factor move; on percent-unit factors (yields) = portfolio log-return per 1 percentage point change.",
+            }
+
+    stresses = []
+    hist = full_history or series
+    for wnd in STRESS_WINDOWS:
+        start, end = pd.Timestamp(wnd["start"]), pd.Timestamp(wnd["end"])
+        moves, missing = {}, []
+        for i in ids:
+            s = hist[i]
+            before, during = s[s.index <= start], s[(s.index > start) & (s.index <= end)]
+            if before.empty or during.empty:
+                missing.append(i)
+                continue
+            moves[i] = float(during.iloc[-1] / before.iloc[-1] - 1)
+        covered = sum(abs(weights[i]) for i in moves) / max(sum(abs(v) for v in weights.values()), 1e-12)
+        stresses.append({
+            **wnd,
+            "portfolio_return_pct": _r(sum(weights[i] * m for i, m in moves.items()) * 100, 2) if moves else None,
+            "holding_returns_pct": {i: _r(m * 100, 2) for i, m in moves.items()},
+            "missing_holdings": missing,
+            "weight_coverage_pct": _r(covered * 100, 1),
+        })
+
+    return {
+        "frequency": freq,
+        "n_observations": int(len(rets)),
+        "start": rets.index[0].date().isoformat(),
+        "end": rets.index[-1].date().isoformat(),
+        "gross_exposure": _r(float(np.sum(np.abs(w))), 4),
+        "net_exposure": _r(float(np.sum(w)), 4),
+        "annualized_vol_pct": _r(vol * 100, 2),
+        "diversification_ratio": _r(standalone / vol, 3) if vol > 0 else None,
+        "annualized_return_pct": _r(((1 + port_s).prod() ** (ppy / len(port_s)) - 1) * 100, 2),
+        "max_drawdown_pct": _r(float(dd.min()) * 100, 2),
+        "var": {
+            "horizon": f"one {freq.removesuffix('ly') if freq != 'daily' else 'day'}",
+            "historical_95_pct": _r(v95 * 100, 2), "historical_99_pct": _r(v99 * 100, 2),
+            "cvar_95_pct": _r(c95 * 100, 2), "cvar_99_pct": _r(c99 * 100, 2),
+            "parametric_95_pct": _r((-(mu - z95 * sd)) * 100, 2),
+        },
+        "holdings": holdings,
+        "correlation": {"labels": ids, "matrix": [[_r(float(x), 3) for x in row] for row in corr.to_numpy()]},
+        "factor_exposures": exposures,
+        "stress_tests": stresses,
+        "cumulative": [{"date": d.date().isoformat(), "value": _r(float(v), 5)} for d, v in wealth.items()],
+        "method": {
+            "returns": f"simple {freq} returns of aligned levels (period means for daily series when mixing frequencies)",
+            "volatility": "sqrt(w' Σ w), Σ annualized sample covariance",
+            "risk_contribution": "w_i (Σw)_i / σ_p, summing to 100%",
+            "var": "historical quantile of portfolio period returns; CVaR = mean beyond VaR; parametric = normal",
+            "stress": "price change of each holding over the historical window applied to current weights (no rebalancing)",
+            "caveat": "Benchmark/reference prices, not tradable quotes; no transaction costs, carry or roll yield.",
+        },
+        "fingerprint": fingerprint(*[series[i] for i in ids]),
+    }

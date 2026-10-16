@@ -56,6 +56,7 @@ class Evidence:
 
 @dataclass
 class ToolContext:
+    workspace_id: str = "local"
     evidence: list[Evidence] = field(default_factory=list)
     calls: int = 0
     log: list[dict[str, Any]] = field(default_factory=list)
@@ -619,6 +620,27 @@ def t_detect_regime(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     return {"evidence_id": label, "dataset_id": dsid, **res}
 
 
+def t_analyze_portfolio(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import portfolios
+
+    holdings, name = args.get("holdings"), args.get("portfolio_name")
+    if not holdings:
+        saved = portfolios.find_by_name(name, ctx.workspace_id) if name else (portfolios.list_portfolios(ctx.workspace_id) or [None])[0]
+        if saved is None:
+            raise ToolError("No saved portfolio found in this workspace. Ask the user for holdings (dataset_id and weight).")
+        holdings, name = saved["holdings"], saved["name"]
+    try:
+        res, metas = portfolios.analyze(holdings, float(args.get("lookback_years", 5)))
+    except portfolios.PortfolioError as exc:
+        raise ToolError(str(exc)) from exc
+    chart = {"type": "line", "title": f"{name or 'Portfolio'}: cumulative value (start = 1)", "unit": "growth of 1",
+             "series": [{"name": name or "Portfolio", "points": res.pop("cumulative")}]}
+    result = {"portfolio_name": name, **res}
+    label = ctx.add("analyze_portfolio", args, result, "ATLAS quant engine (portfolio risk) on: " + _cite(metas),
+                    [_source(m) for m in metas], chart)
+    return {"evidence_id": label, **result}
+
+
 def _unavailable(kind: str, needed: str) -> Callable[[ToolContext, dict[str, Any]], dict[str, Any]]:
     def tool(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         result = {
@@ -745,6 +767,15 @@ TOOLS: dict[str, dict[str, Any]] = {
         "fn": t_detect_regime,
         "description": "Volatility regime for one dataset: realized-volatility percentile bucket (low/normal/elevated/stress) and a 2-state Markov-switching model's probability of the high-volatility regime now, regime volatilities, persistence and recent high-vol episodes.",
         "schema": {"type": "object", "properties": {"dataset_id": _ID, "years": {"type": "integer"}}, "required": ["dataset_id"]},
+    },
+    "analyze_portfolio": {
+        "fn": t_analyze_portfolio,
+        "description": "Risk of a portfolio: pass holdings [{dataset_id, weight}] (weights are fractions of capital, negative = short; price instruments only) or the name of a saved portfolio in the user's workspace (omit both for the most recent one). Returns volatility, VaR/CVaR, risk contributions, correlations, factor betas (dollar, 10Y yield, Brent) and historical stress tests.",
+        "schema": {"type": "object", "properties": {
+            "holdings": {"type": "array", "items": {"type": "object", "properties": {"dataset_id": {"type": "string"}, "weight": {"type": "number"}}, "required": ["dataset_id", "weight"]}},
+            "portfolio_name": {"type": "string"},
+            "lookback_years": {"type": "number"},
+        }, "required": []},
     },
     "get_fundamentals": {
         "fn": _unavailable("fundamentals", "USDA PSD / UNICA / ISO / ICSG supply-demand connectors"),

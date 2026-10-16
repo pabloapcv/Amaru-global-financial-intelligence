@@ -1,4 +1,8 @@
-"""Test fixtures: an isolated SQLite database seeded with synthetic data (no network)."""
+"""Test fixtures: an isolated database seeded with synthetic data (no network).
+
+SQLite by default; set ATLAS_TEST_DATABASE_URL (e.g. a throwaway PostgreSQL/TimescaleDB) to run
+the same suite against Postgres. That database is wiped at the start of the session.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +17,8 @@ import pytest
 @pytest.fixture(scope="session", autouse=True)
 def isolated_env(tmp_path_factory):
     root = tmp_path_factory.mktemp("atlas")
-    os.environ["ATLAS_DATABASE_URL"] = f"sqlite:///{root / 'test.db'}"
+    test_db = os.getenv("ATLAS_TEST_DATABASE_URL")
+    os.environ["ATLAS_DATABASE_URL"] = test_db or f"sqlite:///{root / 'test.db'}"
     os.environ["ATLAS_OBJECT_STORE"] = str(root / "objects")
     os.environ["ATLAS_LLM"] = "off"
     os.environ["ATLAS_AUTH"] = "off"  # auth tests opt in explicitly
@@ -26,6 +31,8 @@ def isolated_env(tmp_path_factory):
 
     db.settings = config.settings
     db._engine = None
+    if test_db:
+        db.Base.metadata.drop_all(db.get_engine(config.settings.database_url))
     db.init_db(config.settings.database_url)
     for mod in ("atlas.ingestion.pipeline", "atlas.reporting", "atlas.ingestion.fred", "atlas.research.llm"):
         m = importlib.import_module(mod)

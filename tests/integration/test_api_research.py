@@ -130,3 +130,25 @@ def test_regime_quant_endpoint(client):
     r = client.post("/api/v1/quant/analyze", json={"analysis": "regime", "dataset_ids": ["CMD.CRUDE.WTI"]})
     assert r.status_code == 200, r.text
     assert 0 <= r.json()["result"]["markov_high_vol_probability_now"] <= 1
+
+
+def test_portfolio_research_uses_saved_portfolio(client):
+    from atlas import portfolios
+
+    portfolios.save("Energy book", [{"dataset_id": "CMD.CRUDE.BRENT", "weight": 0.6}, {"dataset_id": "CMD.NATGAS.HH", "weight": 0.4}])
+    run_id = engine.create_run("What is the value at risk of my portfolio, and how did it do in past stress events?",
+                               {"engine": "deterministic", "formats": []})
+    result = engine.execute_run(run_id)
+    assert result["verification"]["passed"], result["verification"]["unverified_numbers"]
+    assert "analyze_portfolio" in {e["tool"] for e in result["evidence"]}
+    assert "Portfolio risk" in result["narrative_markdown"]
+
+
+def test_metrics_endpoint(client, monkeypatch):
+    client.get("/api/v1/instruments")
+    body = client.get("/metrics").text
+    assert 'atlas_http_requests_total{method="GET",route="/api/v1/instruments",status="200"}' in body
+    assert "atlas_http_request_duration_seconds_bucket" in body and "atlas_datasets{" in body
+    monkeypatch.setenv("ATLAS_METRICS_TOKEN", "s3cret")
+    assert client.get("/metrics").status_code == 401
+    assert client.get("/metrics", headers={"Authorization": "Bearer s3cret"}).status_code == 200

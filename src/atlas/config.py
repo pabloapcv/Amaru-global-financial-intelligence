@@ -59,6 +59,10 @@ class Settings:
         default_factory=lambda: int(os.getenv("ATLAS_MAX_TOOL_CALLS", "24"))
     )
     http_timeout: float = 30.0
+    # Identify ATLAS honestly to data providers, with a contact URL (crawler etiquette).
+    user_agent: str = field(
+        default_factory=lambda: os.getenv("ATLAS_USER_AGENT", "ATLAS-research/0.1 (+https://github.com/pabloapcv/atlas-fin)")
+    )
     cors_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(
             os.getenv("ATLAS_CORS_ORIGINS", "http://localhost:3010,http://127.0.0.1:3010").split(",")
