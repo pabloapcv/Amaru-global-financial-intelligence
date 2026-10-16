@@ -12,10 +12,28 @@
       "frequency": "monthly",
       "price_basis": "monthly_average_spot_benchmark",
       "description": "International Sugar Agreement world raw sugar price, monthly average, from the IMF Primary Commodity Prices dataset via FRED. A physical benchmark — not an ICE Sugar No. 11 futures settlement.",
-      "tags": ["softs", "agriculture", "sugar", "brazil", "india", "thailand"],
-      "keywords": ["sugar", "sugar no. 11", "sugar no 11", "sb", "raw sugar"],
+      "tags": [
+        "softs",
+        "agriculture",
+        "sugar",
+        "brazil",
+        "india",
+        "thailand"
+      ],
+      "keywords": [
+        "sugar",
+        "sugar no. 11",
+        "sugar no 11",
+        "sb",
+        "raw sugar"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "PSUGAISAUSDM"}],
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "PSUGAISAUSDM"
+        }
+      ],
       "coverage_note": "Futures curve, open interest and contract-level settlements for ICE Sugar No. 11 require a licensed ICE/vendor feed."
     },
     {
@@ -29,10 +47,26 @@
       "frequency": "monthly",
       "price_basis": "monthly_average_spot_benchmark",
       "description": "Copper grade A cathode, LME spot price CIF European ports, monthly average, IMF Primary Commodity Prices via FRED.",
-      "tags": ["base_metals", "metals", "copper", "china", "chile", "peru"],
-      "keywords": ["copper", "hg", "dr copper"],
+      "tags": [
+        "base_metals",
+        "metals",
+        "copper",
+        "china",
+        "chile",
+        "peru"
+      ],
+      "keywords": [
+        "copper",
+        "hg",
+        "dr copper"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "PCOPPUSDM"}],
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "PCOPPUSDM"
+        }
+      ],
       "coverage_note": "COMEX HG futures and LME inventories require licensed feeds."
     },
     {
@@ -46,10 +80,25 @@
       "frequency": "monthly",
       "price_basis": "monthly_average_spot_benchmark",
       "description": "Coffee, other mild arabicas, ICO New York cash price, monthly average, IMF via FRED.",
-      "tags": ["softs", "agriculture", "coffee", "brazil", "colombia"],
-      "keywords": ["coffee", "arabica", "kc"],
+      "tags": [
+        "softs",
+        "agriculture",
+        "coffee",
+        "brazil",
+        "colombia"
+      ],
+      "keywords": [
+        "coffee",
+        "arabica",
+        "kc"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "PCOFFOTMUSDM"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "PCOFFOTMUSDM"
+        }
+      ]
     },
     {
       "instrument_id": "CMD.COCOA.ICCO",
@@ -62,10 +111,24 @@
       "frequency": "monthly",
       "price_basis": "monthly_average_spot_benchmark",
       "description": "Cocoa beans, International Cocoa Organization cash price, monthly average, IMF via FRED.",
-      "tags": ["softs", "agriculture", "cocoa", "ivory_coast", "ghana"],
-      "keywords": ["cocoa", "cc"],
+      "tags": [
+        "softs",
+        "agriculture",
+        "cocoa",
+        "ivory_coast",
+        "ghana"
+      ],
+      "keywords": [
+        "cocoa",
+        "cc"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "PCOCOUSDM"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "PCOCOUSDM"
+        }
+      ]
     },
     {
       "instrument_id": "CMD.WHEAT.USHRW",
@@ -78,10 +141,23 @@
       "frequency": "monthly",
       "price_basis": "monthly_average_spot_benchmark",
       "description": "Wheat, No.1 Hard Red Winter, FOB Gulf of Mexico, monthly average, IMF via FRED.",
-      "tags": ["grains", "agriculture", "wheat"],
-      "keywords": ["wheat", "zw", "ke"],
+      "tags": [
+        "grains",
+        "agriculture",
+        "wheat"
+      ],
+      "keywords": [
+        "wheat",
+        "zw",
+        "ke"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "PWHEAMTUSDM"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "PWHEAMTUSDM"
+        }
+      ]
     },
     {
       "instrument_id": "CMD.CORN.US",
@@ -94,10 +170,24 @@
       "frequency": "monthly",
       "price_basis": "monthly_average_spot_benchmark",
       "description": "Maize (corn), U.S. No.2 Yellow, FOB Gulf of Mexico, monthly average, IMF via FRED.",
-      "tags": ["grains", "agriculture", "corn", "ethanol"],
-      "keywords": ["corn", "maize", "zc"],
+      "tags": [
+        "grains",
+        "agriculture",
+        "corn",
+        "ethanol"
+      ],
+      "keywords": [
+        "corn",
+        "maize",
+        "zc"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "PMAIZMTUSDM"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "PMAIZMTUSDM"
+        }
+      ]
     },
     {
       "instrument_id": "CMD.SOYBEANS.US",
@@ -110,10 +200,27 @@
       "frequency": "monthly",
       "price_basis": "monthly_average_spot_benchmark",
       "description": "Soybeans, U.S. soybeans, Chicago Soybean futures contract (first contract forward) No. 2 yellow and par, monthly average, IMF via FRED.",
-      "tags": ["oilseeds", "agriculture", "soybeans", "brazil", "argentina", "china"],
-      "keywords": ["soybeans", "soybean", "soy", "zs"],
+      "tags": [
+        "oilseeds",
+        "agriculture",
+        "soybeans",
+        "brazil",
+        "argentina",
+        "china"
+      ],
+      "keywords": [
+        "soybeans",
+        "soybean",
+        "soy",
+        "zs"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "PSOYBUSDM"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "PSOYBUSDM"
+        }
+      ]
     },
     {
       "instrument_id": "CMD.CRUDE.WTI",
@@ -126,10 +233,26 @@
       "frequency": "daily",
       "price_basis": "daily_spot_reference",
       "description": "West Texas Intermediate crude oil spot price, Cushing, Oklahoma (EIA via FRED). Daily reference price, published with a lag.",
-      "tags": ["energy", "oil", "crude"],
-      "keywords": ["wti", "crude", "crude oil", "oil", "cl", "west texas"],
+      "tags": [
+        "energy",
+        "oil",
+        "crude"
+      ],
+      "keywords": [
+        "wti",
+        "crude",
+        "crude oil",
+        "oil",
+        "cl",
+        "west texas"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DCOILWTICO"}],
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DCOILWTICO"
+        }
+      ],
       "coverage_note": "NYMEX CL futures curve requires a licensed CME/vendor feed."
     },
     {
@@ -143,10 +266,21 @@
       "frequency": "daily",
       "price_basis": "daily_spot_reference",
       "description": "Brent crude oil spot price, Europe (EIA via FRED).",
-      "tags": ["energy", "oil", "crude"],
-      "keywords": ["brent"],
+      "tags": [
+        "energy",
+        "oil",
+        "crude"
+      ],
+      "keywords": [
+        "brent"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DCOILBRENTEU"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DCOILBRENTEU"
+        }
+      ]
     },
     {
       "instrument_id": "CMD.NATGAS.HH",
@@ -159,10 +293,24 @@
       "frequency": "daily",
       "price_basis": "daily_spot_reference",
       "description": "Henry Hub natural gas spot price (EIA via FRED).",
-      "tags": ["energy", "gas"],
-      "keywords": ["natural gas", "natgas", "nat gas", "henry hub", "ng"],
+      "tags": [
+        "energy",
+        "gas"
+      ],
+      "keywords": [
+        "natural gas",
+        "natgas",
+        "nat gas",
+        "henry hub",
+        "ng"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DHHNGSP"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DHHNGSP"
+        }
+      ]
     },
     {
       "instrument_id": "CMD.GOLD",
@@ -175,8 +323,17 @@
       "frequency": "daily",
       "price_basis": "unavailable",
       "description": "Gold. No free, redistributable source is configured: LBMA benchmark prices were withdrawn from FRED. Connect a licensed vendor feed to enable.",
-      "tags": ["precious_metals", "metals", "gold"],
-      "keywords": ["gold", "xau", "gc", "bullion"],
+      "tags": [
+        "precious_metals",
+        "metals",
+        "gold"
+      ],
+      "keywords": [
+        "gold",
+        "xau",
+        "gc",
+        "bullion"
+      ],
       "refresh": "none",
       "sources": [],
       "coverage_note": "COVERAGE GAP: no licensed gold price source configured."
@@ -192,8 +349,16 @@
       "frequency": "daily",
       "price_basis": "unavailable",
       "description": "Silver. No free, redistributable source is configured. Connect a licensed vendor feed to enable.",
-      "tags": ["precious_metals", "metals", "silver"],
-      "keywords": ["silver", "xag", "si"],
+      "tags": [
+        "precious_metals",
+        "metals",
+        "silver"
+      ],
+      "keywords": [
+        "silver",
+        "xag",
+        "si"
+      ],
       "refresh": "none",
       "sources": [],
       "coverage_note": "COVERAGE GAP: no licensed silver price source configured."
@@ -209,10 +374,27 @@
       "frequency": "daily",
       "price_basis": "daily_reference_rate",
       "description": "Noon buying rate in New York, Federal Reserve H.10 via FRED. A reference rate, not a tradable spot quote. Higher = weaker real.",
-      "tags": ["fx", "em_fx", "brazil", "latam"],
-      "keywords": ["usd/brl", "usdbrl", "brl", "real", "brazilian real", "reais"],
+      "tags": [
+        "fx",
+        "em_fx",
+        "brazil",
+        "latam"
+      ],
+      "keywords": [
+        "usd/brl",
+        "usdbrl",
+        "brl",
+        "real",
+        "brazilian real",
+        "reais"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DEXBZUS"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DEXBZUS"
+        }
+      ]
     },
     {
       "instrument_id": "FX.USDINR",
@@ -225,10 +407,26 @@
       "frequency": "daily",
       "price_basis": "daily_reference_rate",
       "description": "Federal Reserve H.10 reference rate via FRED. Higher = weaker rupee.",
-      "tags": ["fx", "em_fx", "india", "asia"],
-      "keywords": ["usd/inr", "usdinr", "inr", "rupee", "indian rupee"],
+      "tags": [
+        "fx",
+        "em_fx",
+        "india",
+        "asia"
+      ],
+      "keywords": [
+        "usd/inr",
+        "usdinr",
+        "inr",
+        "rupee",
+        "indian rupee"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DEXINUS"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DEXINUS"
+        }
+      ]
     },
     {
       "instrument_id": "FX.USDMXN",
@@ -241,10 +439,26 @@
       "frequency": "daily",
       "price_basis": "daily_reference_rate",
       "description": "Federal Reserve H.10 reference rate via FRED. Higher = weaker peso.",
-      "tags": ["fx", "em_fx", "mexico", "latam"],
-      "keywords": ["usd/mxn", "usdmxn", "mxn", "mexican peso", "peso"],
+      "tags": [
+        "fx",
+        "em_fx",
+        "mexico",
+        "latam"
+      ],
+      "keywords": [
+        "usd/mxn",
+        "usdmxn",
+        "mxn",
+        "mexican peso",
+        "peso"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DEXMXUS"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DEXMXUS"
+        }
+      ]
     },
     {
       "instrument_id": "FX.USDCNY",
@@ -257,10 +471,27 @@
       "frequency": "daily",
       "price_basis": "daily_reference_rate",
       "description": "Federal Reserve H.10 reference rate via FRED.",
-      "tags": ["fx", "em_fx", "china", "asia"],
-      "keywords": ["usd/cny", "usdcny", "cny", "yuan", "renminbi", "rmb"],
+      "tags": [
+        "fx",
+        "em_fx",
+        "china",
+        "asia"
+      ],
+      "keywords": [
+        "usd/cny",
+        "usdcny",
+        "cny",
+        "yuan",
+        "renminbi",
+        "rmb"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DEXCHUS"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DEXCHUS"
+        }
+      ]
     },
     {
       "instrument_id": "FX.EURUSD",
@@ -273,10 +504,24 @@
       "frequency": "daily",
       "price_basis": "daily_reference_rate",
       "description": "Federal Reserve H.10 reference rate via FRED.",
-      "tags": ["fx", "g10_fx", "euro_area"],
-      "keywords": ["eur/usd", "eurusd", "euro", "eur"],
+      "tags": [
+        "fx",
+        "g10_fx",
+        "euro_area"
+      ],
+      "keywords": [
+        "eur/usd",
+        "eurusd",
+        "euro",
+        "eur"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DEXUSEU"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DEXUSEU"
+        }
+      ]
     },
     {
       "instrument_id": "FX.USDJPY",
@@ -289,10 +534,24 @@
       "frequency": "daily",
       "price_basis": "daily_reference_rate",
       "description": "Federal Reserve H.10 reference rate via FRED.",
-      "tags": ["fx", "g10_fx", "japan"],
-      "keywords": ["usd/jpy", "usdjpy", "jpy", "yen"],
+      "tags": [
+        "fx",
+        "g10_fx",
+        "japan"
+      ],
+      "keywords": [
+        "usd/jpy",
+        "usdjpy",
+        "jpy",
+        "yen"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DEXJPUS"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DEXJPUS"
+        }
+      ]
     },
     {
       "instrument_id": "FX.USD.BROAD",
@@ -305,10 +564,26 @@
       "frequency": "daily",
       "price_basis": "daily_index",
       "description": "Federal Reserve trade-weighted nominal broad dollar index via FRED. Used here as the dollar-strength proxy (not the ICE DXY).",
-      "tags": ["fx", "dollar"],
-      "keywords": ["dollar index", "dxy", "broad dollar", "us dollar", "usd", "dollar strength", "dollar"],
+      "tags": [
+        "fx",
+        "dollar"
+      ],
+      "keywords": [
+        "dollar index",
+        "dxy",
+        "broad dollar",
+        "us dollar",
+        "usd",
+        "dollar strength",
+        "dollar"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DTWEXBGS"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DTWEXBGS"
+        }
+      ]
     },
     {
       "instrument_id": "RATE.UST.2Y",
@@ -321,10 +596,25 @@
       "frequency": "daily",
       "price_basis": "daily_constant_maturity_yield",
       "description": "Market yield on U.S. Treasury securities at 2-year constant maturity (H.15 via FRED).",
-      "tags": ["rates", "treasuries", "us"],
-      "keywords": ["2-year", "2 year", "2y", "two-year", "2yr"],
+      "tags": [
+        "rates",
+        "treasuries",
+        "us"
+      ],
+      "keywords": [
+        "2-year",
+        "2 year",
+        "2y",
+        "two-year",
+        "2yr"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DGS2"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DGS2"
+        }
+      ]
     },
     {
       "instrument_id": "RATE.UST.10Y",
@@ -337,10 +627,28 @@
       "frequency": "daily",
       "price_basis": "daily_constant_maturity_yield",
       "description": "Market yield on U.S. Treasury securities at 10-year constant maturity (H.15 via FRED).",
-      "tags": ["rates", "treasuries", "us"],
-      "keywords": ["10-year", "10 year", "10y", "ten-year", "treasury", "treasuries", "treasury yield", "bond yield"],
+      "tags": [
+        "rates",
+        "treasuries",
+        "us"
+      ],
+      "keywords": [
+        "10-year",
+        "10 year",
+        "10y",
+        "ten-year",
+        "treasury",
+        "treasuries",
+        "treasury yield",
+        "bond yield"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DGS10"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DGS10"
+        }
+      ]
     },
     {
       "instrument_id": "RATE.UST.10Y.REAL",
@@ -353,10 +661,25 @@
       "frequency": "daily",
       "price_basis": "daily_constant_maturity_yield",
       "description": "Market yield on 10-year inflation-indexed Treasuries (H.15 via FRED).",
-      "tags": ["rates", "treasuries", "real_yields", "us"],
-      "keywords": ["real yield", "real yields", "tips", "real rate"],
+      "tags": [
+        "rates",
+        "treasuries",
+        "real_yields",
+        "us"
+      ],
+      "keywords": [
+        "real yield",
+        "real yields",
+        "tips",
+        "real rate"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DFII10"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DFII10"
+        }
+      ]
     },
     {
       "instrument_id": "RATE.US.BREAKEVEN10Y",
@@ -369,10 +692,22 @@
       "frequency": "daily",
       "price_basis": "daily_market_derived",
       "description": "10-year breakeven inflation rate (FRED).",
-      "tags": ["rates", "inflation_expectations", "us"],
-      "keywords": ["breakeven", "inflation expectations"],
+      "tags": [
+        "rates",
+        "inflation_expectations",
+        "us"
+      ],
+      "keywords": [
+        "breakeven",
+        "inflation expectations"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "T10YIE"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "T10YIE"
+        }
+      ]
     },
     {
       "instrument_id": "RATE.US.FEDFUNDS",
@@ -385,10 +720,30 @@
       "frequency": "daily",
       "price_basis": "daily_policy_rate",
       "description": "Effective federal funds rate, daily (FRED).",
-      "tags": ["rates", "policy_rate", "us", "fed"],
-      "keywords": ["fed funds", "federal funds", "policy rate", "fed", "federal reserve", "interest rate", "interest rates", "rate cut", "rate cuts"],
+      "tags": [
+        "rates",
+        "policy_rate",
+        "us",
+        "fed"
+      ],
+      "keywords": [
+        "fed funds",
+        "federal funds",
+        "policy rate",
+        "fed",
+        "federal reserve",
+        "interest rate",
+        "interest rates",
+        "rate cut",
+        "rate cuts"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "DFF"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DFF"
+        }
+      ]
     },
     {
       "instrument_id": "EQ.US.SP500",
@@ -401,10 +756,27 @@
       "frequency": "daily",
       "price_basis": "daily_close",
       "description": "S&P 500 daily close (S&P Dow Jones Indices via FRED; FRED carries roughly the last 10 years).",
-      "tags": ["equity", "us", "risk_sentiment"],
-      "keywords": ["s&p", "s&p 500", "sp500", "spx", "stocks", "equities", "stock market"],
+      "tags": [
+        "equity",
+        "us",
+        "risk_sentiment"
+      ],
+      "keywords": [
+        "s&p",
+        "s&p 500",
+        "sp500",
+        "spx",
+        "stocks",
+        "equities",
+        "stock market"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "SP500"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "SP500"
+        }
+      ]
     },
     {
       "instrument_id": "EQ.US.NASDAQ",
@@ -417,10 +789,22 @@
       "frequency": "daily",
       "price_basis": "daily_close",
       "description": "NASDAQ Composite daily close via FRED.",
-      "tags": ["equity", "us", "tech"],
-      "keywords": ["nasdaq", "tech stocks"],
+      "tags": [
+        "equity",
+        "us",
+        "tech"
+      ],
+      "keywords": [
+        "nasdaq",
+        "tech stocks"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "NASDAQCOM"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "NASDAQCOM"
+        }
+      ]
     },
     {
       "instrument_id": "VOL.US.VIX",
@@ -433,10 +817,25 @@
       "frequency": "daily",
       "price_basis": "daily_close",
       "description": "CBOE VIX daily close via FRED; a gauge of equity risk sentiment.",
-      "tags": ["volatility", "risk_sentiment", "us"],
-      "keywords": ["vix", "volatility", "fear gauge", "risk sentiment", "risk appetite"],
+      "tags": [
+        "volatility",
+        "risk_sentiment",
+        "us"
+      ],
+      "keywords": [
+        "vix",
+        "volatility",
+        "fear gauge",
+        "risk sentiment",
+        "risk appetite"
+      ],
       "refresh": "daily_poll",
-      "sources": [{"provider_id": "fred", "provider_symbol": "VIXCLS"}]
+      "sources": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "VIXCLS"
+        }
+      ]
     }
   ],
   "macro_series": [
@@ -451,8 +850,16 @@
       "provider_id": "fred",
       "provider_symbol": "CPIAUCSL",
       "description": "Consumer Price Index for All Urban Consumers: all items in U.S. city average (BLS via FRED).",
-      "tags": ["inflation", "us"],
-      "keywords": ["inflation", "cpi", "consumer prices", "headline inflation"]
+      "tags": [
+        "inflation",
+        "us"
+      ],
+      "keywords": [
+        "inflation",
+        "cpi",
+        "consumer prices",
+        "headline inflation"
+      ]
     },
     {
       "series_id": "US.CPI.CORE",
@@ -465,8 +872,14 @@
       "provider_id": "fred",
       "provider_symbol": "CPILFESL",
       "description": "CPI for All Urban Consumers: all items less food and energy (BLS via FRED).",
-      "tags": ["inflation", "us"],
-      "keywords": ["core inflation", "core cpi"]
+      "tags": [
+        "inflation",
+        "us"
+      ],
+      "keywords": [
+        "core inflation",
+        "core cpi"
+      ]
     },
     {
       "series_id": "US.UNRATE",
@@ -479,8 +892,16 @@
       "provider_id": "fred",
       "provider_symbol": "UNRATE",
       "description": "Civilian unemployment rate (BLS via FRED).",
-      "tags": ["labor", "us"],
-      "keywords": ["unemployment", "jobless", "labor market", "jobs"]
+      "tags": [
+        "labor",
+        "us"
+      ],
+      "keywords": [
+        "unemployment",
+        "jobless",
+        "labor market",
+        "jobs"
+      ]
     },
     {
       "series_id": "US.PAYEMS",
@@ -493,8 +914,16 @@
       "provider_id": "fred",
       "provider_symbol": "PAYEMS",
       "description": "All employees, total nonfarm (BLS via FRED).",
-      "tags": ["labor", "us"],
-      "keywords": ["payrolls", "nonfarm", "nfp", "employment"]
+      "tags": [
+        "labor",
+        "us"
+      ],
+      "keywords": [
+        "payrolls",
+        "nonfarm",
+        "nfp",
+        "employment"
+      ]
     },
     {
       "series_id": "US.GDP.REAL",
@@ -507,8 +936,18 @@
       "provider_id": "fred",
       "provider_symbol": "GDPC1",
       "description": "Real gross domestic product (BEA via FRED).",
-      "tags": ["growth", "us"],
-      "keywords": ["gdp", "growth", "economy", "economic growth", "global economy", "recession"]
+      "tags": [
+        "growth",
+        "us"
+      ],
+      "keywords": [
+        "gdp",
+        "growth",
+        "economy",
+        "economic growth",
+        "global economy",
+        "recession"
+      ]
     },
     {
       "series_id": "US.INDPRO",
@@ -521,8 +960,640 @@
       "provider_id": "fred",
       "provider_symbol": "INDPRO",
       "description": "Industrial production: total index (Federal Reserve G.17 via FRED).",
-      "tags": ["growth", "industry", "us"],
-      "keywords": ["industrial production", "industry", "manufacturing", "factory"]
+      "tags": [
+        "growth",
+        "industry",
+        "us"
+      ],
+      "keywords": [
+        "industrial production",
+        "industry",
+        "manufacturing",
+        "factory"
+      ]
     }
-  ]
+  ],
+  "positioning": [
+    {
+      "series_id": "COT.SUGAR11",
+      "name": "CFTC positioning: Sugar No. 11 (ICE)",
+      "cftc_code": "080732",
+      "instrument_id": "CMD.SUGAR.ISA",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "080732",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Sugar No. 11 (ICE). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "sugar positioning",
+        "sugar cot"
+      ]
+    },
+    {
+      "series_id": "COT.COPPER",
+      "name": "CFTC positioning: Copper #1 (COMEX)",
+      "cftc_code": "085692",
+      "instrument_id": "CMD.COPPER.LME",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "085692",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Copper #1 (COMEX). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "copper positioning",
+        "copper cot"
+      ]
+    },
+    {
+      "series_id": "COT.GOLD",
+      "name": "CFTC positioning: Gold (COMEX)",
+      "cftc_code": "088691",
+      "instrument_id": "CMD.GOLD",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "088691",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Gold (COMEX). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "gold positioning",
+        "gold cot"
+      ]
+    },
+    {
+      "series_id": "COT.SILVER",
+      "name": "CFTC positioning: Silver (COMEX)",
+      "cftc_code": "084691",
+      "instrument_id": "CMD.SILVER",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "084691",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Silver (COMEX). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "silver positioning",
+        "silver cot"
+      ]
+    },
+    {
+      "series_id": "COT.WTI",
+      "name": "CFTC positioning: WTI crude oil (NYMEX)",
+      "cftc_code": "067651",
+      "instrument_id": "CMD.CRUDE.WTI",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "067651",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for WTI crude oil (NYMEX). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "wti positioning",
+        "crude positioning",
+        "oil positioning",
+        "wti cot",
+        "crude cot",
+        "oil cot"
+      ]
+    },
+    {
+      "series_id": "COT.NATGAS",
+      "name": "CFTC positioning: Natural gas (NYMEX)",
+      "cftc_code": "023651",
+      "instrument_id": "CMD.NATGAS.HH",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "023651",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Natural gas (NYMEX). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "natural gas positioning",
+        "natgas positioning",
+        "natural gas cot",
+        "natgas cot"
+      ]
+    },
+    {
+      "series_id": "COT.COFFEE",
+      "name": "CFTC positioning: Coffee C (ICE)",
+      "cftc_code": "083731",
+      "instrument_id": "CMD.COFFEE.ARABICA",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "083731",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Coffee C (ICE). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "coffee positioning",
+        "coffee cot"
+      ]
+    },
+    {
+      "series_id": "COT.COCOA",
+      "name": "CFTC positioning: Cocoa (ICE)",
+      "cftc_code": "073732",
+      "instrument_id": "CMD.COCOA.ICCO",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "073732",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Cocoa (ICE). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "cocoa positioning",
+        "cocoa cot"
+      ]
+    },
+    {
+      "series_id": "COT.CORN",
+      "name": "CFTC positioning: Corn (CBOT)",
+      "cftc_code": "002602",
+      "instrument_id": "CMD.CORN.US",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "002602",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Corn (CBOT). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "corn positioning",
+        "corn cot"
+      ]
+    },
+    {
+      "series_id": "COT.WHEAT",
+      "name": "CFTC positioning: Wheat SRW (CBOT)",
+      "cftc_code": "001602",
+      "instrument_id": "CMD.WHEAT.USHRW",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "001602",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Wheat SRW (CBOT). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "wheat positioning",
+        "wheat cot"
+      ]
+    },
+    {
+      "series_id": "COT.SOYBEANS",
+      "name": "CFTC positioning: Soybeans (CBOT)",
+      "cftc_code": "005602",
+      "instrument_id": "CMD.SOYBEANS.US",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "005602",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Soybeans (CBOT). Report reflects positions as of Tuesday, published the following Friday.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "soybeans positioning",
+        "soybeans cot"
+      ]
+    },
+    {
+      "series_id": "COT.BRL",
+      "name": "CFTC positioning: Brazilian real (CME)",
+      "cftc_code": "102741",
+      "instrument_id": "FX.USDBRL",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "102741",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Brazilian real (CME). Report reflects positions as of Tuesday, published the following Friday. Positions are in the foreign-currency future: a net long means long the currency, i.e. short USD.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "brl positioning",
+        "brl cot"
+      ]
+    },
+    {
+      "series_id": "COT.MXN",
+      "name": "CFTC positioning: Mexican peso (CME)",
+      "cftc_code": "095741",
+      "instrument_id": "FX.USDMXN",
+      "frequency": "weekly",
+      "unit": "contracts",
+      "provider_id": "cftc",
+      "provider_symbol": "095741",
+      "description": "CFTC Commitments of Traders (legacy, futures only) for Mexican peso (CME). Report reflects positions as of Tuesday, published the following Friday. Positions are in the foreign-currency future: a net long means long the currency, i.e. short USD.",
+      "tags": [
+        "positioning",
+        "cot"
+      ],
+      "keywords": [
+        "mxn positioning",
+        "mxn cot"
+      ]
+    }
+  ],
+  "country_macro": {
+    "provider_id": "worldbank",
+    "_comment": "Expanded into one annual macro series per (country, indicator): WB.<ISO3>.<KEY>.",
+    "countries": [
+      {
+        "iso3": "USA",
+        "name": "United States",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "united states",
+          "u.s.",
+          "us economy",
+          "america"
+        ]
+      },
+      {
+        "iso3": "CHN",
+        "name": "China",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "china",
+          "chinese"
+        ]
+      },
+      {
+        "iso3": "JPN",
+        "name": "Japan",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "japan"
+        ]
+      },
+      {
+        "iso3": "DEU",
+        "name": "Germany",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "germany"
+        ]
+      },
+      {
+        "iso3": "GBR",
+        "name": "United Kingdom",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "united kingdom",
+          "uk",
+          "britain"
+        ]
+      },
+      {
+        "iso3": "FRA",
+        "name": "France",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "france"
+        ]
+      },
+      {
+        "iso3": "ITA",
+        "name": "Italy",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "italy"
+        ]
+      },
+      {
+        "iso3": "CAN",
+        "name": "Canada",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "canada"
+        ]
+      },
+      {
+        "iso3": "KOR",
+        "name": "South Korea",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "south korea",
+          "korea"
+        ]
+      },
+      {
+        "iso3": "AUS",
+        "name": "Australia",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "australia"
+        ]
+      },
+      {
+        "iso3": "IND",
+        "name": "India",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "india"
+        ]
+      },
+      {
+        "iso3": "IDN",
+        "name": "Indonesia",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "indonesia"
+        ]
+      },
+      {
+        "iso3": "TUR",
+        "name": "Turkey",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "turkey",
+          "turkiye"
+        ]
+      },
+      {
+        "iso3": "SAU",
+        "name": "Saudi Arabia",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "saudi arabia"
+        ]
+      },
+      {
+        "iso3": "ZAF",
+        "name": "South Africa",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "south africa"
+        ]
+      },
+      {
+        "iso3": "RUS",
+        "name": "Russia",
+        "groups": [
+          "g20"
+        ],
+        "aliases": [
+          "russia"
+        ]
+      },
+      {
+        "iso3": "BRA",
+        "name": "Brazil",
+        "groups": [
+          "g20",
+          "latam"
+        ],
+        "aliases": [
+          "brazil"
+        ]
+      },
+      {
+        "iso3": "MEX",
+        "name": "Mexico",
+        "groups": [
+          "g20",
+          "latam"
+        ],
+        "aliases": [
+          "mexico"
+        ]
+      },
+      {
+        "iso3": "ARG",
+        "name": "Argentina",
+        "groups": [
+          "g20",
+          "latam"
+        ],
+        "aliases": [
+          "argentina"
+        ]
+      },
+      {
+        "iso3": "CHL",
+        "name": "Chile",
+        "groups": [
+          "latam"
+        ],
+        "aliases": [
+          "chile"
+        ]
+      },
+      {
+        "iso3": "PER",
+        "name": "Peru",
+        "groups": [
+          "latam"
+        ],
+        "aliases": [
+          "peru"
+        ]
+      },
+      {
+        "iso3": "COL",
+        "name": "Colombia",
+        "groups": [
+          "latam"
+        ],
+        "aliases": [
+          "colombia"
+        ]
+      },
+      {
+        "iso3": "BOL",
+        "name": "Bolivia",
+        "groups": [
+          "latam"
+        ],
+        "aliases": [
+          "bolivia"
+        ]
+      },
+      {
+        "iso3": "ECU",
+        "name": "Ecuador",
+        "groups": [
+          "latam"
+        ],
+        "aliases": [
+          "ecuador"
+        ]
+      },
+      {
+        "iso3": "URY",
+        "name": "Uruguay",
+        "groups": [
+          "latam"
+        ],
+        "aliases": [
+          "uruguay"
+        ]
+      },
+      {
+        "iso3": "PRY",
+        "name": "Paraguay",
+        "groups": [
+          "latam"
+        ],
+        "aliases": [
+          "paraguay"
+        ]
+      }
+    ],
+    "indicators": [
+      {
+        "key": "GDP_GROWTH",
+        "code": "NY.GDP.MKTP.KD.ZG",
+        "name": "Real GDP growth",
+        "unit": "percent",
+        "indicator": "real_gdp_growth",
+        "keywords": [
+          "growth",
+          "gdp"
+        ]
+      },
+      {
+        "key": "INFLATION",
+        "code": "FP.CPI.TOTL.ZG",
+        "name": "Consumer price inflation",
+        "unit": "percent",
+        "indicator": "cpi_inflation",
+        "keywords": [
+          "inflation",
+          "cpi",
+          "prices"
+        ]
+      },
+      {
+        "key": "UNEMPLOYMENT",
+        "code": "SL.UEM.TOTL.ZS",
+        "name": "Unemployment rate (ILO modeled)",
+        "unit": "percent",
+        "indicator": "unemployment_rate",
+        "keywords": [
+          "unemployment",
+          "jobless",
+          "labor"
+        ]
+      },
+      {
+        "key": "GDP_PC",
+        "code": "NY.GDP.PCAP.CD",
+        "name": "GDP per capita (current USD)",
+        "unit": "current USD",
+        "indicator": "gdp_per_capita",
+        "keywords": [
+          "per capita",
+          "income"
+        ]
+      },
+      {
+        "key": "CURRENT_ACCOUNT",
+        "code": "BN.CAB.XOKA.GD.ZS",
+        "name": "Current account balance (% of GDP)",
+        "unit": "percent of GDP",
+        "indicator": "current_account",
+        "keywords": [
+          "current account",
+          "external"
+        ]
+      },
+      {
+        "key": "EXPORTS",
+        "code": "NE.EXP.GNFS.ZS",
+        "name": "Exports of goods and services (% of GDP)",
+        "unit": "percent of GDP",
+        "indicator": "exports_share",
+        "keywords": [
+          "exports",
+          "trade"
+        ]
+      },
+      {
+        "key": "RESERVES",
+        "code": "FI.RES.TOTL.MO",
+        "name": "Total reserves (months of imports)",
+        "unit": "months of imports",
+        "indicator": "reserves_months",
+        "keywords": [
+          "reserves"
+        ]
+      },
+      {
+        "key": "DEBT",
+        "code": "GC.DOD.TOTL.GD.ZS",
+        "name": "Central government debt (% of GDP)",
+        "unit": "percent of GDP",
+        "indicator": "government_debt",
+        "keywords": [
+          "debt",
+          "fiscal"
+        ]
+      }
+    ]
+  }
 }

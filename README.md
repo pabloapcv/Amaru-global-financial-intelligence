@@ -25,7 +25,8 @@ To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login
 
 | Spec area | Implementation |
 |---|---|
-| Canonical registry (§5, §7.4) | `src/atlas/instruments/registry.json`: 27 instruments + 6 macro series, NL resolution |
+| Canonical registry (§5, §7.4) | `src/atlas/instruments/registry.json`: 27 instruments, 6 U.S. macro series, 13 CFTC positioning series, 208 country series (26 countries × 8 WDI indicators); NL resolution of instruments and countries |
+| Data sources | FRED (prices, FX, rates, U.S. macro), CFTC Commitments of Traders (weekly positioning), World Bank WDI (annual country data). None needs an API key |
 | Ingestion pipeline (§7) | `src/atlas/ingestion/`: raw payload storage, validation, normalization, idempotent upserts, incremental watermarks, retries/backoff, replay, refresh scheduler |
 | Point-in-time macro (§7.3) | Revised values are stored as new vintages; `get_series(as_of=...)` reproduces past views |
 | Freshness (§5) | Observation date, ingestion time, last check and a status (`current/delayed/stale/no_source/failing`) for every dataset |
@@ -33,6 +34,8 @@ To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login
 | Research engine (§8) | Planner → typed tools → evidence (E1…En) → narrative → number/citation verification → one revision pass. Claude Opus 5.5 via the Anthropic SDK with server-side refusal fallback; deterministic fallback |
 | Reports (§12) | Versioned HTML (print stylesheet → PDF) and Excel (summary, evidence, sources, chart data) |
 | Monitoring (FR-009) | Alert rules (threshold, % move, anomaly), evaluated after each ingestion |
+| Scheduled reports (FR-010) | Saved questions re-run daily / weekly / monthly by the scheduler, after the data refresh |
+| Positioning & countries (FR-011, §9) | COT index, z-score and crowding flags per market; cross-country comparisons with stale-value flags; country profiles |
 | API (§14) | FastAPI: instruments, quotes, history, macro (with `as_of`), data/pipeline status, research jobs (202 + polling), quant, reports, alerts |
 | UI (§13) | Next.js: Overview, AI Research, Markets, Global Economy, Quant Lab, Reports, Intelligence, Data Explorer |
 
@@ -43,7 +46,8 @@ To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login
   - FX rates are Fed H.10 reference rates.
   - Nothing here is a tradable quote, and the UI and reports say so.
 - **Coverage gaps are disclosed, not filled.**
-  - Gold and silver have no free redistributable source, so they show as `no_source`.
+  - Gold and silver have no free redistributable price source, so their prices show as `no_source`. Their CFTC positioning is available.
+  - World Bank data is annual and lagged; values far older than peers are flagged and excluded from rankings.
   - Fundamentals, futures curves and documents are tools that return "not connected". The gap is recorded as evidence.
 - **Stack differences from the spec:**
   - SQLite by default; Postgres/Timescale via `ATLAS_DATABASE_URL`.
@@ -53,11 +57,11 @@ To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login
 - **Not built yet:**
   - authentication and multi-tenant isolation;
   - billing;
-  - non-US country coverage (World Bank/IMF/BIS connectors);
-  - USDA/EIA/CFTC connectors;
+  - higher-frequency non-US data (IMF/BIS connectors);
+  - USDA/EIA connectors (need free API keys);
   - licensed market data;
   - native PDF rendering.
-- **Claude orchestration is unverified live:** the tool-use loop is unit-tested against a scripted client, but it has not been run against the live API in this environment.
+- **Claude orchestration** is verified live: research runs on Claude Opus 5.5 pass number and citation verification. `atlas llm-check` confirms credentials.
 
 ## Layout
 

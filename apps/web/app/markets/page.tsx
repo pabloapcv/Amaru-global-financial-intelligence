@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import InstrumentDetail from "@/components/InstrumentDetail";
+import Positioning from "@/components/Positioning";
 import { api, type Instrument } from "@/lib/api";
 import { Card, ErrorNote, FreshnessBadge, PageHeader } from "@/components/ui";
 
@@ -55,6 +56,7 @@ function Markets() {
             <Card><span className="muted">Select an instrument.</span></Card>
           )}
           {current?.description && current.has_source && <p className="muted" style={{ fontSize: 12.5 }}>{current.description}</p>}
+          {selected && <div style={{ marginTop: 14 }}><Positioning id={selected} /></div>}
         </div>
       </div>
     </>

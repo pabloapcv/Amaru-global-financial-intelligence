@@ -78,3 +78,39 @@ def test_alerts_lifecycle(client):
     fired = client.post("/api/v1/alerts/evaluate").json()["fired"]
     assert any("WTI" in f["name"] for f in fired)
     assert client.post("/api/v1/alerts", json={"name": "bad", "rule": {"type": "nope", "dataset_id": "X"}}).status_code == 422
+
+
+@pytest.mark.parametrize("question", [
+    "Compare the economic outlook for Brazil, Mexico, Bolivia, Chile, and Peru.",
+    "Is gold positioning crowded?",
+    "Bolivia economic outlook",
+])
+def test_country_and_positioning_research_is_verified(client, question):
+    run_id = engine.create_run(question, {"engine": "deterministic", "formats": []})
+    result = engine.execute_run(run_id)
+    assert "error" not in result, result
+    assert result["verification"]["passed"], result["verification"]["unverified_numbers"]
+    tools = {e["tool"] for e in result["evidence"]}
+    assert tools & {"compare_countries", "get_positioning", "get_country_profile"}
+
+
+def test_positioning_and_country_endpoints(client):
+    r = client.get("/api/v1/positioning?id=CMD.GOLD")  # gold has positioning even without a price source
+    assert r.status_code == 200 and r.json()["result"]["dataset_id"] == "COT.GOLD"
+    assert client.get("/api/v1/positioning?id=EQ.US.SP500").status_code == 404
+    c = client.get("/api/v1/countries/compare?group=latam&indicators=GDP_GROWTH,INFLATION").json()
+    assert len(c["result"]["rows"]) == 10
+
+
+def test_schedule_lifecycle(client):
+    r = client.post("/api/v1/schedules", json={"name": "Weekly copper", "query": "copper outlook", "cadence": "weekly", "engine": "deterministic", "depth": "quick", "formats": []})
+    assert r.status_code == 201
+    sid = r.json()["schedule_id"]
+    from atlas import schedules
+
+    run_id = schedules.run_schedule(sid, background=False)
+    assert engine.get_run(run_id)["status"] == "complete"
+    listed = {s["schedule_id"]: s for s in client.get("/api/v1/schedules").json()}
+    assert listed[sid]["last_run_id"] == run_id
+    assert client.delete(f"/api/v1/schedules/{sid}").status_code == 204
+    assert sid not in {s["schedule_id"] for s in client.get("/api/v1/schedules").json()}

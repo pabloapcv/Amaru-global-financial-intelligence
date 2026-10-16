@@ -115,6 +115,52 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
                 lines.append(f"| {row['name']} | {_fmt(row['last_value'], 4)} | {row['last_date']} | {_fmt(t.get('1M'))} | {_fmt(t.get('1Y'))} | {row['trailing_unit']} |")
         lines += ["", f"Source: [{', '.join(e['label'] for e in comp)}].", ""]
 
+    # Countries ---------------------------------------------------------------------
+    cc = by_tool.get("compare_countries", [])
+    if cc:
+        lines += ["## Country comparison", ""]
+        for e in cc:
+            r = e["result"]
+            keys = list(r["indicators"])
+            head = " | ".join(f"{r['indicators'][k]['name']} ({r['indicators'][k]['unit']})" for k in keys)
+            lines += [f"| Country | {head} |", "|---|" + "---|" * len(keys)]
+            for row in r["rows"]:
+                cells = [(f"{_fmt(row[k]['latest'])} ({row[k]['year']}{', stale' if row[k].get('stale') else ''})") if row.get(k) else "n/a" for k in keys]
+                lines.append(f"| {row['name']} | {' | '.join(cells)} |")
+            lines.append("")
+            for k in keys:
+                order = r["rank_high_to_low"].get(k) or []
+                if order:
+                    names = {row["country"]: row["name"] for row in r["rows"]}
+                    lines.append(f"- {r['indicators'][k]['name']}: highest {names[order[0]]}, lowest {names[order[-1]]} [{e['label']}].")
+            if r.get("stale_values"):
+                lines.append(f"- {len(r['stale_values'])} value(s) are much older than peer data and were excluded from rankings [{e['label']}].")
+            lines += ["", f"*Latest available year per country; reference years {', '.join(str(y) for y in r['reference_years'])}. Source: World Bank WDI [{e['label']}].*", ""]
+    for e in by_tool.get("get_country_profile", []):
+        r = e["result"]
+        lines += [f"## {r['name']}: economic profile", ""]
+        for k, ind in r["indicators"].items():
+            last = ind["recent"][-1]
+            prev = ind["recent"][-2] if len(ind["recent"]) > 1 else None
+            trend = f", from {_fmt(prev['value'])} in {prev['year']}" if prev else ""
+            lines.append(f"- {ind['name']}: {_fmt(last['value'])} {ind['unit']} in {last['year']}{trend}; 10-year average {_fmt(ind['avg_10y'])} [{e['label']}].")
+        lines.append("")
+
+    # Positioning -------------------------------------------------------------------
+    pos = by_tool.get("get_positioning", [])
+    if pos:
+        lines += ["## Positioning (CFTC Commitments of Traders)", ""]
+        for e in pos:
+            r = e["result"]
+            extreme = f" — **{r['positioning_extreme']}**" if r.get("positioning_extreme") else ""
+            lines.append(
+                f"- {r['name']}: speculators (non-commercials) were net {_fmt(r['noncomm_net'], 0)} contracts on {r['report_date']} "
+                f"({_fmt(r['noncomm_net_pct_oi'])}% of open interest), {_fmt(r['noncomm_net_change_1w'], 0)} on the week. "
+                f"COT index {_fmt(r['cot_index'], 1)} (0 = most short, 100 = most long over the window), z-score {_fmt(r['net_zscore'])}{extreme}. "
+                f"Commercial hedgers net {_fmt(r['comm_net'], 0)} [{e['label']}]."
+            )
+        lines += ["", "*Positioning describes who holds risk; crowded positioning raises reversal risk but is not a timing signal.*", ""]
+
     # Relationships ---------------------------------------------------------------
     rel = by_tool.get("calculate_correlation", []) + by_tool.get("run_regression", [])
     if rel:
