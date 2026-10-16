@@ -91,6 +91,16 @@ def datasets() -> dict[str, Dataset]:
                           "indicator_key": ind["key"], "groups": c["groups"], "asset_class": "macro",
                           "description": f"{ind['name']} for {c['name']}, annual (World Bank WDI, code {ind['code']})."},
                 )
+    names = {c["iso3"]: c["name"] for c in reg.get("country_macro", {}).get("countries", [])} | {"WLD": "World"}
+    for rep, par in reg.get("trade_pairs", {}).get("pairs", []):
+        tid = trade_dataset_id(rep, par)
+        out[tid] = Dataset(
+            dataset_id=tid, kind="trade", name=f"Trade: {names[rep]} with {names[par]}", provider_id="comtrade",
+            provider_symbol=f"{rep}:{par}", frequency="annual", unit="USD",
+            tags=("trade", rep.lower(), par.lower()),
+            meta={"reporter": rep, "partner": par, "asset_class": "trade", "refresh": "weekly_poll",
+                  "description": f"{names[rep]}'s declared goods trade with {names[par]} (UN Comtrade, annual, USD): totals and HS-chapter breakdown."},
+        )
     for s in reg["macro_series"]:
         out[s["series_id"]] = Dataset(
             dataset_id=s["series_id"],
@@ -105,6 +115,19 @@ def datasets() -> dict[str, Dataset]:
             meta=s,
         )
     return out
+
+
+def trade_dataset_id(reporter: str, partner: str) -> str:
+    return f"TRADE.{reporter}.{partner}"
+
+
+def trade_pairs() -> list[tuple[str, str]]:
+    return [tuple(p) for p in load_registry().get("trade_pairs", {}).get("pairs", [])]  # type: ignore[misc]
+
+
+@lru_cache(maxsize=1)
+def hs_chapters() -> dict[str, str]:
+    return json.loads(REGISTRY_PATH.with_name("hs_chapters.json").read_text())["chapters"]
 
 
 def country_series_id(iso3: str, key: str) -> str:

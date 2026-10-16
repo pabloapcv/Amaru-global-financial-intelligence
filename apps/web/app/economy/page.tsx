@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Chart from "@/components/Chart";
 import InstrumentDetail from "@/components/InstrumentDetail";
+import TradeFlows from "@/components/TradeFlows";
 import { api, fmt, type ChartSpec, type Instrument } from "@/lib/api";
 import { Card, ErrorNote, FreshnessBadge, PageHeader } from "@/components/ui";
 
@@ -111,10 +112,11 @@ export default function Economy() {
 
   return (
     <>
-      <PageHeader title="Global economy" subtitle="Country comparisons from World Bank WDI, plus monthly U.S. series with point-in-time vintages." />
+      <PageHeader title="Global economy" subtitle="Country comparisons (World Bank WDI), bilateral trade (UN Comtrade), and monthly U.S. series with point-in-time vintages." />
       <ErrorNote error={error} />
       <div className="stack">
         <CountryComparison />
+        <TradeFlows />
         <div className="split">
           <Card title="United States · monthly">
             <table>

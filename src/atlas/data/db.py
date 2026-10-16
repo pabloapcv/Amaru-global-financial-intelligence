@@ -163,6 +163,24 @@ class PositioningObservation(Base):
     raw_id: Mapped[str | None] = mapped_column(String(32))
 
 
+class TradeFlow(Base):
+    """Annual bilateral trade values (UN Comtrade), by flow and HS chapter ("TOTAL" = all goods)."""
+
+    __tablename__ = "trade_flows"
+    __table_args__ = (UniqueConstraint("dataset_id", "year", "flow", "cmd_code", name="uq_trade_flow"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dataset_id: Mapped[str] = mapped_column(String(64), index=True)
+    year: Mapped[date] = mapped_column(Date)
+    flow: Mapped[str] = mapped_column(String(1))  # X = exports, M = imports (as declared by the reporter)
+    cmd_code: Mapped[str] = mapped_column(String(8))
+    value_usd: Mapped[float] = mapped_column(Float)
+    provider_id: Mapped[str] = mapped_column(String(32))
+    ingested_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    pipeline_run_id: Mapped[str | None] = mapped_column(String(32))
+    raw_id: Mapped[str | None] = mapped_column(String(32))
+
+
 # ---------------------------------------------------------------- lineage & pipeline
 
 
@@ -186,7 +204,7 @@ class DatasetState(Base):
     __tablename__ = "dataset_state"
 
     dataset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    kind: Mapped[str] = mapped_column(String(16))  # market | macro | positioning
+    kind: Mapped[str] = mapped_column(String(16))  # market | macro | positioning | trade
     provider_id: Mapped[str] = mapped_column(String(32))
     watermark: Mapped[date | None] = mapped_column(Date)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime)

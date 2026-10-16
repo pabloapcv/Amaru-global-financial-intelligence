@@ -11,7 +11,15 @@ import re
 import uuid
 from typing import Any
 
-from atlas.instruments import country_indicators, datasets, extract_countries, extract_entities, get_dataset, positioning_for
+from atlas.instruments import (
+    country_indicators,
+    datasets,
+    extract_countries,
+    extract_entities,
+    get_dataset,
+    positioning_for,
+    trade_pairs,
+)
 
 # Known cross-asset drivers for flagship workflows (spec §9, §21).
 DRIVERS: dict[str, list[str]] = {
@@ -41,6 +49,7 @@ INTENT_PATTERNS = [
     ("forecast", r"\b(forecast|outlook|next (\d+|three|six|twelve) months?|predict|expect)"),
     ("comparison", r"\b(compare|rank|which|best|worst|across)"),
     ("macro_overview", r"\b(global economy|economy|macro|inflation|unemployment|gdp|growth|recession)"),
+    ("trade", r"\b(trade|trading|exports?|imports?|exporters?|importers?|bilateral)\b"),
     ("market_update", r"\b(today|happening|latest|now|why is|moving|falling|rising|drop|rally)"),
 ]
 
@@ -148,6 +157,14 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
         if re.search(r"vulnerab|stronger dollar|external|crisis", q):
             wanted += ["CURRENT_ACCOUNT", "RESERVES", "DEBT", "INFLATION"]
         indicators = list(dict.fromkeys(wanted)) or ["GDP_GROWTH", "INFLATION", "UNEMPLOYMENT"]
+        if "trade" in intents:
+            loaded = set(trade_pairs())
+            pairs = [(a, b) for a in country_codes for b in country_codes if a != b and (a, b) in loaded]
+            pairs += [(a, "WLD") for a in country_codes if (a, "WLD") in loaded]
+            for rep, par in pairs[:4]:
+                add("get_trade_flows", reporter=rep, partner=par)
+            if not pairs:
+                add("get_trade_flows", reporter=country_codes[0], partner=country_codes[1] if len(country_codes) > 1 else "WLD")
         if len(country_codes) == 1 and not primary:
             add("get_country_profile", country=country_codes[0])
         else:
@@ -172,6 +189,9 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
     if ("forecast" in intents or depth == "deep") and sourced:
         for e in sourced[:2]:
             add("run_forecast", dataset_id=e, horizon_months=horizon)
+    if depth == "deep" or re.search(r"regime|volatil|turbulen|calm|risk", q):
+        for e in sourced[:3]:
+            add("detect_regime", dataset_id=e)
     if depth == "deep":
         for e in sourced[:2]:
             add("get_seasonality", dataset_id=e)

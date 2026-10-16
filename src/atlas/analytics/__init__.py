@@ -530,3 +530,78 @@ def positioning_stats(df: pd.DataFrame, lookback_years: float = 3) -> dict[str, 
         },
         "fingerprint": fingerprint(df["noncomm_net"].rename("noncomm_net"), df["open_interest"].rename("open_interest")),
     }
+
+
+# ---------------------------------------------------------------- volatility regimes
+
+
+def volatility_regime(series: pd.Series, *, unit: str, frequency: str, years: int = 10) -> dict[str, Any]:
+    """Classify the current volatility regime two ways.
+
+    1. Realized-volatility percentile: current annualized volatility (last ~3 months of
+       period changes) ranked against its own rolling history.
+    2. Two-state Markov-switching model (switching variance) fitted to period changes,
+       giving the probability that the market is in its high-volatility state now.
+    """
+    import statsmodels.api as sm
+
+    kind = transform_kind(unit)
+    work = series[series.index > series.index[-1] - pd.DateOffset(years=years)]
+    if frequency == "daily":
+        work = work.resample("W-FRI").last().dropna()
+        freq_used, ppy, window = "weekly", 52, 13
+    else:
+        freq_used, ppy, window = frequency, PERIODS_PER_YEAR.get(frequency, 12), {"monthly": 6, "quarterly": 4}.get(frequency, 6)
+    ch = transform(work, kind).dropna()
+    if len(ch) < 60:
+        raise ValueError(f"only {len(ch)} {freq_used} observations; need at least 60 for regime analysis")
+    scale = 100.0  # % for log returns, bp-equivalent percentage points ×100 for level changes
+    rv = ch.rolling(window).std(ddof=1).dropna() * math.sqrt(ppy) * scale
+    current_rv = float(rv.iloc[-1])
+    pct = float(stats.percentileofscore(rv, current_rv))
+    bucket = "low" if pct < 25 else "normal" if pct < 75 else "elevated" if pct < 95 else "stress"
+
+    y = (ch - ch.mean()) * scale
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = sm.tsa.MarkovRegression(y.to_numpy(), k_regimes=2, trend="n", switching_variance=True)
+        fit = model.fit(disp=False, search_reps=5)
+    sig = np.sqrt(np.asarray(fit.params[-2:]))  # sigma2 for regimes 0, 1
+    high = int(np.argmax(sig))
+    probs = fit.smoothed_marginal_probabilities[:, high]
+    p_trans = fit.regime_transition
+    stay_high = float(np.asarray(p_trans)[high, high, 0]) if np.ndim(p_trans) == 3 else None
+    in_high = probs > 0.5
+    episodes, start = [], None
+    for i, flag in enumerate(in_high):
+        if flag and start is None:
+            start = i
+        if (not flag or i == len(in_high) - 1) and start is not None:
+            end = i if flag else i - 1
+            if end - start + 1 >= 3:
+                episodes.append({"start": ch.index[start].date().isoformat(), "end": ch.index[end].date().isoformat(), "periods": end - start + 1})
+            start = None
+    return {
+        "frequency_used": freq_used,
+        "realized_vol_annualized": _r(current_rv, 2),
+        "realized_vol_unit": "pct" if kind == "log_return" else "bp",
+        "realized_vol_percentile": _r(pct, 1),
+        "realized_vol_regime": bucket,
+        "markov_high_vol_probability_now": _r(float(probs[-1]), 3),
+        "markov_regime_vol_annualized": {
+            "low": _r(float(sig[1 - high]) * math.sqrt(ppy), 2),
+            "high": _r(float(sig[high]) * math.sqrt(ppy), 2),
+        },
+        "markov_high_regime_persistence": _r(stay_high, 3),
+        "expected_high_regime_duration_periods": _r(1 / (1 - stay_high), 1) if stay_high is not None and stay_high < 1 else None,
+        "share_of_time_in_high_regime": _r(float(in_high.mean()), 3),
+        "recent_high_vol_episodes": episodes[-5:],
+        "probability_series": [{"date": d.date().isoformat(), "value": _r(float(p), 3)} for d, p in zip(ch.index, probs)],
+        "method": {
+            "realized": f"rolling {window}-period stdev of {freq_used} changes, annualized; percentile vs the {years}-year history",
+            "markov": "2-state Markov-switching model with regime-specific variance (Hamilton filter, smoothed probabilities)",
+            "caveat": "Smoothed probabilities use the full sample, so past regime dates are in-sample; the latest probability is the actionable reading.",
+            "n_observations": int(len(ch)),
+        },
+        "fingerprint": fingerprint(series),
+    }

@@ -45,16 +45,17 @@ def run_checks(
         metrics["rows_clean"] = 0
         return [], findings, metrics
 
-    # Duplicates: keep the last occurrence per date (provider order).
-    seen: dict[date, ParsedPoint] = {}
+    # Duplicates: keep the last occurrence per key (date plus any extra dimensions), in provider order.
+    seen: dict[tuple, ParsedPoint] = {}
     dupes = 0
     for p in points:
-        if p.observed_at in seen:
+        key = (p.observed_at, p.dims)
+        if key in seen:
             dupes += 1
-        seen[p.observed_at] = p
+        seen[key] = p
     if dupes:
-        findings.append(Finding("duplicates", "warning", f"{dupes} duplicate dates in payload; last value kept"))
-    ordered = sorted(seen.values(), key=lambda p: p.observed_at)
+        findings.append(Finding("duplicates", "warning", f"{dupes} duplicate keys in payload; last value kept"))
+    ordered = sorted(seen.values(), key=lambda p: (p.observed_at, p.dims or ()))
 
     missing = [p for p in ordered if p.value is None]
     clean = [p for p in ordered if p.value is not None and np.isfinite(p.value)]
@@ -68,6 +69,17 @@ def run_checks(
     future = [p for p in clean if p.observed_at > date.today() + timedelta(days=1)]
     if future:
         findings.append(Finding("future_dates", "error", f"{len(future)} observations dated in the future"))
+
+    if any(p.dims for p in clean):
+        # Multi-dimensional records (e.g. trade by product) are not one time series, so the
+        # gap / extreme-move / unit-change checks below do not apply.
+        negative = [p for p in clean if p.value < 0]
+        if negative and not allow_non_positive:
+            findings.append(Finding("non_positive", "warning", f"{len(negative)} negative values"))
+        metrics["rows_clean"] = len(clean)
+        metrics["first_date"] = clean[0].observed_at.isoformat() if clean else None
+        metrics["last_date"] = clean[-1].observed_at.isoformat() if clean else None
+        return clean, findings, metrics
 
     if not allow_non_positive:
         nonpos = [p for p in clean if p.value <= 0]

@@ -5,7 +5,7 @@ import Chart from "@/components/Chart";
 import { api, type ChartSpec, type Instrument } from "@/lib/api";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
-type Analysis = "correlation" | "regression" | "forecast" | "scenario" | "anomalies" | "seasonality";
+type Analysis = "correlation" | "regression" | "forecast" | "scenario" | "anomalies" | "seasonality" | "regime";
 
 const HELP: Record<Analysis, string> = {
   correlation: "Correlation of period changes, aligned to the coarsest frequency, with confidence intervals and rolling stability.",
@@ -14,6 +14,7 @@ const HELP: Record<Analysis, string> = {
   scenario: "Hypothetical: driver shock × historical beta. Shock in % for prices/FX, bp for yields.",
   anomalies: "Robust z-score of the latest change against a trailing median/MAD.",
   seasonality: "Average change by calendar month with hit rates.",
+  regime: "Volatility regime: realized-vol percentile plus a 2-state Markov-switching model's probability of the high-volatility state.",
 };
 
 export default function QuantLab() {
@@ -28,7 +29,7 @@ export default function QuantLab() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<Instrument[]>("/api/v1/instruments").then((all) => setInstruments(all.filter((i) => i.has_source))).catch(setError);
+    api<Instrument[]>("/api/v1/instruments").then((all) => setInstruments(all.filter((i) => i.has_source && (i.kind === "market" || i.dataset_id.startsWith("US."))))).catch(setError);
   }, []);
 
   const multi = analysis === "correlation" || analysis === "regression";

@@ -34,7 +34,7 @@ export default function Intelligence() {
   const load = useCallback(() => api<AlertRow[]>("/api/v1/alerts").then(setAlerts).catch(setError), []);
   useEffect(() => {
     load();
-    api<Instrument[]>("/api/v1/instruments").then((all) => setInstruments(all.filter((i) => i.has_source))).catch(setError);
+    api<Instrument[]>("/api/v1/instruments").then((all) => setInstruments(all.filter((i) => i.has_source && (i.kind === "market" || i.dataset_id.startsWith("US."))))).catch(setError);
   }, [load]);
 
   const create = async () => {
