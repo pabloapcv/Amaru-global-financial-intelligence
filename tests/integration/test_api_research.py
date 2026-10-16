@@ -114,3 +114,19 @@ def test_schedule_lifecycle(client):
     assert listed[sid]["last_run_id"] == run_id
     assert client.delete(f"/api/v1/schedules/{sid}").status_code == 204
     assert sid not in {s["schedule_id"] for s in client.get("/api/v1/schedules").json()}
+
+
+def test_trade_research_and_endpoint(client):
+    r = client.get("/api/v1/trade?reporter=BOL&partner=USA").json()["result"]
+    assert r["by_year"] and r["products"]["exports"]["top"]
+    assert client.get("/api/v1/trade?reporter=BOL&partner=CHN").status_code == 404  # not a loaded pair
+    run_id = engine.create_run("Bolivia–U.S. commodity trading opportunities", {"engine": "deterministic", "formats": []})
+    result = engine.execute_run(run_id)
+    assert result["verification"]["passed"], result["verification"]["unverified_numbers"]
+    assert "get_trade_flows" in {e["tool"] for e in result["evidence"]}
+
+
+def test_regime_quant_endpoint(client):
+    r = client.post("/api/v1/quant/analyze", json={"analysis": "regime", "dataset_ids": ["CMD.CRUDE.WTI"]})
+    assert r.status_code == 200, r.text
+    assert 0 <= r.json()["result"]["markov_high_vol_probability_now"] <= 1

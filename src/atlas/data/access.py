@@ -21,6 +21,7 @@ from atlas.data.db import (
     MarketObservation,
     PipelineRun,
     PositioningObservation,
+    TradeFlow,
     session_scope,
     utcnow,
 )
@@ -98,6 +99,11 @@ def series_meta(dataset_id: str) -> SeriesMeta:
                 func.min(MarketObservation.observed_at), func.max(MarketObservation.observed_at),
                 func.max(MarketObservation.ingested_at), func.count(),
             ).where(MarketObservation.instrument_id == dataset_id, MarketObservation.field == "close")
+        elif ds.kind == "trade":
+            q = select(
+                func.min(TradeFlow.year), func.max(TradeFlow.year), func.max(TradeFlow.ingested_at),
+                func.count(func.distinct(TradeFlow.year)),
+            ).where(TradeFlow.dataset_id == dataset_id, TradeFlow.cmd_code == "TOTAL")
         elif ds.kind == "positioning":
             q = select(
                 func.min(PositioningObservation.report_date), func.max(PositioningObservation.report_date),
@@ -160,6 +166,14 @@ def get_series(
             if as_of:
                 q = q.where(MarketObservation.observed_at <= as_of.date())
             rows = s.execute(q.order_by(MarketObservation.observed_at)).all()
+        elif ds.kind == "trade":
+            # Primary value: total goods exports declared by the reporter.
+            q = select(TradeFlow.year, TradeFlow.value_usd).where(
+                TradeFlow.dataset_id == dataset_id, TradeFlow.cmd_code == "TOTAL", TradeFlow.flow == "X"
+            )
+            if start:
+                q = q.where(TradeFlow.year >= start)
+            rows = s.execute(q.order_by(TradeFlow.year)).all()
         elif ds.kind == "positioning":
             # Primary value: net non-commercial (speculative) position in contracts.
             net = PositioningObservation.noncomm_long - PositioningObservation.noncomm_short
@@ -195,6 +209,24 @@ def get_series(
     if as_of:
         meta.as_of = as_of.isoformat()
     return series, meta
+
+
+def get_trade(dataset_id: str) -> tuple[pd.DataFrame, SeriesMeta]:
+    """All stored trade rows for a pair: columns year, flow (X/M), cmd_code, value_usd."""
+    ds = get_dataset(dataset_id)
+    if ds is None or ds.kind != "trade":
+        raise KeyError(f"'{dataset_id}' is not a trade dataset")
+    meta = series_meta(dataset_id)
+    with session_scope() as s:
+        rows = s.execute(
+            select(TradeFlow.year, TradeFlow.flow, TradeFlow.cmd_code, TradeFlow.value_usd)
+            .where(TradeFlow.dataset_id == dataset_id).order_by(TradeFlow.year)
+        ).all()
+    if not rows:
+        raise DataUnavailable(f"{dataset_id}: no stored observations ({meta.freshness}: {meta.freshness_note})")
+    df = pd.DataFrame(rows, columns=["year", "flow", "cmd_code", "value_usd"])
+    df["year"] = pd.to_datetime(df["year"]).dt.year
+    return df, meta
 
 
 def get_positioning(dataset_id: str, start: date | None = None) -> tuple[pd.DataFrame, SeriesMeta]:

@@ -31,6 +31,13 @@ export default function Chart({ spec, height = 280 }: { spec: ChartSpec; height?
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, minBarSpacing: 0.01 },
       crosshair: { mode: 1 },
+      localization: {
+        // Compact labels for large magnitudes (trade values, contracts); plain decimals otherwise.
+        priceFormatter: (v: number) =>
+          Math.abs(v) >= 1e4
+            ? new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(v)
+            : v.toFixed(Math.abs(v) >= 100 ? 1 : 2),
+      },
     });
     const clean = (pts: { date: string; value: number | null }[]) => {
       const seen = new Set<string>();

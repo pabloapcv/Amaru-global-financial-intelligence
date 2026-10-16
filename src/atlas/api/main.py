@@ -228,7 +228,7 @@ def cancel_research(run_id: str) -> dict[str, Any]:
 
 
 class QuantRequest(BaseModel):
-    analysis: Literal["correlation", "regression", "anomalies", "forecast", "scenario", "seasonality", "performance"]
+    analysis: Literal["correlation", "regression", "anomalies", "forecast", "scenario", "seasonality", "performance", "regime"]
     dataset_ids: list[str] = Field(default_factory=list)
     dependent: str | None = None
     explanatory: list[str] = Field(default_factory=list)
@@ -252,6 +252,7 @@ def quant_analyze(req: QuantRequest) -> dict[str, Any]:
         "scenario": ("run_scenario", {"asset": req.asset, "driver": req.driver, "shock": req.shock, "lookback_years": req.lookback_years}),
         "seasonality": ("get_seasonality", {"dataset_id": (req.dataset_ids or [None])[0]}),
         "performance": ("compare_performance", {"dataset_ids": req.dataset_ids}),
+        "regime": ("detect_regime", {"dataset_id": (req.dataset_ids or [None])[0]}),
     }
     tool, args = calls[a]
     import json
@@ -385,6 +386,32 @@ def compare_countries_endpoint(indicators: str = "GDP_GROWTH,INFLATION,UNEMPLOYM
         raise HTTPException(422, json.loads(out).get("error"))
     ev = ctx.evidence[-1]
     return {"result": json.loads(out), "chart": ev.chart, "sources": ev.sources}
+
+
+@app.get(f"{V1}/trade/pairs")
+def trade_pairs_endpoint() -> list[dict[str, Any]]:
+    from atlas.instruments import trade_dataset_id, trade_pairs
+
+    status = {r["dataset_id"]: r for r in access.data_status() if r["kind"] == "trade"}
+    return [
+        {"reporter": a, "partner": b, "dataset_id": trade_dataset_id(a, b),
+         "name": get_dataset(trade_dataset_id(a, b)).name,  # type: ignore[union-attr]
+         "observation_date": status.get(trade_dataset_id(a, b), {}).get("observation_date"),
+         "freshness": status.get(trade_dataset_id(a, b), {}).get("freshness")}
+        for a, b in trade_pairs()
+    ]
+
+
+@app.get(f"{V1}/trade")
+def trade(reporter: str, partner: str = "WLD", top_n: int = 10) -> dict[str, Any]:
+    import json
+
+    ctx = T.ToolContext()
+    out, err = T.execute(ctx, "get_trade_flows", {"reporter": reporter, "partner": partner, "top_n": top_n})
+    if err:
+        raise HTTPException(404 if "not loaded" in out else 409, json.loads(out).get("error"))
+    ev = ctx.evidence[-1]
+    return {"result": json.loads(out), "chart": ev.chart, "citation": ev.citation}
 
 
 @app.get(f"{V1}/positioning")

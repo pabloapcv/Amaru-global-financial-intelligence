@@ -42,6 +42,11 @@ def make_csv(symbol: str, dates: pd.DatetimeIndex, values: np.ndarray) -> bytes:
     return ("\n".join(lines) + "\n").encode()
 
 
+def _is_trade(symbol: str) -> bool:
+    parts = symbol.split(":")
+    return len(parts) == 2 and len(parts[1]) == 3 and parts[1].isalpha()
+
+
 class FakeFred:
     """Adapter stand-in serving deterministic synthetic series."""
 
@@ -81,9 +86,26 @@ class FakeFred:
                 for y in range(1980, last_year + 1)]
         return json.dumps({"country": iso3, "indicator": code, "rows": rows}).encode()
 
+    def _trade(self, symbol: str) -> bytes:
+        import json
+
+        reporter, partner = symbol.split(":")
+        rng = np.random.default_rng(abs(hash(symbol)) % 2**32)
+        last = pd.Timestamp.today().year - 1
+        rows = []
+        for y in range(last - 7, last + 1):
+            for flow in ("X", "M"):
+                rows.append({"year": y, "flow": flow, "cmd": "TOTAL", "value": float(rng.uniform(1e8, 1e9))})
+        for flow in ("X", "M"):
+            for ch in ("26", "71", "08", "84", "27"):
+                rows.append({"year": last, "flow": flow, "cmd": ch, "value": float(rng.uniform(1e6, 5e7))})
+        return json.dumps({"reporter": reporter, "partner": partner, "rows": rows}).encode()
+
     def _series(self, symbol: str) -> bytes:
         if symbol in self.overrides:
             return self.overrides[symbol]
+        if _is_trade(symbol):
+            return self._trade(symbol)
         if ":" in symbol:
             return self._wb(symbol)
         if symbol.isdigit():
@@ -120,7 +142,10 @@ class FakeFred:
         from atlas.ingestion.fred import FredAdapter
         from atlas.ingestion.worldbank import WorldBankAdapter
 
-        cls = WorldBankAdapter if ":" in symbol else CftcAdapter if symbol.isdigit() else FredAdapter
+        from atlas.ingestion.comtrade import ComtradeAdapter
+
+        cls = (ComtradeAdapter if _is_trade(symbol) else WorldBankAdapter if ":" in symbol
+               else CftcAdapter if symbol.isdigit() else FredAdapter)
         return cls.parse(cls.__new__(cls), symbol, payload)
 
     def citation(self, symbol):

@@ -16,15 +16,26 @@ import numpy as np
 import pandas as pd
 
 from atlas import analytics
-from atlas.data.access import DataUnavailable, data_status, get_positioning, get_series, latest_quote, series_meta
+from atlas.data.access import (
+    DataUnavailable,
+    data_status,
+    get_positioning,
+    get_series,
+    get_trade,
+    latest_quote,
+    series_meta,
+)
 from atlas.instruments import (
     countries,
     country_indicators,
     country_series_id,
     datasets,
     get_dataset,
+    hs_chapters,
     positioning_for,
     resolve,
+    trade_dataset_id,
+    trade_pairs,
 )
 
 
@@ -523,6 +534,91 @@ def t_get_country_profile(ctx: ToolContext, args: dict[str, Any]) -> dict[str, A
     return {"evidence_id": label, **result}
 
 
+def t_get_trade_flows(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    rep, par = str(args["reporter"]).upper(), str(args.get("partner") or "WLD").upper()
+    tid = trade_dataset_id(rep, par)
+    if get_dataset(tid) is None:
+        available = ", ".join(f"{a}->{b}" for a, b in trade_pairs())
+        raise ToolError(f"Trade pair {rep}->{par} is not loaded. Available pairs: {available}. Disclose this gap.")
+    try:
+        df, meta = get_trade(tid)
+    except DataUnavailable as exc:
+        raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap.") from exc
+    top_n = int(args.get("top_n", 8))
+    totals = df[df.cmd_code == "TOTAL"].pivot_table(index="year", columns="flow", values="value_usd", aggfunc="sum")
+    by_year = []
+    for year, row in totals.iterrows():
+        x, m = row.get("X"), row.get("M")
+        by_year.append({
+            "year": int(year),
+            "exports_usd": None if pd.isna(x) else round(float(x)),
+            "imports_usd": None if pd.isna(m) else round(float(m)),
+            "balance_usd": None if pd.isna(x) or pd.isna(m) else round(float(x - m)),
+        })
+    exp = totals.get("X", pd.Series(dtype=float)).dropna()
+    growth = None
+    if len(exp) >= 2 and exp.iloc[-2]:
+        growth = round(float(exp.iloc[-1] / exp.iloc[-2] - 1) * 100, 2)
+    cagr = None
+    if len(exp) >= 4 and exp.iloc[0] > 0:
+        years = int(exp.index[-1] - exp.index[0])
+        cagr = round(float((exp.iloc[-1] / exp.iloc[0]) ** (1 / years) - 1) * 100, 2)
+    names = hs_chapters()
+    products = {}
+    prod = df[df.cmd_code != "TOTAL"]
+    for flow, label in (("X", "exports"), ("M", "imports")):
+        part = prod[prod.flow == flow]
+        if part.empty:
+            continue
+        year = int(part.year.max())
+        part = part[part.year == year].sort_values("value_usd", ascending=False)
+        total = float(totals.loc[year, flow]) if year in totals.index and flow in totals.columns else float(part.value_usd.sum())
+        products[label] = {
+            "year": year,
+            "top": [
+                {"hs_chapter": r.cmd_code, "description": names.get(r.cmd_code, ""), "value_usd": round(float(r.value_usd)),
+                 "share_pct": round(float(r.value_usd) / total * 100, 2) if total else None}
+                for r in part.head(top_n).itertuples()
+            ],
+            "concentration_top3_pct": round(float(part.value_usd.head(3).sum()) / total * 100, 2) if total else None,
+        }
+    ds = get_dataset(tid)
+    result = {
+        "dataset_id": tid, "name": ds.name, "reporter": rep, "partner": par,  # type: ignore[union-attr]
+        "by_year": by_year, "latest_export_growth_pct": growth, "export_cagr_pct": cagr,
+        "export_cagr_years": f"{int(exp.index[0])}-{int(exp.index[-1])}" if len(exp) >= 4 else None,
+        "products": products, "freshness": meta.freshness,
+        "method": {
+            "source": "UN Comtrade, as declared by the reporter (exports FOB, imports typically CIF); partner 'WLD' = all partners.",
+            "caveat": "Mirror statistics (the partner's declared imports) can differ materially; HS chapters are broad product groups. Latest year may be incomplete or revised.",
+        },
+    }
+    chart = {
+        "type": "line", "title": f"{ds.name}: exports vs imports", "unit": "USD",  # type: ignore[union-attr]
+        "series": [
+            {"name": "Exports", "points": [{"date": f"{r['year']}-01-01", "value": r["exports_usd"]} for r in by_year]},
+            {"name": "Imports", "points": [{"date": f"{r['year']}-01-01", "value": r["imports_usd"]} for r in by_year]},
+        ],
+    }
+    label = ctx.add("get_trade_flows", args, result, _cite([meta]), [_source(meta)], chart)
+    return {"evidence_id": label, **result}
+
+
+def t_detect_regime(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    dsid = args["dataset_id"]
+    ds = _ds(dsid)
+    series, metas = _load([dsid])
+    try:
+        res = analytics.volatility_regime(series[dsid], unit=ds.unit, frequency=ds.frequency, years=int(args.get("years", 10)))
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
+    chart = {"type": "line", "title": f"{ds.name}: probability of high-volatility regime", "unit": "probability",
+             "series": [{"name": "P(high-vol regime)", "points": res.pop("probability_series")}]}
+    label = ctx.add("detect_regime", args, {"dataset_id": dsid, **res}, "ATLAS quant engine (Markov-switching volatility regime) on: " + _cite(metas),
+                    [_source(m) for m in metas], chart)
+    return {"evidence_id": label, "dataset_id": dsid, **res}
+
+
 def _unavailable(kind: str, needed: str) -> Callable[[ToolContext, dict[str, Any]], dict[str, Any]]:
     def tool(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         result = {
@@ -635,6 +731,20 @@ TOOLS: dict[str, dict[str, Any]] = {
         "fn": t_get_country_profile,
         "description": "Standardized economic profile of one country (ISO3 code): recent annual growth, inflation, unemployment, income, external accounts, reserves and debt from World Bank WDI.",
         "schema": {"type": "object", "properties": {"country": {"type": "string", "description": "ISO3 code, e.g. BRA, BOL"}}, "required": ["country"]},
+    },
+    "get_trade_flows": {
+        "fn": t_get_trade_flows,
+        "description": "Bilateral goods trade from UN Comtrade for a reporter country (ISO3) and partner (ISO3, or 'WLD' for all partners): annual exports/imports/balance, export growth and CAGR, top HS-chapter products with shares and concentration. Only pre-loaded pairs are available; the error lists them.",
+        "schema": {"type": "object", "properties": {
+            "reporter": {"type": "string", "description": "ISO3, e.g. BOL"},
+            "partner": {"type": "string", "description": "ISO3, e.g. USA, or WLD for all partners"},
+            "top_n": {"type": "integer"},
+        }, "required": ["reporter"]},
+    },
+    "detect_regime": {
+        "fn": t_detect_regime,
+        "description": "Volatility regime for one dataset: realized-volatility percentile bucket (low/normal/elevated/stress) and a 2-state Markov-switching model's probability of the high-volatility regime now, regime volatilities, persistence and recent high-vol episodes.",
+        "schema": {"type": "object", "properties": {"dataset_id": _ID, "years": {"type": "integer"}}, "required": ["dataset_id"]},
     },
     "get_fundamentals": {
         "fn": _unavailable("fundamentals", "USDA PSD / UNICA / ISO / ICSG supply-demand connectors"),

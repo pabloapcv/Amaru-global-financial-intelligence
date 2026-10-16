@@ -26,7 +26,7 @@ To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login
 | Spec area | Implementation |
 |---|---|
 | Canonical registry (§5, §7.4) | `src/atlas/instruments/registry.json`: 27 instruments, 6 U.S. macro series, 13 CFTC positioning series, 208 country series (26 countries × 8 WDI indicators); NL resolution of instruments and countries |
-| Data sources | FRED (prices, FX, rates, U.S. macro), CFTC Commitments of Traders (weekly positioning), World Bank WDI (annual country data). None needs an API key |
+| Data sources | FRED (prices, FX, rates, U.S. macro), CFTC Commitments of Traders (weekly positioning), World Bank WDI (annual country data), UN Comtrade (bilateral trade, 12 pre-loaded pairs incl. Bolivia–US). None needs an API key |
 | Ingestion pipeline (§7) | `src/atlas/ingestion/`: raw payload storage, validation, normalization, idempotent upserts, incremental watermarks, retries/backoff, replay, refresh scheduler |
 | Point-in-time macro (§7.3) | Revised values are stored as new vintages; `get_series(as_of=...)` reproduces past views |
 | Freshness (§5) | Observation date, ingestion time, last check and a status (`current/delayed/stale/no_source/failing`) for every dataset |
@@ -35,6 +35,8 @@ To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login
 | Reports (§12) | Versioned HTML (print stylesheet → PDF) and Excel (summary, evidence, sources, chart data) |
 | Monitoring (FR-009) | Alert rules (threshold, % move, anomaly), evaluated after each ingestion |
 | Scheduled reports (FR-010) | Saved questions re-run daily / weekly / monthly by the scheduler, after the data refresh |
+| Trade flows (FR-016) | Annual exports/imports/balance and HS-chapter product mix per pair; `get_trade_flows` tool and Global Economy card |
+| Volatility regimes (§11) | Realized-vol percentile buckets plus a 2-state Markov-switching model (`detect_regime`), in research and Quant Lab |
 | Positioning & countries (FR-011, §9) | COT index, z-score and crowding flags per market; cross-country comparisons with stale-value flags; country profiles |
 | API (§14) | FastAPI: instruments, quotes, history, macro (with `as_of`), data/pipeline status, research jobs (202 + polling), quant, reports, alerts |
 | UI (§13) | Next.js: Overview, AI Research, Markets, Global Economy, Quant Lab, Reports, Intelligence, Data Explorer |
@@ -83,6 +85,10 @@ tests/           unit, integration (pipeline, API, LLM loop), financial_validati
 ## Configuration
 
 See `.env.example`. Key variables: `ATLAS_DATABASE_URL`, `ATLAS_OBJECT_STORE`, `ATLAS_LLM` (`auto`/`off`), `ATLAS_LLM_MODEL` (default `claude-opus-5-5`), `ATLAS_LLM_EFFORT`, `ATLAS_SCHEDULER=on` (refresh inside the API process), `NEXT_PUBLIC_API_URL` for the web app.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs the Python tests (3.12 and 3.13) and type-checks and builds the web app on every push to `main` and on pull requests.
 
 ## Tests
 

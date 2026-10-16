@@ -28,6 +28,10 @@ def _fmt(v: Any, nd: int = 2) -> str:
     return str(v)
 
 
+def _usd(v: float | None) -> str:
+    return "n/a" if v is None else f"{'-' if v < 0 else ''}${abs(v):,.0f}"
+
+
 def _sig(p: float | None) -> bool:
     return p is not None and p < 0.05
 
@@ -64,7 +68,7 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             elif t.get(k) and "change_bp" in t[k]:
                 bits.append(f"{_fmt(t[k]['change_bp'], 1)} bp over {k}")
         if bits:
-            summary.append(f"- {e['result']['name']}: {', '.join(bits)}; it sits at the {_fmt(p['percentile_in_5y_range'], 1)}th percentile of its 5-year range [{e['label']}].")
+            summary.append(f"- {e['result']['name']}: {', '.join(bits)}; its 5-year percentile rank is {_fmt(p['percentile_in_5y_range'], 1)} [{e['label']}].")
     for e in by_tool.get("detect_anomalies", []):
         lt = e["result"]["latest"]
         if lt["is_anomalous"]:
@@ -146,6 +150,25 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             lines.append(f"- {ind['name']}: {_fmt(last['value'])} {ind['unit']} in {last['year']}{trend}; 10-year average {_fmt(ind['avg_10y'])} [{e['label']}].")
         lines.append("")
 
+    # Trade -------------------------------------------------------------------------
+    for e in by_tool.get("get_trade_flows", []):
+        r = e["result"]
+        lines += [f"## {r['name']}", ""]
+        last = r["by_year"][-1] if r["by_year"] else None
+        if last:
+            lines.append(
+                f"- In {last['year']}, exports were {_usd(last['exports_usd'])} and imports {_usd(last['imports_usd'])}, "
+                f"a balance of {_usd(last['balance_usd'])} [{e['label']}]."
+            )
+        if r.get("latest_export_growth_pct") is not None:
+            lines.append(f"- Exports changed {_fmt(r['latest_export_growth_pct'])}% on the prior year; compound annual growth {_fmt(r['export_cagr_pct'])}% over {r['export_cagr_years']} [{e['label']}].")
+        for flow in ("exports", "imports"):
+            pr = r["products"].get(flow)
+            if pr:
+                top = "; ".join(f"{t['description'].split(';')[0]} {_fmt(t['share_pct'], 1)}%" for t in pr["top"][:4])
+                lines.append(f"- Top {flow} in {pr['year']} (HS chapters): {top}. Top three = {_fmt(pr['concentration_top3_pct'], 1)}% of the total [{e['label']}].")
+        lines += ["", "*Reporter-declared values; the latest year may be incomplete or revised.*", ""]
+
     # Positioning -------------------------------------------------------------------
     pos = by_tool.get("get_positioning", [])
     if pos:
@@ -203,6 +226,20 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
                     lines.append(f"- Flagged: {row['name']} — {_fmt(row['change'], 3)} {row['change_unit']} on {row['date']} (robust z {_fmt(row['robust_z'])}) [{e['label']}].")
             else:
                 lines.append(f"- No dataset's latest move exceeded |z| ≥ {_fmt(e['result']['threshold'], 1)} [{e['label']}].")
+        lines.append("")
+
+    # Regimes -----------------------------------------------------------------------
+    rg = by_tool.get("detect_regime", [])
+    if rg:
+        lines += ["## Volatility regime", ""]
+        for e in rg:
+            r = e["result"]
+            lines.append(
+                f"- {_name(r['dataset_id'])}: realized volatility {_fmt(r['realized_vol_annualized'])} {r['realized_vol_unit']} annualized, "
+                f"percentile rank {_fmt(r['realized_vol_percentile'], 1)} in its history ({r['realized_vol_regime']}). "
+                f"The Markov-switching model puts the probability of the high-volatility regime at {_fmt(r['markov_high_vol_probability_now'], 3)} "
+                f"(regime volatilities {_fmt(r['markov_regime_vol_annualized']['low'])} vs {_fmt(r['markov_regime_vol_annualized']['high'])}) [{e['label']}]."
+            )
         lines.append("")
 
     # Outlook ---------------------------------------------------------------------

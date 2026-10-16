@@ -1243,7 +1243,8 @@
           "u.s.",
           "us economy",
           "america"
-        ]
+        ],
+        "m49": 842
       },
       {
         "iso3": "CHN",
@@ -1254,7 +1255,8 @@
         "aliases": [
           "china",
           "chinese"
-        ]
+        ],
+        "m49": 156
       },
       {
         "iso3": "JPN",
@@ -1264,7 +1266,8 @@
         ],
         "aliases": [
           "japan"
-        ]
+        ],
+        "m49": 392
       },
       {
         "iso3": "DEU",
@@ -1274,7 +1277,8 @@
         ],
         "aliases": [
           "germany"
-        ]
+        ],
+        "m49": 276
       },
       {
         "iso3": "GBR",
@@ -1286,7 +1290,8 @@
           "united kingdom",
           "uk",
           "britain"
-        ]
+        ],
+        "m49": 826
       },
       {
         "iso3": "FRA",
@@ -1296,7 +1301,8 @@
         ],
         "aliases": [
           "france"
-        ]
+        ],
+        "m49": 251
       },
       {
         "iso3": "ITA",
@@ -1306,7 +1312,8 @@
         ],
         "aliases": [
           "italy"
-        ]
+        ],
+        "m49": 380
       },
       {
         "iso3": "CAN",
@@ -1316,7 +1323,8 @@
         ],
         "aliases": [
           "canada"
-        ]
+        ],
+        "m49": 124
       },
       {
         "iso3": "KOR",
@@ -1327,7 +1335,8 @@
         "aliases": [
           "south korea",
           "korea"
-        ]
+        ],
+        "m49": 410
       },
       {
         "iso3": "AUS",
@@ -1337,7 +1346,8 @@
         ],
         "aliases": [
           "australia"
-        ]
+        ],
+        "m49": 36
       },
       {
         "iso3": "IND",
@@ -1347,7 +1357,8 @@
         ],
         "aliases": [
           "india"
-        ]
+        ],
+        "m49": 699
       },
       {
         "iso3": "IDN",
@@ -1357,7 +1368,8 @@
         ],
         "aliases": [
           "indonesia"
-        ]
+        ],
+        "m49": 360
       },
       {
         "iso3": "TUR",
@@ -1368,7 +1380,8 @@
         "aliases": [
           "turkey",
           "turkiye"
-        ]
+        ],
+        "m49": 792
       },
       {
         "iso3": "SAU",
@@ -1378,7 +1391,8 @@
         ],
         "aliases": [
           "saudi arabia"
-        ]
+        ],
+        "m49": 682
       },
       {
         "iso3": "ZAF",
@@ -1388,7 +1402,8 @@
         ],
         "aliases": [
           "south africa"
-        ]
+        ],
+        "m49": 710
       },
       {
         "iso3": "RUS",
@@ -1398,7 +1413,8 @@
         ],
         "aliases": [
           "russia"
-        ]
+        ],
+        "m49": 643
       },
       {
         "iso3": "BRA",
@@ -1409,7 +1425,8 @@
         ],
         "aliases": [
           "brazil"
-        ]
+        ],
+        "m49": 76
       },
       {
         "iso3": "MEX",
@@ -1420,7 +1437,8 @@
         ],
         "aliases": [
           "mexico"
-        ]
+        ],
+        "m49": 484
       },
       {
         "iso3": "ARG",
@@ -1431,7 +1449,8 @@
         ],
         "aliases": [
           "argentina"
-        ]
+        ],
+        "m49": 32
       },
       {
         "iso3": "CHL",
@@ -1441,7 +1460,8 @@
         ],
         "aliases": [
           "chile"
-        ]
+        ],
+        "m49": 152
       },
       {
         "iso3": "PER",
@@ -1451,7 +1471,8 @@
         ],
         "aliases": [
           "peru"
-        ]
+        ],
+        "m49": 604
       },
       {
         "iso3": "COL",
@@ -1461,7 +1482,8 @@
         ],
         "aliases": [
           "colombia"
-        ]
+        ],
+        "m49": 170
       },
       {
         "iso3": "BOL",
@@ -1471,7 +1493,8 @@
         ],
         "aliases": [
           "bolivia"
-        ]
+        ],
+        "m49": 68
       },
       {
         "iso3": "ECU",
@@ -1481,7 +1504,8 @@
         ],
         "aliases": [
           "ecuador"
-        ]
+        ],
+        "m49": 218
       },
       {
         "iso3": "URY",
@@ -1491,7 +1515,8 @@
         ],
         "aliases": [
           "uruguay"
-        ]
+        ],
+        "m49": 858
       },
       {
         "iso3": "PRY",
@@ -1501,7 +1526,8 @@
         ],
         "aliases": [
           "paraguay"
-        ]
+        ],
+        "m49": 600
       }
     ],
     "indicators": [
@@ -1594,6 +1620,60 @@
           "fiscal"
         ]
       }
+    ]
+  },
+  "trade_pairs": {
+    "_comment": "Bilateral trade relationships pre-loaded from UN Comtrade (reporter's declared exports/imports). WLD = all partners.",
+    "years": 8,
+    "pairs": [
+      [
+        "BOL",
+        "USA"
+      ],
+      [
+        "BOL",
+        "WLD"
+      ],
+      [
+        "BRA",
+        "CHN"
+      ],
+      [
+        "BRA",
+        "USA"
+      ],
+      [
+        "BRA",
+        "WLD"
+      ],
+      [
+        "CHL",
+        "CHN"
+      ],
+      [
+        "PER",
+        "CHN"
+      ],
+      [
+        "MEX",
+        "USA"
+      ],
+      [
+        "ARG",
+        "BRA"
+      ],
+      [
+        "COL",
+        "USA"
+      ],
+      [
+        "IND",
+        "USA"
+      ],
+      [
+        "CHN",
+        "WLD"
+      ]
     ]
   }
 }

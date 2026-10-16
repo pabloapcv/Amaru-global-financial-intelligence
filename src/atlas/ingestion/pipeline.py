@@ -23,6 +23,7 @@ from atlas.data.db import (
     MarketObservation,
     PipelineRun,
     PositioningObservation,
+    TradeFlow,
     RawPayload,
     session_scope,
     utcnow,
@@ -71,7 +72,7 @@ def _previous_values(session: Session, ds: Dataset) -> list[float]:
             .order_by(MarketObservation.observed_at.desc())
             .limit(60)
         ).scalars().all()
-    elif ds.kind == "positioning":
+    elif ds.kind in ("positioning", "trade"):
         return []
     else:
         rows = session.execute(
@@ -139,6 +140,28 @@ def _publish_positioning(session: Session, ds: Dataset, points: list[ParsedPoint
             for k, v in fields.items():
                 setattr(cur, k, v)
             cur.pipeline_run_id, cur.raw_id, cur.ingested_at = run_id, raw_id, utcnow()
+            revised += 1
+    return inserted, revised
+
+
+def _publish_trade(session: Session, ds: Dataset, points: list[ParsedPoint], run_id: str, raw_id: str) -> tuple[int, int]:
+    if not points:
+        return 0, 0
+    existing = {
+        (o.year, o.flow, o.cmd_code): o
+        for o in session.execute(select(TradeFlow).where(TradeFlow.dataset_id == ds.dataset_id)).scalars()
+    }
+    inserted = revised = 0
+    for p in points:
+        dims = dict(p.dims or ())
+        key = (p.observed_at, dims["flow"], dims["cmd"])
+        cur = existing.get(key)
+        if cur is None:
+            session.add(TradeFlow(dataset_id=ds.dataset_id, year=p.observed_at, flow=dims["flow"], cmd_code=dims["cmd"],
+                                  value_usd=p.value, provider_id=ds.provider_id, pipeline_run_id=run_id, raw_id=raw_id))
+            inserted += 1
+        elif abs(cur.value_usd - p.value) > 1e-6 * max(1.0, abs(cur.value_usd)):
+            cur.value_usd, cur.pipeline_run_id, cur.raw_id, cur.ingested_at = p.value, run_id, raw_id, utcnow()
             revised += 1
     return inserted, revised
 
@@ -223,7 +246,7 @@ def ingest_dataset(
                 frequency=ds.frequency,
                 allow_non_positive=ds.kind in ("macro", "positioning") or asset_class in NON_POSITIVE_OK,
                 # Level-ratio unit checks are meaningless for series that cross zero (net positions, growth rates).
-                previous_values=None if ds.kind == "positioning" or "percent" in ds.unit else _previous_values(s, ds),
+                previous_values=None if ds.kind in ("positioning", "trade") or "percent" in ds.unit else _previous_values(s, ds),
             )
             result.findings = quality.to_json(findings)
             run_row = s.get(PipelineRun, run_id)
@@ -241,13 +264,15 @@ def ingest_dataset(
                 state.last_error = result.error
                 state.consecutive_failures = (state.consecutive_failures or 0) + 1
             else:
-                publish = {"market": _publish_market, "macro": _publish_macro, "positioning": _publish_positioning}[ds.kind]
+                publish = {"market": _publish_market, "macro": _publish_macro, "positioning": _publish_positioning,
+                           "trade": _publish_trade}[ds.kind]
                 ins, rev = publish(s, ds, clean, run_id, raw.raw_id)
                 result.rows_inserted, result.rows_revised = ins, rev
                 run_row.rows_inserted, run_row.rows_revised = ins, rev
                 run_row.status = result.status = "success"
                 if clean:
-                    state.watermark = max(state.watermark or clean[-1].observed_at, clean[-1].observed_at)
+                    newest = max(p.observed_at for p in clean)
+                    state.watermark = max(state.watermark or newest, newest)
                 if ins or rev:
                     state.last_changed_at = utcnow()
                 state.last_error = None
