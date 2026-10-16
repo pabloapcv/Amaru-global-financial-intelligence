@@ -1,0 +1,85 @@
+"""Continuous monitoring: alert rules evaluated after each ingestion (spec FR-009, §7.1 step 07)."""
+
+from __future__ import annotations
+
+import logging
+from datetime import timedelta
+from typing import Any, Iterable
+
+from sqlalchemy import select
+
+from atlas.analytics import anomalies
+from atlas.data.access import DataUnavailable, get_series
+from atlas.data.db import Alert, AlertEvent, session_scope, utcnow
+from atlas.instruments import get_dataset
+
+log = logging.getLogger("atlas.intelligence")
+
+RULE_TYPES = {
+    "threshold": "Fires when the latest value crosses `value` using `op` ('>' or '<').",
+    "pct_change": "Fires when the change over `window_days` exceeds `abs_pct` percent (absolute).",
+    "anomaly": "Fires when the latest period change has |robust z| >= `z` (default 3.5).",
+}
+
+
+def validate_rule(rule: dict[str, Any]) -> None:
+    t = rule.get("type")
+    if t not in RULE_TYPES:
+        raise ValueError(f"rule.type must be one of {sorted(RULE_TYPES)}")
+    if not get_dataset(rule.get("dataset_id", "")):
+        raise ValueError("rule.dataset_id must be a registered dataset")
+    if t == "threshold" and (rule.get("op") not in (">", "<") or not isinstance(rule.get("value"), (int, float))):
+        raise ValueError("threshold rules need op ('>'|'<') and numeric value")
+    if t == "pct_change" and not isinstance(rule.get("abs_pct"), (int, float)):
+        raise ValueError("pct_change rules need numeric abs_pct")
+
+
+def evaluate_rule(rule: dict[str, Any]) -> str | None:
+    """Return a trigger message, or None when the rule does not fire."""
+    ds = get_dataset(rule["dataset_id"])
+    assert ds is not None
+    series, meta = get_series(rule["dataset_id"])
+    last, last_date = float(series.iloc[-1]), series.index[-1].date()
+    t = rule["type"]
+    if t == "threshold":
+        hit = last > rule["value"] if rule["op"] == ">" else last < rule["value"]
+        return f"{ds.name} at {last:g} {ds.unit} on {last_date} is {rule['op']} {rule['value']:g}" if hit else None
+    if t == "pct_change":
+        window = int(rule.get("window_days", 30))
+        past = series[series.index <= series.index[-1] - timedelta(days=window)]
+        if past.empty or past.iloc[-1] == 0:
+            return None
+        pct = (last / float(past.iloc[-1]) - 1) * 100
+        return (
+            f"{ds.name} moved {pct:+.2f}% over {window} days to {last:g} ({last_date})"
+            if abs(pct) >= rule["abs_pct"] else None
+        )
+    if t == "anomaly":
+        res = anomalies(series, unit=ds.unit, frequency=ds.frequency, threshold=float(rule.get("z", 3.5)))
+        lt = res["latest"]
+        return (
+            f"Unusual move in {ds.name} on {lt['date']}: {lt['change']:+.3f} {lt['change_unit']} (robust z {lt['robust_z']:+.2f})"
+            if lt["is_anomalous"] else None
+        )
+    return None
+
+
+def evaluate_alerts(changed_datasets: Iterable[str] | None = None) -> list[dict[str, Any]]:
+    changed = set(changed_datasets) if changed_datasets is not None else None
+    fired = []
+    with session_scope() as s:
+        alerts = s.execute(select(Alert).where(Alert.status == "active")).scalars().all()
+        for a in alerts:
+            if changed is not None and a.rule.get("dataset_id") not in changed:
+                continue
+            a.last_evaluated_at = utcnow()
+            try:
+                msg = evaluate_rule(a.rule)
+            except (DataUnavailable, ValueError) as exc:
+                log.warning("alert %s not evaluable: %s", a.alert_id, exc)
+                continue
+            if msg:
+                a.last_triggered_at = utcnow()
+                s.add(AlertEvent(alert_id=a.alert_id, message=msg, payload={"rule": a.rule}))
+                fired.append({"alert_id": a.alert_id, "name": a.name, "message": msg})
+    return fired
