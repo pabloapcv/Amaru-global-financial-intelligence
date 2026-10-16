@@ -9,12 +9,25 @@ export class ApiError extends Error {
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
+    credentials: "include", // httpOnly session cookie
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
     cache: "no-store",
   });
   const body = res.status === 204 ? null : await res.json().catch(() => null);
+  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/v1/auth/") && window.location.pathname !== "/login") {
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+  }
   if (!res.ok) throw new ApiError(res.status, body?.detail ?? body ?? res.statusText);
   return body as T;
+}
+
+export interface Account {
+  user: { user_id: string; email: string; name: string };
+  workspace: { workspace_id: string; name: string; plan: string } | null;
+  role: string;
+  auth: string;
+  limits: Record<string, number | null>;
+  usage: Record<string, number>;
 }
 
 export type Freshness = "current" | "delayed" | "stale" | "no_data" | "no_source" | "failing";

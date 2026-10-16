@@ -1,0 +1,118 @@
+"""Accounts, sessions, API keys, quotas and workspace isolation (spec §15, §16)."""
+
+import pytest
+from fastapi.testclient import TestClient
+
+from atlas import auth
+
+
+@pytest.fixture()
+def secured(seeded, monkeypatch):
+    monkeypatch.setenv("ATLAS_AUTH", "required")
+    from atlas.api.main import app
+
+    with TestClient(app) as c:
+        yield c
+
+
+def _signup(client, email, workspace):
+    r = client.post("/api/v1/auth/signup", json={"email": email, "password": "correct horse battery", "name": email.split("@")[0], "workspace_name": workspace})
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def test_password_hashing_roundtrip():
+    h = auth.hash_password("correct horse battery")
+    assert h.startswith("scrypt$") and "correct" not in h
+    assert auth.verify_password("correct horse battery", h)
+    assert not auth.verify_password("wrong password!!", h)
+
+
+def test_requests_without_credentials_are_rejected(secured):
+    secured.cookies.clear()
+    assert secured.get("/api/v1/instruments").status_code == 401
+    assert secured.get("/health").status_code == 200  # health stays public
+
+
+def test_signup_login_session_cookie_and_logout(secured):
+    _signup(secured, "ana@example.test", "Ana's desk")
+    assert secured.get("/api/v1/account").json()["user"]["email"] == "ana@example.test"
+    secured.post("/api/v1/auth/logout")
+    assert secured.get("/api/v1/account").status_code == 401
+    bad = secured.post("/api/v1/auth/login", json={"email": "ana@example.test", "password": "nope nope nope"})
+    assert bad.status_code == 401
+    ok = secured.post("/api/v1/auth/login", json={"email": "ana@example.test", "password": "correct horse battery"})
+    assert ok.status_code == 200 and secured.get("/api/v1/account").status_code == 200
+
+
+def test_signup_validation(secured):
+    assert secured.post("/api/v1/auth/signup", json={"email": "not-an-email", "password": "correct horse battery"}).status_code == 422
+    assert secured.post("/api/v1/auth/signup", json={"email": "short@example.test", "password": "short"}).status_code == 422
+
+
+def test_workspaces_cannot_see_each_others_research(secured):
+    from atlas.research import engine
+
+    a = _signup(secured, "alice@example.test", "Alice")
+    run_a = engine.create_run("copper outlook", {"engine": "deterministic", "depth": "quick", "formats": ["html"]},
+                              a["user"]["user_id"], a["workspace"]["workspace_id"])
+    result = engine.execute_run(run_a)
+    report_id = result["report_id"]
+    assert secured.get(f"/api/v1/research/{run_a}").status_code == 200
+    assert secured.get(f"/api/v1/reports/{report_id}/download").status_code == 200
+
+    secured.cookies.clear()
+    _signup(secured, "bob@example.test", "Bob")
+    assert secured.get(f"/api/v1/research/{run_a}").status_code == 404
+    assert secured.get(f"/api/v1/reports/{report_id}").status_code == 404
+    assert secured.get(f"/api/v1/reports/{report_id}/download").status_code == 404
+    assert run_a not in {r["run_id"] for r in secured.get("/api/v1/research").json()}
+    assert report_id not in {r["report_id"] for r in secured.get("/api/v1/reports").json()}
+
+
+def test_alerts_and_schedules_are_workspace_scoped(secured):
+    _signup(secured, "carol@example.test", "Carol")
+    alert = secured.post("/api/v1/alerts", json={"name": "WTI > 0", "rule": {"type": "threshold", "dataset_id": "CMD.CRUDE.WTI", "op": ">", "value": 0}}).json()
+    sched = secured.post("/api/v1/schedules", json={"name": "weekly", "query": "copper outlook", "cadence": "weekly"}).json()
+    secured.cookies.clear()
+    _signup(secured, "dave@example.test", "Dave")
+    assert alert["alert_id"] not in {a["alert_id"] for a in secured.get("/api/v1/alerts").json()}
+    assert secured.delete(f"/api/v1/alerts/{alert['alert_id']}").status_code == 404
+    assert secured.post(f"/api/v1/schedules/{sched['schedule_id']}/run").status_code == 404
+    assert secured.delete(f"/api/v1/schedules/{sched['schedule_id']}").status_code == 404
+
+
+def test_api_keys_authenticate_and_can_be_revoked(secured):
+    _signup(secured, "erin@example.test", "Erin")
+    key = secured.post("/api/v1/api-keys", json={"name": "notebook"}).json()
+    assert key["key"].startswith("atk_")
+    assert key["key"] not in str(secured.get("/api/v1/api-keys").json())  # shown once, never listed
+    secured.cookies.clear()
+    headers = {"Authorization": f"Bearer {key['key']}"}
+    assert secured.get("/api/v1/account", headers=headers).json()["auth"] == "api_key"
+    assert secured.post("/api/v1/api-keys", json={"name": "x"}, headers=headers).status_code == 403
+    secured.post("/api/v1/auth/login", json={"email": "erin@example.test", "password": "correct horse battery"})
+    assert secured.delete(f"/api/v1/api-keys/{key['key_id']}").status_code == 204
+    secured.cookies.clear()
+    assert secured.get("/api/v1/account", headers=headers).status_code == 401
+
+
+def test_plan_quotas_return_429(secured):
+    _signup(secured, "frank@example.test", "Frank")
+    limit = auth.PLANS["explorer"]["schedules"]
+    for i in range(limit):
+        assert secured.post("/api/v1/schedules", json={"name": f"s{i}", "query": "copper outlook", "cadence": "weekly"}).status_code == 201
+    r = secured.post("/api/v1/schedules", json={"name": "over", "query": "copper outlook", "cadence": "weekly"})
+    assert r.status_code == 429 and "plan limit" in r.json()["detail"]
+
+
+def test_data_refresh_requires_operator(secured):
+    _signup(secured, "gina@example.test", "Gina")
+    assert secured.post("/api/v1/pipelines/run", json={}).status_code == 403
+
+
+def test_login_throttling(secured):
+    for _ in range(auth.MAX_ATTEMPTS):
+        secured.post("/api/v1/auth/login", json={"email": "victim@example.test", "password": "guess guess guess"})
+    r = secured.post("/api/v1/auth/login", json={"email": "victim@example.test", "password": "guess guess guess"})
+    assert r.status_code == 401 and "too many attempts" in r.json()["detail"]

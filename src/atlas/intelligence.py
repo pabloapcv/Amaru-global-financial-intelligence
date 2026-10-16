@@ -64,11 +64,14 @@ def evaluate_rule(rule: dict[str, Any]) -> str | None:
     return None
 
 
-def evaluate_alerts(changed_datasets: Iterable[str] | None = None) -> list[dict[str, Any]]:
+def evaluate_alerts(changed_datasets: Iterable[str] | None = None, workspace_id: str | None = None) -> list[dict[str, Any]]:
     changed = set(changed_datasets) if changed_datasets is not None else None
     fired = []
     with session_scope() as s:
-        alerts = s.execute(select(Alert).where(Alert.status == "active")).scalars().all()
+        q = select(Alert).where(Alert.status == "active")
+        if workspace_id is not None:
+            q = q.where(Alert.workspace_id == workspace_id)
+        alerts = s.execute(q).scalars().all()
         for a in alerts:
             if changed is not None and a.rule.get("dataset_id") not in changed:
                 continue

@@ -210,19 +210,24 @@ def build_report(run_id: str, formats: list[str] | None = None, template: str = 
     return {"report_id": report_id, "version": version, "formats": uris}
 
 
-def get_report(report_id: str) -> dict[str, Any] | None:
+def get_report(report_id: str, workspace_id: str | None = None) -> dict[str, Any] | None:
     with session_scope() as s:
         r = s.get(Report, report_id)
         if r is None:
+            return None
+        if workspace_id is not None and s.get(ResearchRun, r.run_id).workspace_id != workspace_id:  # type: ignore[union-attr]
             return None
         return {"report_id": r.report_id, "run_id": r.run_id, "title": r.title, "template": r.template,
                 "version": r.version, "formats": sorted(r.formats), "paths": r.formats,
                 "created_at": r.created_at.isoformat(timespec="seconds") + "Z"}
 
 
-def list_reports(limit: int = 100) -> list[dict[str, Any]]:
+def list_reports(limit: int = 100, workspace_id: str | None = None) -> list[dict[str, Any]]:
     with session_scope() as s:
-        rows = s.execute(select(Report, ResearchRun.query).join(ResearchRun).order_by(Report.created_at.desc()).limit(limit)).all()
+        q = select(Report, ResearchRun.query).join(ResearchRun)
+        if workspace_id is not None:
+            q = q.where(ResearchRun.workspace_id == workspace_id)
+        rows = s.execute(q.order_by(Report.created_at.desc()).limit(limit)).all()
         return [
             {"report_id": r.report_id, "run_id": r.run_id, "title": r.title, "query": q, "version": r.version,
              "formats": sorted(r.formats), "created_at": r.created_at.isoformat(timespec="seconds") + "Z"}
