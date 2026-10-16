@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "atlas-api",
+      "runtimeExecutable": "/Users/pablopena/atlas/.venv/bin/atlas",
+      "runtimeArgs": ["serve", "--port", "8010"],
+      "port": 8010
+    },
+    {
+      "name": "atlas-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "apps/web", "run", "dev"],
+      "port": 3010
+    }
+  ]
+}
