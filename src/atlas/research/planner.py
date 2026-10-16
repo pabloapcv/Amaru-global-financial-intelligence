@@ -202,6 +202,14 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
             targets = [e for e in sourced if e != driver] or ["CMD.COPPER.LME", "FX.USDBRL", "EQ.US.SP500"]
             for e in targets[:5]:
                 add("run_scenario", asset=e, driver=driver, shock=size, lookback_years=10)
+            if driver.startswith("RATE."):
+                etype = "fed_cut" if size < 0 else "fed_hike"
+                for e in [t for t in targets if get_dataset(t) and get_dataset(t).frequency == "daily"][:3]:  # type: ignore[union-attr]
+                    add("run_event_study", dataset_id=e, event_type=etype)
+    if re.search(r"event stud|react(ion|s)? (to|around|after)|after (the )?(fomc|fed)|around (fomc|fed)", q):
+        etype = "fed_cut" if re.search(r"\bcuts?\b", q) else "fed_hike" if re.search(r"\bhikes?\b", q) else "fed_change"
+        for e in [t for t in sourced if get_dataset(t).frequency == "daily"][:3]:  # type: ignore[union-attr]
+            add("run_event_study", dataset_id=e, event_type=etype)
     if re.search(r"\bportfolio|\bmy (holdings|positions|book)\b|value at risk|\bvar\b|stress test", q):
         add("analyze_portfolio")
     if "anomaly_screen" in intents:

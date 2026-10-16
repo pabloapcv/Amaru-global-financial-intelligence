@@ -61,7 +61,7 @@ class Settings:
     http_timeout: float = 30.0
     # Identify ATLAS honestly to data providers, with a contact URL (crawler etiquette).
     user_agent: str = field(
-        default_factory=lambda: os.getenv("ATLAS_USER_AGENT", "ATLAS-research/0.1 (+https://github.com/pabloapcv/atlas-fin)")
+        default_factory=lambda: os.getenv("ATLAS_USER_AGENT") or "ATLAS-research/0.1 (+https://github.com/pabloapcv/atlas-fin)"
     )
     cors_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(

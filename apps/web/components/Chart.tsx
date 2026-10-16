@@ -46,6 +46,20 @@ export default function Chart({ spec, height = 280 }: { spec: ChartSpec; height?
         .map((p) => ({ time: p.date, value: p.value as number }))
         .sort((a, b) => (a.time < b.time ? -1 : 1));
     };
+    if (spec.x_is_event_time) {
+      // Map anchor-relative business days back to "day N" labels.
+      const anchor = Date.UTC(2000, 0, 3);
+      const dayOf = (t: unknown) => {
+        const ms = typeof t === "number" ? t * 1000 : typeof t === "string" ? Date.parse(t) : Date.UTC((t as any).year, (t as any).month - 1, (t as any).day);
+        const cal = Math.round((ms - anchor) / 86400000);
+        const weeks = Math.floor(cal / 7);
+        return weeks * 5 + Math.min(cal - weeks * 7, 5);
+      };
+      chart.applyOptions({
+        timeScale: { tickMarkFormatter: (t: unknown) => `day ${dayOf(t)}` },
+        localization: { timeFormatter: (t: unknown) => `day ${dayOf(t)}` },
+      });
+    }
     spec.series.forEach((s, i) => {
       let pts = clean(s.points);
       if (spec.type === "forecast" && s.name === "forecast" && spec.series[0]?.points.length) {

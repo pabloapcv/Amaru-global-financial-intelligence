@@ -29,11 +29,12 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 - **Existing local data** lives in the `local` workspace. To own it: `atlas create-user you@example.com --workspace local`.
 - **API keys:** create on the Account page; send `Authorization: Bearer atk_…`. Keys are shown once and stored hashed.
 - **Plans and quotas:** explorer / investor / research_pro / pro limits on daily research runs (and Claude runs), schedules, alerts and keys; over-limit requests get HTTP 429.
+- **Passwords:** "Forgot password?" sends a single-use reset link valid for 1 hour (SMTP via `ATLAS_SMTP_*`; without SMTP the link is written to the API log for the operator). Reset requests never reveal whether an account exists. Resetting or changing a password signs the user out everywhere. Set `ATLAS_PUBLIC_URL` so links point at your web app.
 - **Single-user mode:** `ATLAS_AUTH=off` skips sign-in and uses the `local` workspace.
 
 ## Deployment
 
-`infrastructure/docker/docker-compose.yml` runs TimescaleDB, the API, the ingestion/report scheduler and the web app; the file header lists the bootstrap commands. CI builds both images and smoke-tests the API image on every push.
+`infrastructure/docker/docker-compose.yml` runs TimescaleDB, the API, the ingestion/report scheduler and the web app; the file header lists the bootstrap commands. `infrastructure/docker/smoke-test.sh` starts the stack and exercises it end to end (create user, sign in, ingest real data, run research through the API, download HTML/Excel reports, check metrics and the web app); CI runs it on every push.
 
 ## What's in the MVP
 
@@ -51,6 +52,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | Scheduled reports (FR-010) | Saved questions re-run daily / weekly / monthly by the scheduler, after the data refresh |
 | Trade flows (FR-016) | Annual exports/imports/balance and HS-chapter product mix per pair; `get_trade_flows` tool and Global Economy card |
 | Portfolio risk (FR-015) | Saved long/short portfolios per workspace: volatility, historical/parametric VaR and CVaR, risk contributions, correlation, factor betas (dollar, 10Y yield, Brent), historical stress tests (2008, COVID, 2022); `analyze_portfolio` tool and Portfolio page |
+| Event studies (§11) | Average cumulative abnormal moves around Fed decisions (inferred from the effective fed funds rate since 2009) or custom dates; `run_event_study` tool, added automatically to rate-cut/hike scenario questions, and in Quant Lab |
 | Volatility regimes (§11) | Realized-vol percentile buckets plus a 2-state Markov-switching model (`detect_regime`), in research and Quant Lab |
 | Positioning & countries (FR-011, §9) | COT index, z-score and crowding flags per market; cross-country comparisons with stale-value flags; country profiles |
 | API (§14) | FastAPI: instruments, quotes, history, macro (with `as_of`), data/pipeline status, research jobs (202 + polling), quant, reports, alerts |
@@ -73,7 +75,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
   - All interfaces are modular so these can be swapped.
 - **Not built yet:**
   - billing and plan upgrades (plans are set by an operator);
-  - password reset and email verification;
+  - email verification at sign-up;
   - higher-frequency non-US data (IMF/BIS connectors);
   - USDA/EIA connectors (need free API keys);
   - licensed market data;

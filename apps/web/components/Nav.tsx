@@ -21,9 +21,9 @@ export default function Nav() {
   const path = usePathname();
   const [account, setAccount] = useState<Account | null>(null);
   useEffect(() => {
-    if (path !== "/login") api<Account>("/api/v1/account").then(setAccount).catch(() => {});
+    if (path !== "/login" && path !== "/reset") api<Account>("/api/v1/account").then(setAccount).catch(() => {});
   }, [path]);
-  if (path === "/login") return null;
+  if (path === "/login" || path === "/reset") return null;
   return (
     <nav className="nav">
       <div className="brand">

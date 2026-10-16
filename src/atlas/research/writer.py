@@ -271,7 +271,7 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
 
     # Outlook ---------------------------------------------------------------------
     fc, sc, se = by_tool.get("run_forecast", []), by_tool.get("run_scenario", []), by_tool.get("get_seasonality", [])
-    if fc or sc or se:
+    if fc or sc or se or by_tool.get("run_event_study"):
         lines += ["## Outlook and scenarios", ""]
         for e in fc:
             r = e["result"]
@@ -287,6 +287,15 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             if months:
                 lo, hi = months[0], months[-1]
                 lines.append(f"- Seasonality in {_name(e['result']['dataset_id'])}: weakest calendar month on average is month {lo['month']} ({_fmt(lo['mean_change'], 3)}), strongest is month {hi['month']} ({_fmt(hi['mean_change'], 3)}) [{e['label']}].")
+        for e in by_tool.get("run_event_study", []):
+            r = e["result"]
+            rx = r["reaction"]
+            sig = "statistically significant" if _sig(rx["p_value"]) else "not statistically significant"
+            lines.append(
+                f"- *Historical precedent:* across {r['n_events']} {r['event_type'].replace('_', ' ')}s, {_name(r['dataset_id'])} moved "
+                f"{_fmt(rx['mean'], 3)} {r['unit']} on average from the day before to day +{r['window']['post']} "
+                f"(median {_fmt(rx['median'], 3)}, positive in {_fmt(rx['hit_rate_positive'] * 100, 1)}% of cases; {sig}, p={_fmt(rx['p_value'], 4)}) [{e['label']}]."
+            )
         for e in sc:
             r = e["result"]
             lines.append(

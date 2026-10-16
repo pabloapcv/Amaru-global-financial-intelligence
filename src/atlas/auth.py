@@ -30,6 +30,7 @@ from atlas.data.db import (
     AuditEvent,
     AuthSession,
     Membership,
+    PasswordReset,
     ReportSchedule,
     ResearchRun,
     User,
@@ -39,6 +40,7 @@ from atlas.data.db import (
 )
 
 SESSION_TTL = timedelta(days=14)
+RESET_TTL = timedelta(hours=1)
 API_KEY_PREFIX = "atk_"
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MIN_PASSWORD = 10
@@ -231,6 +233,65 @@ def account(principal: Principal) -> dict[str, Any]:
             "limits": PLANS.get(ws.plan if ws else "explorer"),
             "usage": usage(principal.workspace_id),
         }
+
+
+# ---------------------------------------------------------------- passwords
+
+
+def _set_password(s, user: User, new_password: str) -> None:
+    if len(new_password) < MIN_PASSWORD:
+        raise ValidationError(f"password must be at least {MIN_PASSWORD} characters")
+    user.password_hash = hash_password(new_password)
+    # Changing the password signs the user out everywhere.
+    for sess in s.execute(select(AuthSession).where(AuthSession.user_id == user.user_id)).scalars():
+        s.delete(sess)
+
+
+def change_password(principal: Principal, current: str, new_password: str) -> None:
+    with session_scope() as s:
+        user = s.get(User, principal.user_id)
+        if user is None or not verify_password(current, user.password_hash):
+            raise AuthError("current password is incorrect")
+        _set_password(s, user, new_password)
+    audit("password.changed", principal.user_id, principal.workspace_id)
+
+
+def request_password_reset(email: str, client: str = "") -> str | None:
+    """Create a single-use reset token and email the link. Returns the token only for tests/CLI.
+
+    Callers must respond identically whether or not the account exists (no enumeration).
+    """
+    from atlas import mailer
+
+    email = email.strip().lower()
+    _throttle(f"reset|{email}|{client}")
+    with session_scope() as s:
+        user = s.execute(select(User).where(User.email == email)).scalar_one_or_none()
+        if user is None:
+            return None
+        token = secrets.token_urlsafe(32)
+        s.add(PasswordReset(token_hash=_token_hash(token), user_id=user.user_id, expires_at=utcnow() + RESET_TTL))
+        uid = user.user_id
+    base = os.getenv("ATLAS_PUBLIC_URL", "http://localhost:3010").rstrip("/")
+    mailer.send(email, "Reset your ATLAS password",
+                f"Someone requested a password reset for your ATLAS account.\n\n"
+                f"Reset it within {int(RESET_TTL.total_seconds() // 60)} minutes: {base}/reset?token={token}\n\n"
+                f"If this wasn't you, ignore this email; your password is unchanged.")
+    audit("password.reset_requested", uid, None)
+    return token
+
+
+def reset_password(token: str, new_password: str) -> None:
+    with session_scope() as s:
+        rec = s.get(PasswordReset, _token_hash(token or ""))
+        if rec is None or rec.used_at is not None or rec.expires_at < utcnow():
+            raise AuthError("reset link is invalid or has expired")
+        user = s.get(User, rec.user_id)
+        assert user is not None
+        _set_password(s, user, new_password)
+        rec.used_at = utcnow()
+        uid = user.user_id
+    audit("password.reset_completed", uid, None)
 
 
 # ---------------------------------------------------------------- API keys

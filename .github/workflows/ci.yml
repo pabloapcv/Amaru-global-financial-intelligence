@@ -83,3 +83,15 @@ jobs:
           docker run -d --name api -p 8010:8010 -e ATLAS_DATABASE_URL=sqlite:////data/atlas.db atlas-api:ci
           for i in $(seq 1 30); do curl -sf localhost:8010/health && exit 0; sleep 1; done
           docker logs api; exit 1
+
+  stack:
+    # Full compose stack (TimescaleDB + API + web) exercised end to end like a user would.
+    runs-on: ubuntu-latest
+    needs: docker
+    steps:
+      - uses: actions/checkout@v7
+      - name: Smoke-test the compose stack
+        run: infrastructure/docker/smoke-test.sh
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f infrastructure/docker/docker-compose.yml logs --no-color | tail -200

@@ -748,3 +748,89 @@ def portfolio_risk(
         },
         "fingerprint": fingerprint(*[series[i] for i in ids]),
     }
+
+
+# ---------------------------------------------------------------- event studies
+
+
+def policy_events(fed_funds: pd.Series, threshold: float = 0.2, since: str = "2009-01-01") -> list[dict[str, Any]]:
+    """Fed policy-rate changes inferred from the daily effective fed funds rate.
+
+    Since the 2008 floor system, a one-day move of >= `threshold` percentage points marks a
+    decision; the move shows up the business day after the announcement, so the event date is
+    shifted back one business day. Moves within 5 days of the previous event are merged.
+    """
+    s = fed_funds[fed_funds.index >= since].dropna()
+    d = s.diff()
+    events: list[dict[str, Any]] = []
+    for dt, chg in d[d.abs() >= threshold].items():
+        ann = (dt - pd.offsets.BDay(1)).normalize()
+        if events and (ann - pd.Timestamp(events[-1]["date"])).days <= 5:
+            continue
+        events.append({"date": ann.date().isoformat(), "change_bp": _r(float(chg) * 100, 0),
+                       "type": "hike" if chg > 0 else "cut"})
+    return events
+
+
+def event_study(
+    series: pd.Series,
+    event_dates: list[str],
+    *,
+    unit: str,
+    pre: int = 5,
+    post: int = 10,
+    estimation: int = 120,
+) -> dict[str, Any]:
+    """Mean-adjusted event study on daily data.
+
+    Abnormal return = period change minus its mean over an estimation window ending 10 days
+    before the event. Reports the average cumulative abnormal return (CAR) path from -pre to
+    +post trading days, with cross-sectional t-statistics and hit rates.
+    """
+    kind = transform_kind(unit)
+    ch = transform(series, kind)
+    idx = ch.index
+    paths, used, skipped = [], [], []
+    for ev in event_dates:
+        t = pd.Timestamp(ev)
+        pos = idx.searchsorted(t)  # first trading day on/after the event
+        if pos - pre - estimation - 10 < 0 or pos + post >= len(idx):
+            skipped.append({"date": ev, "reason": "insufficient data around event"})
+            continue
+        est = ch.iloc[pos - 10 - estimation: pos - 10]
+        window = ch.iloc[pos - pre: pos + post + 1] - float(est.mean())
+        paths.append(window.cumsum().to_numpy())
+        used.append({"date": ev, "aligned_to": idx[pos].date().isoformat(),
+                     "car_post": _r(float(window.iloc[pre:].sum()) * 100, 3)})
+    if len(paths) < 3:
+        raise ValueError(f"only {len(paths)} usable events; need at least 3")
+    m = np.vstack(paths) * 100  # % for log returns, bp for percent-unit series
+    mean, sd = m.mean(axis=0), m.std(axis=0, ddof=1)
+    n = m.shape[0]
+    t_stat = np.where(sd > 0, mean / (sd / np.sqrt(n)), np.nan)
+    days = list(range(-pre, post + 1))
+    # CAR from the day before the event to the end of the window isolates the reaction.
+    reaction = m[:, -1] - m[:, pre - 1] if pre >= 1 else m[:, -1]
+    r_t, r_p = stats.ttest_1samp(reaction, 0.0)
+    return {
+        "n_events": int(n),
+        "unit": "pct (log)" if kind == "log_return" else "bp",
+        "window": {"pre": pre, "post": post, "estimation": estimation},
+        "car_path": [{"day": d, "mean_car": _r(float(a), 3), "t_stat": _r(float(b), 2)} for d, a, b in zip(days, mean, t_stat)],
+        "reaction": {
+            "definition": f"CAR from day -1 to day +{post}",
+            "mean": _r(float(reaction.mean()), 3),
+            "median": _r(float(np.median(reaction)), 3),
+            "hit_rate_positive": _r(float((reaction > 0).mean()), 3),
+            "t_stat": _r(float(r_t), 2),
+            "p_value": _r(float(r_p), 4),
+        },
+        "events": used,
+        "skipped": skipped,
+        "method": {
+            "model": "mean-adjusted abnormal returns (estimation window ends 10 trading days before each event)",
+            "transform": kind,
+            "caveat": "Small event samples; overlapping macro news can contaminate windows; association, not causation.",
+        },
+        "fingerprint": fingerprint(series),
+    }

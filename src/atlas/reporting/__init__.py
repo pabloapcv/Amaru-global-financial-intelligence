@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import markdown as md
+import numpy as np
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -73,15 +74,24 @@ def svg_chart(chart: dict[str, Any], width: int = 760, height: int = 260) -> str
         label = f"{tick:,.0f}" if step >= 1 else f"{tick:,.{max(0, -math.floor(math.log10(step)))}f}"
         parts.append(f'<text x="{pad_l - 6}" y="{y + 4:.1f}" text-anchor="end" class="axis">{label}</text>')
         tick += step
-    # x labels: years
-    first_year = dt.date.fromordinal(int(x0)).year
+    if chart.get("x_is_event_time"):
+        # Event-relative axis: label business-day offsets from the 2000-01-03 anchor.
+        anchor = dt.date(2000, 1, 3)
+        for s_ in series[:1]:
+            pts = s_["points"]
+            for p in pts[:: max(1, len(pts) // 8)] + pts[-1:]:
+                d = dt.date.fromisoformat(p["date"])
+                off = int(np.busday_count(anchor, d)) if d >= anchor else -int(np.busday_count(d, anchor))
+                parts.append(f'<text x="{px(ts(p["date"])):.1f}" y="{height - pad_b + 18}" text-anchor="middle" class="axis">day {off}</text>')
+    # x labels: years (calendar axes only)
+    first_year = 0 if chart.get("x_is_event_time") else dt.date.fromordinal(int(x0)).year
     last_year = dt.date.fromordinal(int(x1)).year
-    years = list(range(first_year + 1, last_year + 1))
+    years = list(range(first_year + 1, last_year + 1)) if first_year else []
     stride = max(1, len(years) // 8)
     for yr in years[::stride]:
         x = px(dt.date(yr, 1, 1).toordinal())
         parts.append(f'<text x="{x:.1f}" y="{height - pad_b + 18}" text-anchor="middle" class="axis">{yr}</text>')
-    if len(years) <= 1:
+    if len(years) <= 1 and not chart.get("x_is_event_time"):
         for d in (x0, x1):
             parts.append(f'<text x="{px(d):.1f}" y="{height - pad_b + 18}" text-anchor="middle" class="axis">{dt.date.fromordinal(int(d)).isoformat()}</text>')
     # band
