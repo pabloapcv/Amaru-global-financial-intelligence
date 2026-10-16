@@ -70,7 +70,7 @@ def execute_run(run_id: str) -> dict[str, Any]:
     with session_scope() as s:
         run = s.get(ResearchRun, run_id)
         assert run is not None
-        query, config = run.query, dict(run.config or {})
+        query, config, workspace_id = run.query, dict(run.config or {}), run.workspace_id
         run.status = "running"
     try:
         depth = config.get("depth", "standard")
@@ -92,7 +92,7 @@ def execute_run(run_id: str) -> dict[str, Any]:
                 "environment or in .env at the project root (one line: ANTHROPIC_API_KEY=sk-ant-...)."
             )
         use_llm = engine_pref == "llm" or (engine_pref == "auto" and llm.available())
-        ctx = T.ToolContext()
+        ctx = T.ToolContext(workspace_id=workspace_id)
         narrative, engine, model = "", "deterministic", None
         transcript = None
         if use_llm:
@@ -107,7 +107,7 @@ def execute_run(run_id: str) -> dict[str, Any]:
                     raise
                 log.warning("LLM research failed, falling back to deterministic: %s", exc)
                 _progress(run_id, f"LLM unavailable ({type(exc).__name__}: {str(exc)[:200]}); using deterministic engine")
-                ctx = T.ToolContext()
+                ctx = T.ToolContext(workspace_id=workspace_id)
         if engine == "deterministic":
             for step in plan["steps"]:
                 _progress(run_id, f"Running {step['tool']}")

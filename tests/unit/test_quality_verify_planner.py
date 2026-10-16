@@ -117,3 +117,8 @@ def test_dotenv_parsing_tolerates_common_formats():
     assert env["ATLAS_LLM"] == "auto"
     assert env["EMPTY"] == ""
     assert env["QUOTED"] == "x y"
+
+
+def test_confidence_levels_are_not_claims_but_other_95s_are():
+    assert verify.verify("VaR of 1.15% at 95% and 2.01% at 99% [E1].", [{"label": "E1", "result": {"a": 1.15, "b": 2.01}}])["passed"]
+    assert not verify.verify("Inflation hit 95% [E1].", [{"label": "E1", "result": {"a": 1.15}}])["passed"]
