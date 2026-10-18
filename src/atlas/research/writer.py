@@ -46,7 +46,21 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
     for e in evidence:
         by_tool.setdefault(e["tool"], []).append(e)
 
-    title = f"# {plan['asset']['name']}: research brief" if plan.get("asset") else "# Market and macro research brief"
+    from atlas.research.templates import TEMPLATES
+
+    tmpl = TEMPLATES.get(plan.get("template") or "research_report", {})
+    if plan.get("template") and plan["template"] != "research_report":
+        subject = None
+        if plan["template"] == "commodity_deep_dive" and plan.get("asset"):
+            subject = plan["asset"]["name"]
+        elif plan["template"] == "country_intelligence":
+            from atlas.instruments import countries
+
+            iso = (plan.get("countries") or ["BRA"])[0]
+            subject = next((c["name"] for c in countries() if c["iso3"] == iso), iso)
+        title = f"# {tmpl['name']}" + (f": {subject}" if subject else "")
+    else:
+        title = f"# {plan['asset']['name']}: research brief" if plan.get("asset") else "# Market and macro research brief"
     lines = [title, ""]
 
     # Executive summary ---------------------------------------------------------

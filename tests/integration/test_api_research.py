@@ -152,3 +152,22 @@ def test_metrics_endpoint(client, monkeypatch):
     monkeypatch.setenv("ATLAS_METRICS_TOKEN", "s3cret")
     assert client.get("/metrics").status_code == 401
     assert client.get("/metrics", headers={"Authorization": "Bearer s3cret"}).status_code == 200
+
+
+@pytest.mark.parametrize("template", ["daily_market_brief", "commodity_deep_dive", "global_macro_outlook", "country_intelligence", "cross_asset"])
+def test_report_templates_produce_verified_reports(client, template):
+    from atlas.research.templates import TEMPLATES
+
+    t = TEMPLATES[template]
+    run_id = engine.create_run(t["default_query"], {"engine": "deterministic", "template": template, "formats": []})
+    result = engine.execute_run(run_id)
+    assert "error" not in result, result
+    assert result["verification"]["passed"], result["verification"]["unverified_numbers"]
+    assert result["title"].startswith(t["name"])
+    assert client.post("/api/v1/research", json={"query": "x y z", "report": {"template": "nope"}}).status_code == 422
+
+
+def test_openapi_declares_api_key_auth(client):
+    spec = client.get("/openapi.json").json()
+    assert "ApiKey" in spec["components"]["securitySchemes"]
+    assert {"ApiKey": []} in spec["paths"]["/api/v1/research"]["post"]["security"]

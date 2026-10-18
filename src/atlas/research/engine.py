@@ -80,6 +80,9 @@ def execute_run(run_id: str) -> dict[str, Any]:
             query, depth=depth, horizon_months=config.get("horizon_months"),
             lookback_years=config.get("lookback_years"), scope=config.get("assets"),
         )
+        from atlas.research import templates
+
+        plan = templates.apply(plan, config.get("template"))
         problems = validate_plan(plan)
         if problems:
             raise ValueError("invalid research plan: " + "; ".join(problems))

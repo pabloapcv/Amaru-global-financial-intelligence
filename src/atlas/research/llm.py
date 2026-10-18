@@ -87,7 +87,9 @@ class LLMResearcher:
                 f"Research question: {query}\n\nRequested depth: {depth}. Outlook horizon: "
                 f"{plan['timeframe']['horizon_months']} months. Lookback: {plan['timeframe']['lookback_years']} years.\n\n"
                 f"Resolved entities: {', '.join(plan['entities']) or 'none — use search_instruments'}.\n"
-                f"Suggested plan (tool calls):\n{steps}\n\nRun the investigation, then write the brief."
+                f"Suggested plan (tool calls):\n{steps}\n\n"
+                + (f"Report type: {plan['template_brief']}\n\n" if plan.get("template_brief") else "")
+                + "Run the investigation, then write the brief."
             ),
         }]
         while True:

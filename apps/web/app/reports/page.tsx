@@ -12,6 +12,11 @@ function Schedules() {
   const [name, setName] = useState("Weekly sugar brief");
   const [query, setQuery] = useState("What's happening with sugar, and what are the main drivers? Include positioning. Outlook for the next three months.");
   const [cadence, setCadence] = useState("weekly");
+  const [template, setTemplate] = useState("research_report");
+  const [templates, setTemplates] = useState<{ key: string; name: string; default_query: string | null }[]>([]);
+  useEffect(() => {
+    api<typeof templates>("/api/v1/report-templates").then(setTemplates).catch(() => {});
+  }, []);
   const [error, setError] = useState<unknown>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const load = useCallback(() => api<Schedule[]>("/api/v1/schedules").then(setRows).catch(setError), []);
@@ -20,7 +25,7 @@ function Schedules() {
   const create = async () => {
     setError(null);
     try {
-      await api("/api/v1/schedules", { method: "POST", body: JSON.stringify({ name, query, cadence }) });
+      await api("/api/v1/schedules", { method: "POST", body: JSON.stringify({ name, query, cadence, template }) });
       load();
     } catch (e) { setError(e); }
   };
@@ -35,6 +40,16 @@ function Schedules() {
       <div className="grid grid-2">
         <div>
           <div className="field"><label>Name</label><input value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div className="field">
+            <label>Report type</label>
+            <select value={template} onChange={(e) => {
+              setTemplate(e.target.value);
+              const t = templates.find((x) => x.key === e.target.value);
+              if (t?.default_query) { setQuery(t.default_query); setName(t.name); }
+            }}>
+              {templates.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+            </select>
+          </div>
           <div className="field"><label>Research question</label><textarea value={query} onChange={(e) => setQuery(e.target.value)} /></div>
           <div className="row" style={{ marginTop: 10 }}>
             <select value={cadence} onChange={(e) => setCadence(e.target.value)} style={{ width: 140 }}>

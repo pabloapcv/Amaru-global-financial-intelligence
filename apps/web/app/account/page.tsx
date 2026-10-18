@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type Account } from "@/lib/api";
+import { API_URL, api, type Account } from "@/lib/api";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
 type Key = { key_id: string; name: string; prefix: string; created_at: string; last_used_at: string | null };
@@ -116,6 +116,27 @@ export default function AccountPage() {
             Copy this key now; it won't be shown again: <code style={{ userSelect: "all", wordBreak: "break-all" }}>{newKey}</code>
           </div>
         )}
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ cursor: "pointer" }}>Quickstart</summary>
+          <pre>{`# Start a research job (returns 202 with a run_id)
+curl -s -X POST ${API_URL}/api/v1/research \\
+  -H "Authorization: Bearer $ATLAS_API_KEY" -H "content-type: application/json" \\
+  -d '{"query": "Is sugar positioning crowded?", "report": {"template": "commodity_deep_dive"}}'
+
+# Poll until "status": "complete", then download the report
+curl -s ${API_URL}/api/v1/research/$RUN_ID -H "Authorization: Bearer $ATLAS_API_KEY"
+curl -s -o report.xlsx "${API_URL}/api/v1/reports/$REPORT_ID/download?format=xlsx" \\
+  -H "Authorization: Bearer $ATLAS_API_KEY"`}</pre>
+          <pre>{`import os, time, requests
+
+s = requests.Session()
+s.headers["Authorization"] = f"Bearer {os.environ['ATLAS_API_KEY']}"
+run = s.post("${API_URL}/api/v1/research", json={"query": "Copper outlook"}).json()
+while (r := s.get(f"${API_URL}/api/v1/research/{run['run_id']}").json())["status"] not in ("complete", "failed"):
+    time.sleep(2)
+print(r["result"]["narrative_markdown"])`}</pre>
+          <p className="muted" style={{ fontSize: 12 }}>Full reference with a try-it console: <a href={`${API_URL}/docs`} target="_blank">{API_URL}/docs</a> (click Authorize and paste your key).</p>
+        </details>
         <table style={{ marginTop: 10 }}>
           <thead><tr><th>Name</th><th>Key</th><th>Created</th><th>Last used</th><th /></tr></thead>
           <tbody>
