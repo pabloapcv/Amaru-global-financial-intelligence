@@ -316,6 +316,11 @@ def ingest(dataset_ids: Iterable[str] | None = None, *, backfill: bool = False) 
     changed = {r.dataset_id for r in results if r.rows_inserted or r.rows_revised}
     if changed:
         evaluate_alerts(changed)
+        # Monitoring agents watching market instruments; positioning updates map to their instrument.
+        from atlas.agents import evaluate_agents
+
+        watched = set(changed) | {datasets()[c].meta.get("instrument_id") for c in changed if c.startswith("COT.")}
+        evaluate_agents({w for w in watched if w})
     return results
 
 

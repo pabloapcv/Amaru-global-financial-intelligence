@@ -717,6 +717,77 @@ def positioning(id: str, lookback_years: float = 3) -> dict[str, Any]:
     return {"result": json.loads(out), "chart": ev.chart, "citation": ev.citation}
 
 
+# ---------------------------------------------------------------- monitoring agents
+
+
+class AgentRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    watch: list[str] = Field(..., max_length=20)
+    triggers: list[dict[str, Any]] = Field(..., max_length=10)
+    action: dict[str, Any]
+    cooldown_hours: int = Field(24, ge=1, le=24 * 30)
+    notify_email: bool = False
+
+
+@api.get("/agents/triggers")
+def agent_triggers() -> dict[str, Any]:
+    from atlas.agents import TRIGGERS
+
+    return TRIGGERS
+
+
+@api.get("/agents")
+def list_agents(p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import agents
+
+    return {"agents": agents.list_agents(p.workspace_id), "unread": agents.unread_count(p.workspace_id)}
+
+
+@api.post("/agents", status_code=201)
+def create_agent(req: AgentRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import agents
+
+    _quota(p.workspace_id, "agents")
+    try:
+        return agents.create(req.name, req.watch, req.triggers, req.action, req.cooldown_hours, req.notify_email,
+                             p.workspace_id, p.user_id)
+    except agents.AgentError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@api.post("/agents/inbox/read", status_code=204)
+def mark_agent_events_read(p: Principal = Depends(principal)) -> None:
+    from atlas import agents
+
+    agents.mark_read(p.workspace_id)
+
+
+@api.post("/agents/{agent_id}/check")
+def check_agent(agent_id: str, force: bool = False, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import agents
+
+    if not agents.get_owned(agent_id, p.workspace_id):
+        _404("agent")
+    _quota(p.workspace_id, "research_per_day")
+    return agents.check_agent(agent_id, force=force)
+
+
+@api.post("/agents/{agent_id}/{action}", status_code=204)
+def set_agent_status(agent_id: str, action: Literal["pause", "resume"], p: Principal = Depends(principal)) -> None:
+    from atlas import agents
+
+    if not agents.set_status(agent_id, p.workspace_id, "paused" if action == "pause" else "active"):
+        _404("agent")
+
+
+@api.delete("/agents/{agent_id}", status_code=204)
+def delete_agent(agent_id: str, p: Principal = Depends(principal)) -> None:
+    from atlas import agents
+
+    if not agents.set_status(agent_id, p.workspace_id, "deleted"):
+        _404("agent")
+
+
 # ---------------------------------------------------------------- alerts
 
 

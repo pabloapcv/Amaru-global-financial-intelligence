@@ -98,3 +98,16 @@ def test_volatility_regime_detects_high_vol_state():
     assert r["markov_high_vol_probability_now"] > 0.9
     assert r["realized_vol_regime"] in ("elevated", "stress")
     assert r["markov_regime_vol_annualized"]["high"] > 2 * r["markov_regime_vol_annualized"]["low"]
+
+
+def test_agent_validation():
+    from atlas.agents import AgentError, validate
+
+    ok_action = {"template": "research_report", "query": "why?"}
+    validate(["CMD.SUGAR.ISA"], [{"type": "anomaly", "z": 3}], ok_action)
+    with pytest.raises(AgentError, match="market instrument"):
+        validate(["US.CPI.HEADLINE"], [{"type": "anomaly"}], ok_action)
+    with pytest.raises(AgentError, match="trigger type"):
+        validate(["CMD.SUGAR.ISA"], [{"type": "moon_phase"}], ok_action)
+    with pytest.raises(AgentError, match="template"):
+        validate(["CMD.SUGAR.ISA"], [{"type": "anomaly"}], {"template": "nope", "query": "why?"})
