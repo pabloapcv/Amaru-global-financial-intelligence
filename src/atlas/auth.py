@@ -30,6 +30,7 @@ from atlas.data.db import (
     AuditEvent,
     AuthSession,
     Membership,
+    MonitorAgent,
     PasswordReset,
     ReportSchedule,
     ResearchRun,
@@ -47,10 +48,10 @@ MIN_PASSWORD = 10
 
 # Plan limits (spec §18 tiers). None = unlimited.
 PLANS: dict[str, dict[str, int | None]] = {
-    "explorer": {"research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1},
-    "investor": {"research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2},
-    "research_pro": {"research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5},
-    "pro": {"research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20},
+    "explorer": {"agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1},
+    "investor": {"agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2},
+    "research_pro": {"agents": 10, "research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5},
+    "pro": {"agents": 50, "research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20},
 }
 
 
@@ -347,6 +348,8 @@ def usage(workspace_id: str) -> dict[str, int]:
                 ReportSchedule.workspace_id == workspace_id, ReportSchedule.status != "deleted")),
             "alerts": count(select(func.count()).select_from(Alert).where(
                 Alert.workspace_id == workspace_id, Alert.status != "deleted")),
+            "agents": count(select(func.count()).select_from(MonitorAgent).where(
+                MonitorAgent.workspace_id == workspace_id, MonitorAgent.status != "deleted")),
             "api_keys": count(select(func.count()).select_from(ApiKey).where(
                 ApiKey.workspace_id == workspace_id, ApiKey.revoked_at.is_(None))),
         }

@@ -322,6 +322,38 @@ class Portfolio(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class MonitorAgent(Base):
+    """A saved research agent: watches datasets and runs research when a trigger fires (FR-017)."""
+
+    __tablename__ = "monitor_agents"
+
+    agent_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(String(32), default=LOCAL_WORKSPACE, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), default="local")
+    name: Mapped[str] = mapped_column(String(200))
+    watch: Mapped[list[str]] = mapped_column(JSON, default=list)
+    triggers: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    action: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # {template, query, engine, depth}
+    cooldown_hours: Mapped[int] = mapped_column(Integer, default=24)
+    notify_email: Mapped[bool] = mapped_column(default=False)
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_fired_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class AgentEvent(Base):
+    __tablename__ = "agent_events"
+
+    event_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    agent_id: Mapped[str] = mapped_column(ForeignKey("monitor_agents.agent_id"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    findings: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    run_id: Mapped[str | None] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), default="fired")  # fired | suppressed
+    read: Mapped[bool] = mapped_column(default=False)
+
+
 class Alert(Base):
     __tablename__ = "alerts"
 

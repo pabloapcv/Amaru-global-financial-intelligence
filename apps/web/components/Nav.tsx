@@ -20,8 +20,11 @@ const ITEMS = [
 export default function Nav() {
   const path = usePathname();
   const [account, setAccount] = useState<Account | null>(null);
+  const [unread, setUnread] = useState(0);
   useEffect(() => {
-    if (path !== "/login" && path !== "/reset") api<Account>("/api/v1/account").then(setAccount).catch(() => {});
+    if (path === "/login" || path === "/reset") return;
+    api<Account>("/api/v1/account").then(setAccount).catch(() => {});
+    api<{ unread: number }>("/api/v1/agents").then((r) => setUnread(path.startsWith("/intelligence") ? 0 : r.unread)).catch(() => {});
   }, [path]);
   if (path === "/login" || path === "/reset") return null;
   return (
@@ -35,7 +38,7 @@ export default function Nav() {
           return (
             <li key={it.href}>
               <Link href={it.href} className={active ? "active" : ""}>
-                <span>{it.label}</span>
+                <span>{it.label}{it.href === "/intelligence" && unread > 0 && <span className="badge badge-delayed" style={{ marginLeft: 6 }}>{unread}</span>}</span>
                 <small>{it.hint}</small>
               </Link>
             </li>

@@ -156,3 +156,33 @@ def test_change_password_requires_current(secured):
     assert ok.status_code == 204
     assert secured.get("/api/v1/account").status_code == 401  # signed out everywhere
     assert secured.post("/api/v1/auth/login", json={"email": "kim@example.test", "password": "next passphrase ok"}).status_code == 200
+
+
+def test_monitoring_agents_fire_run_research_and_are_scoped(secured):
+    _signup(secured, "liz@example.test", "Liz")
+    body = {"name": "WTI big move", "watch": ["CMD.CRUDE.WTI"],
+            "triggers": [{"type": "pct_move", "abs_pct": 0.0001, "window_days": 30}],  # always fires on synthetic data
+            "action": {"template": "commodity_deep_dive", "query": "What triggered this?", "engine": "deterministic"}}
+    agent = secured.post("/api/v1/agents", json=body).json()
+    from atlas import agents
+    from atlas.research import engine
+
+    r = agents.check_agent(agent["agent_id"], background=False)
+    assert r["fired"] and r["run_id"]
+    run = engine.get_run(r["run_id"])
+    assert run["status"] == "complete" and run["result"]["verification"]["passed"]
+    assert agents.check_agent(agent["agent_id"], background=False)["suppressed"]  # cooldown
+    listed = secured.get("/api/v1/agents").json()
+    events = listed["agents"][0]["events"]  # newest first: the suppressed check, then the firing
+    assert listed["unread"] == 1 and [e["status"] for e in events] == ["suppressed", "fired"]
+    assert events[1]["run_id"] == r["run_id"]
+    assert secured.post("/api/v1/agents/inbox/read").status_code == 204  # not captured by /{agent_id}/{action}
+    assert secured.get("/api/v1/agents").json()["unread"] == 0
+    # quota: explorer allows one agent
+    assert secured.post("/api/v1/agents", json=body).status_code == 429
+    bad = secured.post("/api/v1/agents", json={**body, "triggers": [{"type": "nope"}]})
+    assert bad.status_code in (422, 429)
+    secured.cookies.clear()
+    _signup(secured, "max@example.test", "Max")
+    assert secured.post(f"/api/v1/agents/{agent['agent_id']}/check").status_code == 404
+    assert secured.get("/api/v1/agents").json()["agents"] == []

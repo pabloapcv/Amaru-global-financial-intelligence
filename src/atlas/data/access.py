@@ -77,6 +77,8 @@ def _freshness(ds: Dataset, last_obs: date | None, state: DatasetState | None, t
     if last_obs is None:
         if state and state.last_error:
             return "failing", f"Ingestion failing: {state.last_error}"
+        if state and state.last_checked_at:
+            return "no_data", "The provider has no observations for this series."
         return "no_data", "Not yet ingested."
     lag = EXPECTED_LAG.get(ds.frequency, timedelta(days=400))
     age = today - last_obs
