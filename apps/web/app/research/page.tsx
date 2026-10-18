@@ -32,6 +32,12 @@ function ResearchForm({ onSubmitted }: { onSubmitted: (id: string) => void }) {
   const [lookback, setLookback] = useState("5Y");
   const [engine, setEngine] = useState<"auto" | "llm" | "deterministic">("auto");
   const [xlsx, setXlsx] = useState(true);
+  const [template, setTemplate] = useState("research_report");
+  const [templates, setTemplates] = useState<{ key: string; name: string; description: string; default_query: string | null }[]>([]);
+
+  useEffect(() => {
+    api<typeof templates>("/api/v1/report-templates").then(setTemplates).catch(() => {});
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
@@ -44,7 +50,7 @@ function ResearchForm({ onSubmitted }: { onSubmitted: (id: string) => void }) {
         body: JSON.stringify({
           query, depth, engine,
           scope: { lookback, forecast_horizon: horizon },
-          report: { formats: xlsx ? ["html", "xlsx"] : ["html"] },
+          report: { formats: xlsx ? ["html", "xlsx"] : ["html"], template },
         }),
       });
       onSubmitted(r.run_id);
@@ -60,6 +66,17 @@ function ResearchForm({ onSubmitted }: { onSubmitted: (id: string) => void }) {
       <div className="field">
         <label htmlFor="q">Research question</label>
         <textarea id="q" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </div>
+      <div className="field">
+        <label htmlFor="tmpl">Report type</label>
+        <select id="tmpl" value={template} onChange={(e) => {
+          setTemplate(e.target.value);
+          const t = templates.find((x) => x.key === e.target.value);
+          if (t?.default_query) setQuery(t.default_query);
+        }}>
+          {templates.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+        </select>
+        {templates.find((t) => t.key === template) && <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>{templates.find((t) => t.key === template)!.description}</p>}
       </div>
       <div className="field">
         <label>Depth</label>

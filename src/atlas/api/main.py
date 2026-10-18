@@ -12,6 +12,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -40,19 +41,36 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="ATLAS API", version=__version__, lifespan=lifespan)
+API_DESCRIPTION = """
+Evidence-grounded market, macro and trade research.
+
+**Authentication.** Send `Authorization: Bearer atk_…` with an API key created on the Account page
+(click **Authorize** above to try requests here). Keys act on one workspace; research runs, reports,
+alerts, schedules and portfolios are private to it. Market and macro data are shared.
+
+**Research jobs** are asynchronous: `POST /api/v1/research` returns `202` with a `run_id`; poll
+`GET /api/v1/research/{run_id}` until `status` is `complete`, then download the report.
+
+**Limits.** Plan quotas apply (HTTP 429 when exceeded). Data are public reference/benchmark series
+published with a lag, not live tradable quotes. Research and decision support only, not investment advice.
+"""
+
+app = FastAPI(title="ATLAS API", version=__version__, lifespan=lifespan, description=API_DESCRIPTION)
 app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"], allow_headers=["*"],
                    allow_credentials=True)
 V1 = "/api/v1"
 SESSION_COOKIE = "atlas_session"
 
 
-def principal(request: Request) -> Principal:
+_bearer = HTTPBearer(auto_error=False, scheme_name="ApiKey",
+                     description="An API key (`atk_…`) from the Account page, or a session token from /auth/login.")
+
+
+def principal(request: Request, creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> Principal:
     """Authenticate via session cookie or `Authorization: Bearer <session token | API key>`."""
     if not auth.auth_required():
         return auth.LOCAL_PRINCIPAL
-    header = request.headers.get("authorization", "")
-    token = header[7:].strip() if header.lower().startswith("bearer ") else request.cookies.get(SESSION_COOKIE)
+    token = creds.credentials.strip() if creds else request.cookies.get(SESSION_COOKIE)
     try:
         return auth.authenticate(token)
     except auth.AuthError as exc:
@@ -383,8 +401,19 @@ def _parse_period(text: str | None, unit_months: dict[str, float]) -> float | No
         raise HTTPException(422, f"cannot parse period '{text}' (use e.g. 5Y, 3M)")
 
 
+@api.get("/report-templates")
+def report_templates() -> list[dict[str, Any]]:
+    from atlas.research.templates import list_templates
+
+    return list_templates()
+
+
 @api.post(f"/research", status_code=202)
 def create_research(req: ResearchRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas.research.templates import TEMPLATES
+
+    if req.report.template not in TEMPLATES:
+        raise HTTPException(422, f"unknown template; choose one of {sorted(TEMPLATES)}")
     unknown = [a for a in req.scope.assets if not get_dataset(a)]
     if unknown:
         raise HTTPException(422, f"unknown assets: {unknown}; use /api/v1/instruments/search")
@@ -521,6 +550,7 @@ def download_report(report_id: str, format: Literal["html", "xlsx", "pdf"] = "ht
 
 class ScheduleRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
+    template: str = "research_report"
     query: str = Field(..., min_length=3, max_length=2000)
     cadence: Literal["daily", "weekly", "monthly"] = "weekly"
     depth: Literal["quick", "standard", "deep"] = "standard"
@@ -534,7 +564,7 @@ def create_schedule(req: ScheduleRequest, p: Principal = Depends(principal)) -> 
 
     _quota(p.workspace_id, "schedules")
     return schedules.create_schedule(req.name, req.query, req.cadence,
-                                     {"depth": req.depth, "engine": req.engine, "formats": req.formats},
+                                     {"depth": req.depth, "engine": req.engine, "formats": req.formats, "template": req.template},
                                      workspace_id=p.workspace_id, user_id=p.user_id)
 
 
