@@ -28,7 +28,9 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 - **Web:** create an account on the sign-in page (`ATLAS_ALLOW_SIGNUP=true`), or create one from the CLI.
 - **Existing local data** lives in the `local` workspace. To own it: `atlas create-user you@example.com --workspace local`.
 - **API keys:** create on the Account page; send `Authorization: Bearer atk_…`. Keys are shown once and stored hashed.
-- **Plans and quotas:** explorer / investor / research_pro / pro limits on daily research runs (and Claude runs), schedules, alerts and keys; over-limit requests get HTTP 429.
+- **Plans and quotas:** explorer / investor / research_pro / pro limits on daily research runs (and Claude runs), schedules, alerts, agents and keys; over-limit requests get HTTP 429.
+- **Claude cost control:** every Claude run records its token usage and estimated cost (shown on the run and the Account page). Each plan has a monthly Claude budget; once reached, `auto` runs fall back to the deterministic engine and explicit `llm` runs are refused. Prompt caching cuts the repeated system/tool prefix to ~5% of input price within a research loop.
+- **Result cache:** an identical question (same settings) asked again within `ATLAS_RESEARCH_CACHE_TTL_HOURS` (default 6) with no data changed since is answered instantly from the earlier verified run, without using quota; pass `"no_cache": true` to force fresh research.
 - **Passwords:** "Forgot password?" sends a single-use reset link valid for 1 hour (SMTP via `ATLAS_SMTP_*`; without SMTP the link is written to the API log for the operator). Reset requests never reveal whether an account exists. Resetting or changing a password signs the user out everywhere. Set `ATLAS_PUBLIC_URL` so links point at your web app.
 - **Single-user mode:** `ATLAS_AUTH=off` skips sign-in and uses the `local` workspace.
 

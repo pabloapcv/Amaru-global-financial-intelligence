@@ -112,6 +112,10 @@ export interface ResearchRun {
     charts: ChartSpec[];
     sources: Record<string, any>[];
     report_id?: string;
+    cached?: boolean;
+    cached_from?: string;
+    llm_usage?: { requests: number; input_tokens: number; output_tokens: number; cache_read_input_tokens: number;
+      cache_creation_input_tokens: number; cost_usd: number; models: string[] } | null;
   } | null;
 }
 

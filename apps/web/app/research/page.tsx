@@ -155,7 +155,8 @@ function RunView({ runId, onDone }: { runId: string; onDone?: () => void }) {
       {res && (
         <>
           <Card
-            title={`${res.engine === "llm" ? res.model : "Deterministic engine"} · ${res.evidence.length} evidence items`}
+            title={`${res.engine === "llm" ? res.model : "Deterministic engine"} · ${res.evidence.length} evidence items${
+              res.cached ? " · from cache" : res.llm_usage ? ` · ${(res.llm_usage.input_tokens + res.llm_usage.cache_read_input_tokens + res.llm_usage.cache_creation_input_tokens).toLocaleString()} in / ${res.llm_usage.output_tokens.toLocaleString()} out tokens · ~$${res.llm_usage.cost_usd.toFixed(2)}` : ""}`}
             actions={res.report_id && (
               <div className="row">
                 <a href={`${API_URL}/api/v1/reports/${res.report_id}/download?format=html&inline=true`} target="_blank"><button className="secondary">Open report</button></a>
