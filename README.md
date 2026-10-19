@@ -32,6 +32,8 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 - **Claude cost control:** every Claude run records its token usage and estimated cost (shown on the run and the Account page). Each plan has a monthly Claude budget; once reached, `auto` runs fall back to the deterministic engine and explicit `llm` runs are refused. Prompt caching cuts the repeated system/tool prefix to ~5% of input price within a research loop.
 - **Result cache:** an identical question (same settings) asked again within `ATLAS_RESEARCH_CACHE_TTL_HOURS` (default 6) with no data changed since is answered instantly from the earlier verified run, without using quota; pass `"no_cache": true` to force fresh research.
 - **Passwords:** "Forgot password?" sends a single-use reset link valid for 1 hour (SMTP via `ATLAS_SMTP_*`; without SMTP the link is written to the API log for the operator). Reset requests never reveal whether an account exists. Resetting or changing a password signs the user out everywhere. Set `ATLAS_PUBLIC_URL` so links point at your web app.
+- **Email verification:** sign-up sends a 48-hour verification link. With `ATLAS_REQUIRE_EMAIL_VERIFICATION=true`, unverified accounts can browse data but cannot run research or create keys, agents, schedules, portfolios or alerts. Users created with the CLI are pre-verified.
+- **Operators:** `atlas workspaces` lists workspaces, plans, members and this month's Claude spend; `atlas set-plan <workspace_id> <plan>` changes a plan (audited).
 - **Single-user mode:** `ATLAS_AUTH=off` skips sign-in and uses the `local` workspace.
 
 ## Deployment
@@ -49,7 +51,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | Freshness (§5) | Observation date, ingestion time, last check and a status (`current/delayed/stale/no_source/failing`) for every dataset |
 | Quant engine (§11) | `src/atlas/analytics/`: returns, vol/EWMA, drawdowns, correlation (CI, rolling, lead/lag), HAC regression, robust-z anomalies, seasonality, walk-forward forecasts vs naive baselines, historical-beta scenarios |
 | Research engine (§8) | Planner → typed tools → evidence (E1…En) → narrative → number/citation verification → one revision pass. Claude Opus 5.5 via the Anthropic SDK with server-side refusal fallback; deterministic fallback |
-| Reports (§12) | Versioned HTML (print stylesheet → PDF) and Excel (summary, evidence, sources, chart data) |
+| Reports (§12) | Versioned HTML, native PDF (WeasyPrint; page numbers, charts) and Excel (summary, evidence, sources, chart data) |
 | Monitoring (FR-009) | Alert rules (threshold, % move, anomaly), evaluated after each ingestion |
 | Monitoring agents (FR-017, §21 Layer 3) | Saved agents watch instruments for unusual moves, large % moves, crowded CFTC positioning or high-volatility regimes; checked after each data refresh; when one fires (outside a cooldown) it runs a research template and records the evidence, with optional email; Intelligence › Agents |
 | Report templates (§12) | Daily Market Brief, Commodity Deep Dive, Global Macro Outlook, Country Intelligence, Cross-Asset Research |
@@ -79,12 +81,10 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
   - Plain CSS instead of Tailwind.
   - All interfaces are modular so these can be swapped.
 - **Not built yet:**
-  - billing and plan upgrades (plans are set by an operator);
-  - email verification at sign-up;
   - higher-frequency non-US data (IMF/BIS connectors);
   - USDA/EIA connectors (need free API keys);
   - licensed market data;
-  - native PDF rendering.
+  - self-service billing (plans are set by an operator with `atlas set-plan`).
 - **Claude orchestration** is verified live: research runs on Claude Opus 5.5 pass number and citation verification. `atlas llm-check` confirms credentials.
 
 ## Layout

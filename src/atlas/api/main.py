@@ -83,6 +83,14 @@ def require_admin(p: Principal = Depends(principal)) -> Principal:
     return p
 
 
+def require_verified(p: Principal = Depends(principal)) -> Principal:
+    try:
+        auth.require_verified(p)
+    except auth.VerificationRequired as exc:
+        raise HTTPException(403, str(exc)) from exc
+    return p
+
+
 def _quota(workspace_id: str, resource: str) -> None:
     try:
         auth.check_quota(workspace_id, resource)
@@ -157,7 +165,8 @@ def signup(req: SignupRequest, request: Request, response: Response) -> dict[str
     if not auth.signup_allowed():
         raise HTTPException(403, "self-service signup is disabled")
     try:
-        auth.create_user(req.email, req.password, req.name, req.workspace_name)
+        uid, _ = auth.create_user(req.email, req.password, req.name, req.workspace_name)
+        auth.send_verification(uid)
         token, p = auth.login(req.email, req.password, request.client.host if request.client else "")
     except auth.ValidationError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -204,6 +213,18 @@ def password_reset_confirm(req: ResetConfirm) -> None:
         raise HTTPException(422, str(exc)) from exc
 
 
+class VerifyRequest(BaseModel):
+    token: str = Field(..., max_length=200)
+
+
+@app.post(f"{V1}/auth/verify-email", status_code=204)
+def verify_email(req: VerifyRequest) -> None:
+    try:
+        auth.verify_email(req.token)
+    except auth.AuthError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
 @app.post(f"{V1}/auth/logout", status_code=204)
 def logout(request: Request, response: Response) -> None:
     token = request.cookies.get(SESSION_COOKIE)
@@ -224,6 +245,16 @@ def health() -> dict[str, Any]:
 @api.get("/account")
 def get_account(p: Principal = Depends(principal)) -> dict[str, Any]:
     return auth.account(p)
+
+
+@api.post("/account/verify-email/resend", status_code=202)
+def resend_verification(request: Request, p: Principal = Depends(principal)) -> dict[str, Any]:
+    try:
+        auth._throttle(f"verify|{p.user_id}|{request.client.host if request.client else ''}")
+    except auth.AuthError as exc:
+        raise HTTPException(429, str(exc)) from exc
+    sent = auth.send_verification(p.user_id)
+    return {"status": "sent" if sent else "already_verified"}
 
 
 class PasswordChange(BaseModel):
@@ -254,7 +285,7 @@ def list_api_keys(p: Principal = Depends(principal)) -> list[dict[str, Any]]:
 
 
 @api.post("/api-keys", status_code=201)
-def create_api_key(req: ApiKeyRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+def create_api_key(req: ApiKeyRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
     if p.via == "api_key":
         raise HTTPException(403, "API keys cannot create API keys; sign in")
     _quota(p.workspace_id, "api_keys")
@@ -410,7 +441,7 @@ def report_templates() -> list[dict[str, Any]]:
 
 
 @api.post(f"/research", status_code=202)
-def create_research(req: ResearchRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+def create_research(req: ResearchRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
     from atlas.research.templates import TEMPLATES
 
     if req.report.template not in TEMPLATES:
@@ -542,11 +573,14 @@ def download_report(report_id: str, format: Literal["html", "xlsx", "pdf"] = "ht
     from atlas.reporting import get_report as gr
 
     r = gr(report_id, p.workspace_id) or _404("report")
-    fmt = "html" if format == "pdf" else format  # PDF = print the HTML (print stylesheet included)
+    fmt = format
+    if fmt == "pdf" and "pdf" not in r["paths"]:
+        fmt = "html"  # no PDF renderer installed: serve the print-ready HTML (print stylesheet included)
     path = r["paths"].get(fmt)
     if not path or not Path(path).exists():
         _404(f"{format} export")
-    media = {"html": "text/html", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}[fmt]
+    media = {"html": "text/html", "pdf": "application/pdf",
+             "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}[fmt]
     filename = f"atlas-report-{report_id[:8]}-v{r['version']}.{fmt}"
     return FileResponse(path, media_type=media, filename=None if inline else filename,
                         headers={"Content-Disposition": "inline"} if inline else None)
@@ -566,7 +600,7 @@ class ScheduleRequest(BaseModel):
 
 
 @api.post(f"/schedules", status_code=201)
-def create_schedule(req: ScheduleRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+def create_schedule(req: ScheduleRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
     from atlas import schedules
 
     _quota(p.workspace_id, "schedules")
@@ -617,7 +651,7 @@ def list_portfolios(p: Principal = Depends(principal)) -> list[dict[str, Any]]:
 
 
 @api.post("/portfolios", status_code=201)
-def create_portfolio(req: PortfolioRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+def create_portfolio(req: PortfolioRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
     from atlas import portfolios
 
     try:
@@ -751,7 +785,7 @@ def list_agents(p: Principal = Depends(principal)) -> dict[str, Any]:
 
 
 @api.post("/agents", status_code=201)
-def create_agent(req: AgentRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+def create_agent(req: AgentRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
     from atlas import agents
 
     _quota(p.workspace_id, "agents")
@@ -805,7 +839,7 @@ class AlertRequest(BaseModel):
 
 
 @api.post(f"/alerts", status_code=201)
-def create_alert(req: AlertRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+def create_alert(req: AlertRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
     from atlas.intelligence import validate_rule
 
     _quota(p.workspace_id, "alerts")

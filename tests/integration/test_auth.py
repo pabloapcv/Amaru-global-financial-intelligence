@@ -186,3 +186,35 @@ def test_monitoring_agents_fire_run_research_and_are_scoped(secured):
     _signup(secured, "max@example.test", "Max")
     assert secured.post(f"/api/v1/agents/{agent['agent_id']}/check").status_code == 404
     assert secured.get("/api/v1/agents").json()["agents"] == []
+
+
+def test_email_verification_flow_and_optional_enforcement(secured, monkeypatch):
+    acct = _signup(secured, "nora@example.test", "Nora")
+    assert acct["email_verified"] is False
+    monkeypatch.setenv("ATLAS_REQUIRE_EMAIL_VERIFICATION", "true")
+    blocked = secured.post("/api/v1/research", json={"query": "copper outlook", "engine": "deterministic"})
+    assert blocked.status_code == 403 and "verify your email" in blocked.json()["detail"]
+    assert secured.get("/api/v1/instruments").status_code == 200  # reading data stays open
+    token = auth.send_verification(acct["user"]["user_id"])
+    assert secured.post("/api/v1/auth/verify-email", json={"token": token}).status_code == 204
+    assert secured.post("/api/v1/auth/verify-email", json={"token": token}).status_code == 400  # single use
+    assert secured.get("/api/v1/account").json()["email_verified"] is True
+    ok = secured.post("/api/v1/research", json={"query": "copper outlook", "engine": "deterministic", "depth": "quick"})
+    assert ok.status_code == 202
+    assert secured.post("/api/v1/account/verify-email/resend").json()["status"] == "already_verified"
+
+
+def test_operator_created_users_are_verified():
+    uid, _ = auth.create_user("ops@example.test", "operator passphrase", verified=True)
+    assert auth.send_verification(uid) is None
+
+
+def test_operator_set_plan_changes_limits():
+    uid, ws = auth.create_user("plan@example.test", "operator passphrase", verified=True)
+    assert auth.account(auth.Principal(uid, ws, "owner", "plan@example.test", "session"))["workspace"]["plan"] == "explorer"
+    auth.set_plan(ws, "research_pro")
+    acct = auth.account(auth.Principal(uid, ws, "owner", "plan@example.test", "session"))
+    assert acct["workspace"]["plan"] == "research_pro" and acct["limits"]["agents"] == auth.PLANS["research_pro"]["agents"]
+    with pytest.raises(auth.ValidationError):
+        auth.set_plan(ws, "platinum")
+    assert any(w["workspace_id"] == ws and w["plan"] == "research_pro" for w in auth.list_workspaces())

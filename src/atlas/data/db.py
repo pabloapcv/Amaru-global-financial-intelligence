@@ -395,6 +395,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(256))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class Workspace(Base):
@@ -440,6 +441,16 @@ class ApiKey(Base):
 
 class PasswordReset(Base):
     __tablename__ = "password_resets"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class EmailVerification(Base):
+    __tablename__ = "email_verifications"
 
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), index=True)
@@ -502,6 +513,7 @@ _ADDED_COLUMNS = [
     ("research_runs", "cost_usd", "FLOAT", None),
     ("research_runs", "cache_key", "VARCHAR(64)", None),
     ("research_runs", "cached_from", "VARCHAR(32)", None),
+    ("users", "email_verified_at", "TIMESTAMP", None),
 ]
 
 

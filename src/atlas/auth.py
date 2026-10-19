@@ -29,6 +29,7 @@ from atlas.data.db import (
     ApiKey,
     AuditEvent,
     AuthSession,
+    EmailVerification,
     Membership,
     MonitorAgent,
     PasswordReset,
@@ -42,6 +43,7 @@ from atlas.data.db import (
 
 SESSION_TTL = timedelta(days=14)
 RESET_TTL = timedelta(hours=1)
+VERIFY_TTL = timedelta(hours=48)
 API_KEY_PREFIX = "atk_"
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MIN_PASSWORD = 10
@@ -81,6 +83,14 @@ LOCAL_PRINCIPAL = Principal(user_id="local", workspace_id=LOCAL_WORKSPACE, role=
 
 def auth_required() -> bool:
     return os.getenv("ATLAS_AUTH", "required").lower() != "off"
+
+
+def verification_required() -> bool:
+    return os.getenv("ATLAS_REQUIRE_EMAIL_VERIFICATION", "false").lower() == "true"
+
+
+class VerificationRequired(Exception):
+    """Email not verified while ATLAS_REQUIRE_EMAIL_VERIFICATION=true (HTTP 403)."""
 
 
 def signup_allowed() -> bool:
@@ -136,7 +146,7 @@ def audit(action: str, user_id: str | None = None, workspace_id: str | None = No
 
 
 def create_user(email: str, password: str, name: str = "", workspace_name: str | None = None,
-                workspace_id: str | None = None, plan: str = "explorer") -> tuple[str, str]:
+                workspace_id: str | None = None, plan: str = "explorer", verified: bool = False) -> tuple[str, str]:
     """Create a user and either a new workspace or a membership in an existing one."""
     email = email.strip().lower()
     if not EMAIL_RE.match(email):
@@ -148,7 +158,8 @@ def create_user(email: str, password: str, name: str = "", workspace_name: str |
     with session_scope() as s:
         if s.execute(select(User).where(User.email == email)).scalar_one_or_none():
             raise ValidationError("an account with this email already exists")
-        user = User(email=email, name=name.strip(), password_hash=hash_password(password))
+        user = User(email=email, name=name.strip(), password_hash=hash_password(password),
+                    email_verified_at=utcnow() if verified else None)
         s.add(user)
         s.flush()
         if workspace_id:
@@ -231,6 +242,8 @@ def account(principal: Principal) -> dict[str, Any]:
             "workspace": {"workspace_id": ws.workspace_id, "name": ws.name, "plan": ws.plan} if ws else None,
             "role": principal.role,
             "auth": principal.via,
+            "email_verified": bool(user.email_verified_at) if user else True,
+            "verification_required": verification_required(),
             "limits": PLANS.get(ws.plan if ws else "explorer"),
             "usage": usage(principal.workspace_id),
         }
@@ -293,6 +306,82 @@ def reset_password(token: str, new_password: str) -> None:
         rec.used_at = utcnow()
         uid = user.user_id
     audit("password.reset_completed", uid, None)
+
+
+# ---------------------------------------------------------------- operator tools
+
+
+def list_workspaces() -> list[dict[str, Any]]:
+    with session_scope() as s:
+        rows = s.execute(select(Workspace).order_by(Workspace.created_at)).scalars().all()
+        out = []
+        for ws in rows:
+            members = s.execute(select(User.email, Membership.role).join(Membership, Membership.user_id == User.user_id)
+                                .where(Membership.workspace_id == ws.workspace_id)).all()
+            out.append({"workspace_id": ws.workspace_id, "name": ws.name, "plan": ws.plan,
+                        "members": [f"{e} ({r})" for e, r in members]})
+    for w in out:
+        w["claude_spend_month_usd"] = round(llm_spend_this_month(w["workspace_id"]), 2)
+    return out
+
+
+def set_plan(workspace_id: str, plan: str) -> None:
+    if plan not in PLANS:
+        raise ValidationError(f"plan must be one of {sorted(PLANS)}")
+    with session_scope() as s:
+        ws = s.get(Workspace, workspace_id)
+        if ws is None:
+            raise ValidationError(f"workspace {workspace_id} does not exist")
+        old, ws.plan = ws.plan, plan
+    audit("workspace.plan_changed", None, workspace_id, old=old, new=plan)
+
+
+# ---------------------------------------------------------------- email verification
+
+
+def send_verification(user_id: str) -> str | None:
+    """Email a 48-hour verification link. Returns the token (for tests/CLI); None if already verified."""
+    from atlas import mailer
+
+    with session_scope() as s:
+        user = s.get(User, user_id)
+        if user is None or user.email_verified_at is not None:
+            return None
+        token = secrets.token_urlsafe(32)
+        s.add(EmailVerification(token_hash=_token_hash(token), user_id=user_id, expires_at=utcnow() + VERIFY_TTL))
+        email = user.email
+    base = os.getenv("ATLAS_PUBLIC_URL", "http://localhost:3010").rstrip("/")
+    mailer.send(email, "Verify your ATLAS email",
+                f"Confirm this email address for your ATLAS account: {base}/verify?token={token}\n\n"
+                f"The link is valid for {int(VERIFY_TTL.total_seconds() // 3600)} hours.")
+    audit("email.verification_sent", user_id, None)
+    return token
+
+
+def verify_email(token: str) -> None:
+    with session_scope() as s:
+        rec = s.get(EmailVerification, _token_hash(token or ""))
+        if rec is None or rec.used_at is not None or rec.expires_at < utcnow():
+            raise AuthError("verification link is invalid or has expired")
+        user = s.get(User, rec.user_id)
+        assert user is not None
+        user.email_verified_at = user.email_verified_at or utcnow()
+        rec.used_at = utcnow()
+        uid = user.user_id
+    audit("email.verified", uid, None)
+
+
+def is_verified(principal: Principal) -> bool:
+    if principal.via == "local":
+        return True
+    with session_scope() as s:
+        user = s.get(User, principal.user_id)
+        return bool(user and user.email_verified_at)
+
+
+def require_verified(principal: Principal) -> None:
+    if verification_required() and not is_verified(principal):
+        raise VerificationRequired("verify your email address to use this feature (check your inbox or resend from Account)")
 
 
 # ---------------------------------------------------------------- API keys

@@ -36,7 +36,7 @@ def _commodity(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         ("get_futures_curve", {"underlying": asset}),
     ]
     if positioning_for(asset):
-        steps.append(("get_positioning", {"dataset_id": asset}))
+        steps.append(("get_positioning", {"dataset_id": positioning_for(asset)}))
     return steps
 
 
@@ -124,6 +124,10 @@ TEMPLATES: dict[str, dict[str, Any]] = {
 }
 
 
+def _subject(args: dict[str, Any]) -> str | None:
+    return args.get("dataset_id") or args.get("series_id") or args.get("country")
+
+
 def list_templates() -> list[dict[str, Any]]:
     return [{"key": k, "name": t["name"], "description": t["description"], "default_query": t["default_query"]}
             for k, t in TEMPLATES.items()]
@@ -139,5 +143,9 @@ def apply(plan: dict[str, Any], template: str | None) -> dict[str, Any]:
     builder: Callable | None = t["steps"]
     if builder:
         extra = [{"tool": tool, "args": args} for tool, args in builder(plan)]
-        plan["steps"] = extra + [s for s in plan["steps"] if s not in extra]
+        # A template step supersedes a plan step with the same tool on the same dataset (e.g. a 10-year
+        # history replaces the 5-year one), so reports don't repeat the same analysis twice.
+        taken = {(e["tool"], _subject(e["args"])) for e in extra if _subject(e["args"])}
+        rest = [s for s in plan["steps"] if s not in extra and (s["tool"], _subject(s["args"])) not in taken]
+        plan["steps"] = extra + rest
     return plan

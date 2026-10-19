@@ -22,11 +22,11 @@ export default function Nav() {
   const [account, setAccount] = useState<Account | null>(null);
   const [unread, setUnread] = useState(0);
   useEffect(() => {
-    if (path === "/login" || path === "/reset") return;
+    if (["/login", "/reset", "/verify"].includes(path)) return;
     api<Account>("/api/v1/account").then(setAccount).catch(() => {});
     api<{ unread: number }>("/api/v1/agents").then((r) => setUnread(path.startsWith("/intelligence") ? 0 : r.unread)).catch(() => {});
   }, [path]);
-  if (path === "/login" || path === "/reset") return null;
+  if (["/login", "/reset", "/verify"].includes(path)) return null;
   return (
     <nav className="nav">
       <div className="brand">
