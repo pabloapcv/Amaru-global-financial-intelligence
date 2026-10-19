@@ -9,6 +9,7 @@ type Key = { key_id: string; name: string; prefix: string; created_at: string; l
 const LABELS: Record<string, string> = {
   research_per_day: "Research runs (24h)",
   llm_research_per_day: "Claude research runs (24h)",
+  llm_budget_usd_per_month: "Claude spend this month (USD)",
   schedules: "Scheduled reports",
   alerts: "Alerts",
   api_keys: "API keys",
@@ -79,7 +80,7 @@ export default function AccountPage() {
                           <div style={{ width: `${pct}%`, height: 6, borderRadius: 3, background: pct >= 100 ? "var(--down)" : "var(--accent)" }} />
                         </div>
                       </td>
-                      <td className="num" style={{ whiteSpace: "nowrap" }}>{used} / {limit ?? "∞"}</td>
+                      <td className="num" style={{ whiteSpace: "nowrap" }}>{k.includes("usd") ? `$${used.toFixed(2)} / $${limit ?? "∞"}` : `${used} / ${limit ?? "∞"}`}</td>
                     </tr>
                   );
                 })}

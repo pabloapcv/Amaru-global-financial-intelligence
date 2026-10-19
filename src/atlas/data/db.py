@@ -254,6 +254,10 @@ class ResearchRun(Base):
     user_id: Mapped[str] = mapped_column(String(64), default="local")
     workspace_id: Mapped[str] = mapped_column(String(32), default=LOCAL_WORKSPACE, index=True)
     query: Mapped[str] = mapped_column(Text)
+    llm_usage: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    cost_usd: Mapped[float | None] = mapped_column(Float)
+    cache_key: Mapped[str | None] = mapped_column(String(64), index=True)
+    cached_from: Mapped[str | None] = mapped_column(String(32))
     config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(16), default="queued")
     engine: Mapped[str | None] = mapped_column(String(32))
@@ -494,6 +498,10 @@ _ADDED_COLUMNS = [
     ("research_runs", "workspace_id", "VARCHAR(32)", LOCAL_WORKSPACE),
     ("report_schedules", "workspace_id", "VARCHAR(32)", LOCAL_WORKSPACE),
     ("alerts", "workspace_id", "VARCHAR(32)", LOCAL_WORKSPACE),
+    ("research_runs", "llm_usage", "JSON", None),
+    ("research_runs", "cost_usd", "FLOAT", None),
+    ("research_runs", "cache_key", "VARCHAR(64)", None),
+    ("research_runs", "cached_from", "VARCHAR(32)", None),
 ]
 
 
@@ -505,7 +513,8 @@ def _migrate(engine) -> None:
     with engine.begin() as conn:
         for table, column, ddl, default in _ADDED_COLUMNS:
             if table in tables and column not in {c["name"] for c in insp.get_columns(table)}:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl} DEFAULT '{default}'"))
+                default_sql = "" if default is None else f" DEFAULT '{default}'"
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}{default_sql}"))
 
 
 def init_db(url: str | None = None) -> None:

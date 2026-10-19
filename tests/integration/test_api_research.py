@@ -171,3 +171,38 @@ def test_openapi_declares_api_key_auth(client):
     spec = client.get("/openapi.json").json()
     assert "ApiKey" in spec["components"]["securitySchemes"]
     assert {"ApiKey": []} in spec["paths"]["/api/v1/research"]["post"]["security"]
+
+
+def test_identical_research_is_served_from_cache_until_data_changes(client):
+    from atlas.data.db import DatasetState, session_scope, utcnow
+
+    body = {"query": "Copper cache check outlook", "engine": "deterministic", "depth": "quick", "report": {"formats": ["html"]}}
+    first = client.post("/api/v1/research", json=body).json()
+    import time
+
+    for _ in range(300):  # the API runs research in a background worker
+        if engine.get_run(first["run_id"])["status"] in ("complete", "failed"):
+            break
+        time.sleep(0.1)
+    assert engine.get_run(first["run_id"])["status"] == "complete"
+    second = client.post("/api/v1/research", json=body).json()
+    assert second["cached"] is True and second["status"] == "complete"
+    run2 = client.get(f"/api/v1/research/{second['run_id']}").json()
+    assert run2["cached_from"] == first["run_id"] and run2["result"]["cached"] is True
+    assert client.post("/api/v1/research", json={**body, "no_cache": True}).json()["cached"] is False
+    with session_scope() as s:  # new data invalidates the cache
+        st = s.get(DatasetState, "CMD.COPPER.LME")
+        st.last_changed_at = utcnow()
+    assert client.post("/api/v1/research", json=body).json()["cached"] is False
+
+
+def test_cost_estimate_uses_served_model_prices():
+    from types import SimpleNamespace as NS
+
+    from atlas.research.llm import call_cost
+
+    u = NS(input_tokens=1_000_000, output_tokens=1_000_000, cache_read_input_tokens=0, cache_creation_input_tokens=0)
+    assert call_cost("claude-opus-5-5", u) == (24.0, True)
+    assert call_cost("claude-sonnet-5-5", u) == (12.0, True)
+    cost, known = call_cost("claude-unknown", u)
+    assert not known and cost == 24.0

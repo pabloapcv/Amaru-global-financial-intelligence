@@ -54,23 +54,64 @@ def _text(content: list[Any]) -> str:
     return "\n".join(b.text for b in content if getattr(b, "type", None) == "text").strip()
 
 
+# USD per million tokens: (input, output, cache read, cache write 5-min). Anthropic list prices.
+PRICING: dict[str, tuple[float, float, float, float]] = {
+    "claude-opus-5-5": (4.00, 20.00, 0.20, 5.00),
+    "claude-opus-5": (5.00, 25.00, 0.50, 6.25),
+    "claude-opus-4-8": (5.00, 25.00, 0.50, 6.25),
+    "claude-fable-5-1": (10.00, 50.00, 0.25, 12.50),
+    "claude-sonnet-5-5": (2.00, 10.00, 0.20, 2.50),
+    "claude-haiku-5-5": (0.10, 0.50, 0.01, 0.125),
+}
+
+
+def call_cost(model: str, usage: Any) -> tuple[float, bool]:
+    """Estimated USD cost of one response; second value is False when the model's price is unknown."""
+    known = model in PRICING
+    p_in, p_out, p_read, p_write = PRICING.get(model, PRICING["claude-opus-5-5"])
+    get = lambda f: int(getattr(usage, f, 0) or 0)  # noqa: E731
+    cost = (get("input_tokens") * p_in + get("output_tokens") * p_out
+            + get("cache_read_input_tokens") * p_read + get("cache_creation_input_tokens") * p_write) / 1e6
+    return cost, known
+
+
 class LLMResearcher:
     def __init__(self, client: anthropic.Anthropic | None = None):
         self.client = client or anthropic.Anthropic()
         self.model = settings.llm_model
+        self.usage: dict[str, Any] = {"requests": 0, "input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0,
+                                      "cache_creation_input_tokens": 0, "cost_usd": 0.0, "models": [], "price_estimated": False}
+
+    def _record(self, resp: Any) -> None:
+        u = getattr(resp, "usage", None)
+        if u is None:
+            return
+        served = getattr(resp, "model", None) or self.model
+        cost, known = call_cost(served, u)
+        self.usage["requests"] += 1
+        for f in ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
+            self.usage[f] += int(getattr(u, f, 0) or 0)
+        self.usage["cost_usd"] = round(self.usage["cost_usd"] + cost, 6)
+        if served not in self.usage["models"]:
+            self.usage["models"].append(served)
+        self.usage["price_estimated"] = self.usage["price_estimated"] or not known
 
     def _call(self, messages: list[dict[str, Any]]):
-        return self.client.beta.messages.create(
+        resp = self.client.beta.messages.create(
             model=self.model,
             max_tokens=16000,
             system=SYSTEM_PROMPT,
             tools=T.anthropic_tool_specs(),
             messages=messages,
             output_config={"effort": settings.llm_effort},
+            # Cache the stable prefix (tools, system, earlier turns) across the tool-use loop.
+            cache_control={"type": "ephemeral"},
             # Server-side refusal fallback: if the model declines, the API reroutes by category.
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
         )
+        self._record(resp)
+        return resp
 
     def run(
         self,

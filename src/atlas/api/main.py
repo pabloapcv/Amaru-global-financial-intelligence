@@ -389,6 +389,7 @@ class ResearchRequest(BaseModel):
     scope: ResearchScope = Field(default_factory=ResearchScope)
     analysis: dict[str, bool] = Field(default_factory=dict)
     report: ResearchReportOptions = Field(default_factory=ResearchReportOptions)
+    no_cache: bool = Field(False, description="Always run fresh research, even if an identical recent answer exists.")
 
 
 def _parse_period(text: str | None, unit_months: dict[str, float]) -> float | None:
@@ -424,11 +425,17 @@ def create_research(req: ResearchRequest, p: Principal = Depends(principal)) -> 
         "geographies": req.scope.geographies, "lookback_years": lb, "horizon_months": int(hz) if hz else None,
         "analysis": req.analysis, "formats": req.report.formats, "template": req.report.template,
     }
-    _quota(p.workspace_id, "research_per_day")
-    if req.engine == "llm" or (req.engine == "auto" and llm.available()):
-        _quota(p.workspace_id, "llm_research_per_day")
-    run_id = engine.submit(req.query, config, p.user_id, p.workspace_id)
-    return {"run_id": run_id, "status": "queued", "links": {"self": f"{V1}/research/{run_id}"}}
+    if req.no_cache:
+        config["cache"] = False
+
+    def quotas() -> None:  # only charged when new research actually runs (cache hits are free)
+        _quota(p.workspace_id, "research_per_day")
+        if req.engine == "llm" or (req.engine == "auto" and llm.available()):
+            _quota(p.workspace_id, "llm_research_per_day")
+
+    run_id, cached = engine.submit_or_cached(req.query, config, p.user_id, p.workspace_id, before_submit=quotas)
+    return {"run_id": run_id, "status": "complete" if cached else "queued", "cached": cached,
+            "links": {"self": f"{V1}/research/{run_id}"}}
 
 
 @api.get(f"/research")

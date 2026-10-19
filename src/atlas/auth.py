@@ -48,10 +48,10 @@ MIN_PASSWORD = 10
 
 # Plan limits (spec §18 tiers). None = unlimited.
 PLANS: dict[str, dict[str, int | None]] = {
-    "explorer": {"agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1},
-    "investor": {"agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2},
-    "research_pro": {"agents": 10, "research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5},
-    "pro": {"agents": 50, "research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20},
+    "explorer": {"llm_budget_usd_per_month": 2, "agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1},
+    "investor": {"llm_budget_usd_per_month": 15, "agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2},
+    "research_pro": {"llm_budget_usd_per_month": 60, "agents": 10, "research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5},
+    "pro": {"llm_budget_usd_per_month": 300, "agents": 50, "research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20},
 }
 
 
@@ -341,18 +341,36 @@ def usage(workspace_id: str) -> dict[str, int]:
 
         return {
             "research_per_day": count(select(func.count()).select_from(ResearchRun).where(
-                ResearchRun.workspace_id == workspace_id, ResearchRun.created_at >= since)),
+                ResearchRun.workspace_id == workspace_id, ResearchRun.created_at >= since, ResearchRun.cached_from.is_(None))),
             "llm_research_per_day": count(select(func.count()).select_from(ResearchRun).where(
-                ResearchRun.workspace_id == workspace_id, ResearchRun.created_at >= since, ResearchRun.engine == "llm")),
+                ResearchRun.workspace_id == workspace_id, ResearchRun.created_at >= since, ResearchRun.engine == "llm",
+                ResearchRun.cached_from.is_(None))),
             "schedules": count(select(func.count()).select_from(ReportSchedule).where(
                 ReportSchedule.workspace_id == workspace_id, ReportSchedule.status != "deleted")),
             "alerts": count(select(func.count()).select_from(Alert).where(
                 Alert.workspace_id == workspace_id, Alert.status != "deleted")),
+            "llm_budget_usd_per_month": round(llm_spend_this_month(workspace_id), 4),
             "agents": count(select(func.count()).select_from(MonitorAgent).where(
                 MonitorAgent.workspace_id == workspace_id, MonitorAgent.status != "deleted")),
             "api_keys": count(select(func.count()).select_from(ApiKey).where(
                 ApiKey.workspace_id == workspace_id, ApiKey.revoked_at.is_(None))),
         }
+
+
+def llm_spend_this_month(workspace_id: str) -> float:
+    now = utcnow()
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    with session_scope() as s:
+        return float(s.execute(select(func.coalesce(func.sum(ResearchRun.cost_usd), 0.0)).where(
+            ResearchRun.workspace_id == workspace_id, ResearchRun.created_at >= start)).scalar() or 0.0)
+
+
+def llm_budget(workspace_id: str) -> float | None:
+    with session_scope() as s:
+        ws = s.get(Workspace, workspace_id)
+        plan = ws.plan if ws else "explorer"
+    v = PLANS.get(plan, PLANS["explorer"]).get("llm_budget_usd_per_month")
+    return None if v is None else float(v)
 
 
 def check_quota(workspace_id: str, resource: str) -> None:
