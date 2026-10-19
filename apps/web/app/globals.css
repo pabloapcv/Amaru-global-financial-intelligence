@@ -126,6 +126,7 @@ body:has(.login-page) .shell { grid-template-columns: 1fr; }
 /* Phone and narrow layouts: let grid/flex children shrink, wrap headers, keep the nav to one scrolling row. */
 .main { min-width: 0; }
 .page-head > * { min-width: 0; }
+@media (min-width: 961px) { .page-head > :not(:first-child) { flex-shrink: 0; } }
 .kv { grid-template-columns: auto minmax(0, 1fr); }
 .kv dd { overflow-wrap: anywhere; }
 @media (max-width: 960px) {

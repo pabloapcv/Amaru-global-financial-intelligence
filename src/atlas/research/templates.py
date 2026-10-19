@@ -17,7 +17,7 @@ def _daily(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     steps.append(("screen_anomalies", {}))
     steps += [("detect_regime", {"dataset_id": d}) for d in ("CMD.CRUDE.BRENT", "FX.USD.BROAD", "EQ.US.SP500")]
     steps.append(("get_economic_calendar", {"days": 14}))
-    steps.append(("search_documents", {"query": "market news"}))
+    steps.append(("search_documents", {"query": "", "days": 7}))
     return steps
 
 

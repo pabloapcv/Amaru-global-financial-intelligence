@@ -426,6 +426,13 @@ def economic_calendar(days: int = Query(60, ge=1, le=400)) -> dict[str, Any]:
     return calendar.upcoming(days)
 
 
+@api.get("/documents")
+def search_documents(q: str = "", days: int = Query(30, ge=1, le=730), limit: int = Query(20, ge=1, le=100)) -> dict[str, Any]:
+    from atlas import documents
+
+    return documents.search(q, days=days, limit=limit)
+
+
 @api.get(f"/pipelines/status")
 def pipelines_status(limit: int = 50) -> dict[str, Any]:
     return access.pipeline_status(limit)

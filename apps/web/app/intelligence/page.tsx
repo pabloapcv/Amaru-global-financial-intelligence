@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type Instrument } from "@/lib/api";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 import Agents from "@/components/Agents";
+import Releases from "@/components/Releases";
 
 type AlertRow = {
   alert_id: string;
@@ -31,7 +32,7 @@ export default function Intelligence() {
   const [value, setValue] = useState(10);
   const [op, setOp] = useState(">");
   const [fired, setFired] = useState<string[] | null>(null);
-  const [tab, setTab] = useState<"agents" | "alerts">("agents");
+  const [tab, setTab] = useState<"agents" | "alerts" | "releases">("agents");
 
   const load = useCallback(() => api<AlertRow[]>("/api/v1/alerts").then(setAlerts).catch(setError), []);
   useEffect(() => {
@@ -64,18 +65,20 @@ export default function Intelligence() {
     <>
       <PageHeader
         title="Intelligence"
-        subtitle="Agents and alerts are evaluated automatically after every data refresh that changes what they watch."
+        subtitle="Agents and alerts are evaluated after every data refresh; official releases from the Fed, BEA and CFTC are indexed every 6 hours."
         actions={
           <div className="row">
             <div className="seg">
               <button className={tab === "agents" ? "on" : ""} onClick={() => setTab("agents")}>Agents</button>
               <button className={tab === "alerts" ? "on" : ""} onClick={() => setTab("alerts")}>Alerts</button>
+              <button className={tab === "releases" ? "on" : ""} onClick={() => setTab("releases")}>Releases</button>
             </div>
             {tab === "alerts" && <button className="secondary" onClick={evaluate}>Evaluate all now</button>}
           </div>
         }
       />
       {tab === "agents" && <Agents instruments={instruments} />}
+      {tab === "releases" && <Releases />}
       {tab === "alerts" && <>
       <ErrorNote error={error} />
       {fired && <div className={`note ${fired.length ? "note-warn" : ""}`} style={{ marginBottom: 14 }}>{fired.length ? fired.join(" · ") : "No alerts fired."}</div>}
