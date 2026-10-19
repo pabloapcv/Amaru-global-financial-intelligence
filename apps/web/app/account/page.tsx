@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
   llm_budget_usd_per_month: "Claude spend this month (USD)",
   schedules: "Scheduled reports",
   alerts: "Alerts",
+  agents: "Monitoring agents",
   api_keys: "API keys",
 };
 
@@ -23,6 +24,7 @@ export default function AccountPage() {
   const [error, setError] = useState<unknown>(null);
   const [pw, setPw] = useState({ current: "", next: "" });
   const [pwError, setPwError] = useState<unknown>(null);
+  const [resent, setResent] = useState(false);
 
   const load = useCallback(() => {
     api<Account>("/api/v1/account").then(setAccount).catch(setError);
@@ -54,6 +56,14 @@ export default function AccountPage() {
     <>
       <PageHeader title="Account" subtitle="Workspace, plan usage and API access." actions={<button className="secondary" onClick={logout}>Sign out</button>} />
       <ErrorNote error={error} />
+      {account && !account.email_verified && (
+        <div className="note note-warn" style={{ marginBottom: 14 }}>
+          Please verify {account.user.email}: we sent you a link.{account.verification_required && " Research, API keys, agents and schedules are disabled until you do."}{" "}
+          <a href="#" onClick={async (e) => { e.preventDefault(); await api("/api/v1/account/verify-email/resend", { method: "POST" }).catch(setError); setResent(true); }}>
+            {resent ? "Sent again" : "Resend link"}
+          </a>
+        </div>
+      )}
       {account && (
         <div className="grid grid-2">
           <Card title="Profile">

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import html
 import math
 from pathlib import Path
@@ -26,6 +27,20 @@ PALETTE = ["#2f6fdf", "#e07b39", "#2a9d8f", "#b5179e", "#6c757d", "#e9c46a"]
 
 
 # ---------------------------------------------------------------- charts
+
+
+# Presentation attributes (not CSS classes) so charts render identically in browsers and the PDF renderer.
+GRID = 'stroke="#e6eaef" stroke-width="1"'
+AXIS = 'fill="#7a8594" font-size="11" font-family="Helvetica, Arial, sans-serif"'
+
+
+def _compact(v: float, step: float) -> str:
+    """Axis label: 1.2B / 350K / 12.5K for large magnitudes, otherwise decimals matching the tick step."""
+    a = abs(v)
+    for div, suffix, floor in ((1e9, "B", 1e9), (1e6, "M", 1e6), (1e3, "K", 1e4)):
+        if a >= floor:
+            return f"{v / div:,.1f}".removesuffix(".0") + suffix
+    return f"{v:,.0f}" if step >= 1 else f"{v:,.{max(0, -math.floor(math.log10(step)))}f}"
 
 
 def svg_chart(chart: dict[str, Any], width: int = 760, height: int = 260) -> str:
@@ -70,9 +85,8 @@ def svg_chart(chart: dict[str, Any], width: int = 760, height: int = 260) -> str
     tick = math.ceil(y0 / step) * step
     while tick <= y1:
         y = py(tick)
-        parts.append(f'<line x1="{pad_l}" x2="{width - pad_r}" y1="{y:.1f}" y2="{y:.1f}" class="grid"/>')
-        label = f"{tick:,.0f}" if step >= 1 else f"{tick:,.{max(0, -math.floor(math.log10(step)))}f}"
-        parts.append(f'<text x="{pad_l - 6}" y="{y + 4:.1f}" text-anchor="end" class="axis">{label}</text>')
+        parts.append(f'<line x1="{pad_l}" x2="{width - pad_r}" y1="{y:.1f}" y2="{y:.1f}" {GRID}/>')
+        parts.append(f'<text x="{pad_l - 6}" y="{y + 4:.1f}" text-anchor="end" {AXIS}>{_compact(tick, step)}</text>')
         tick += step
     if chart.get("x_is_event_time"):
         # Event-relative axis: label business-day offsets from the 2000-01-03 anchor.
@@ -82,7 +96,7 @@ def svg_chart(chart: dict[str, Any], width: int = 760, height: int = 260) -> str
             for p in pts[:: max(1, len(pts) // 8)] + pts[-1:]:
                 d = dt.date.fromisoformat(p["date"])
                 off = int(np.busday_count(anchor, d)) if d >= anchor else -int(np.busday_count(d, anchor))
-                parts.append(f'<text x="{px(ts(p["date"])):.1f}" y="{height - pad_b + 18}" text-anchor="middle" class="axis">day {off}</text>')
+                parts.append(f'<text x="{px(ts(p["date"])):.1f}" y="{height - pad_b + 18}" text-anchor="middle" {AXIS}>day {off}</text>')
     # x labels: years (calendar axes only)
     first_year = 0 if chart.get("x_is_event_time") else dt.date.fromordinal(int(x0)).year
     last_year = dt.date.fromordinal(int(x1)).year
@@ -90,17 +104,17 @@ def svg_chart(chart: dict[str, Any], width: int = 760, height: int = 260) -> str
     stride = max(1, len(years) // 8)
     for yr in years[::stride]:
         x = px(dt.date(yr, 1, 1).toordinal())
-        parts.append(f'<text x="{x:.1f}" y="{height - pad_b + 18}" text-anchor="middle" class="axis">{yr}</text>')
+        parts.append(f'<text x="{x:.1f}" y="{height - pad_b + 18}" text-anchor="middle" {AXIS}>{yr}</text>')
     if len(years) <= 1 and not chart.get("x_is_event_time"):
         for d in (x0, x1):
-            parts.append(f'<text x="{px(d):.1f}" y="{height - pad_b + 18}" text-anchor="middle" class="axis">{dt.date.fromordinal(int(d)).isoformat()}</text>')
+            parts.append(f'<text x="{px(d):.1f}" y="{height - pad_b + 18}" text-anchor="middle" {AXIS}>{dt.date.fromordinal(int(d)).isoformat()}</text>')
     # band
     band = [b for b in chart.get("band", []) if b.get("low") is not None]
     if band and series:
         anchor = series[0]["points"][-1]
         pts = [(ts(anchor["date"]), anchor["value"], anchor["value"])] + [(ts(b["date"]), b["low"], b["high"]) for b in band]
         poly = " ".join(f"{px(x):.1f},{py(h):.1f}" for x, _, h in pts) + " " + " ".join(f"{px(x):.1f},{py(l):.1f}" for x, l, _ in reversed(pts))
-        parts.append(f'<polygon points="{poly}" class="band"/>')
+        parts.append(f'<polygon points="{poly}" fill="#2f6fdf" fill-opacity="0.14" stroke="none"/>')
     for i, s in enumerate(series):
         pts = [p for p in s["points"] if p["value"] is not None]
         if chart.get("type") == "forecast" and s["name"] == "forecast" and series[0]["points"]:
@@ -135,6 +149,41 @@ def render_html(run: dict[str, Any], version: int) -> str:
     return _env.get_template("report.html").render(
         title=res["title"], run=run, res=res, body=body, charts=charts, version=version,
     )
+
+
+@functools.lru_cache(maxsize=1)
+def pdf_available() -> bool:
+    """WeasyPrint plus its system libraries (Pango) are usable.
+
+    Probed in a subprocess: with mismatched or missing native libraries, importing WeasyPrint can
+    crash the interpreter (segfault) instead of raising, which must not take down the API.
+    """
+    import importlib.util
+    import os
+    import subprocess
+    import sys
+
+    if os.getenv("ATLAS_PDF", "auto").lower() == "off" or importlib.util.find_spec("weasyprint") is None:
+        return False
+    try:
+        probe = subprocess.run([sys.executable, "-c", "import weasyprint"], capture_output=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return probe.returncode == 0
+
+
+def render_pdf(html_doc: str, path: Path) -> Path | None:
+    """Render the report HTML (inline SVG charts, print stylesheet) to PDF. None if unavailable."""
+    if not pdf_available():
+        return None
+    import logging
+
+    import weasyprint
+
+    # Keep WeasyPrint's font/CSS warnings out of the application log at INFO.
+    logging.getLogger("weasyprint").setLevel(logging.ERROR)
+    weasyprint.HTML(string=html_doc).write_pdf(str(path))
+    return path
 
 
 def render_xlsx(run: dict[str, Any], path: Path) -> None:
@@ -206,9 +255,14 @@ def build_report(run_id: str, formats: list[str] | None = None, template: str = 
     out_dir = _report_dir(report_id)
     uris: dict[str, str] = {}
     if "html" in formats or "pdf" in formats:
+        html_doc = render_html(run, version)
         p = out_dir / f"v{version}.html"
-        p.write_text(render_html(run, version), encoding="utf-8")
+        p.write_text(html_doc, encoding="utf-8")
         uris["html"] = str(p)
+        if "pdf" in formats or pdf_available():
+            pdf = render_pdf(html_doc, out_dir / f"v{version}.pdf")
+            if pdf:
+                uris["pdf"] = str(pdf)
     if "xlsx" in formats:
         p = out_dir / f"v{version}.xlsx"
         render_xlsx(run, p)

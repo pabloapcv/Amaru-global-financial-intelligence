@@ -4,9 +4,14 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 
+# Pango/HarfBuzz for native PDF reports (WeasyPrint); fonts for readable output.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install ".[postgres]"
+RUN pip install ".[postgres,pdf]"
 
 RUN useradd --create-home --uid 1000 atlas && mkdir -p /data && chown atlas /data
 USER atlas

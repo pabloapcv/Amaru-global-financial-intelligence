@@ -25,6 +25,7 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.2"]
+pdf = ["weasyprint>=62"]  # also needs Pango system libraries (see api.Dockerfile)
 dev = ["pytest>=8"]
 
 [project.scripts]

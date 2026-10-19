@@ -28,6 +28,10 @@ def main(argv: list[str] | None = None) -> None:
     rs.add_argument("--depth", choices=["quick", "standard", "deep"], default="standard")
     rs.add_argument("--engine", choices=["auto", "llm", "deterministic"], default="auto")
     sub.add_parser("llm-check", help="verify Anthropic credentials with a minimal API request")
+    sub.add_parser("workspaces", help="list workspaces, plans, members and this month's Claude spend")
+    sp = sub.add_parser("set-plan", help="change a workspace's plan")
+    sp.add_argument("workspace_id")
+    sp.add_argument("plan")
     cu = sub.add_parser("create-user", help="create a user account (prompts for the password)")
     cu.add_argument("email")
     cu.add_argument("--name", default="")
@@ -37,7 +41,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    if args.cmd in ("init-db", "ingest", "schedule", "research", "create-user"):
+    if args.cmd in ("init-db", "ingest", "schedule", "research", "create-user", "workspaces", "set-plan"):
         init_db()
         with session_scope() as s:
             sync_registry(s)
@@ -72,10 +76,25 @@ def main(argv: list[str] | None = None) -> None:
             if getpass.getpass("Repeat password: ") != password:
                 raise SystemExit("passwords do not match")
         try:
-            uid, ws = auth.create_user(args.email, password, args.name, workspace_id=args.workspace, plan=args.plan)
+            uid, ws = auth.create_user(args.email, password, args.name, workspace_id=args.workspace, plan=args.plan,
+                                       verified=True)  # created by an operator
         except auth.ValidationError as exc:
             raise SystemExit(str(exc))
         print(f"created user {args.email} in workspace {ws}")
+    elif args.cmd == "workspaces":
+        from atlas import auth
+
+        for w in auth.list_workspaces():
+            print(f"{w['workspace_id']:32}  {w['plan']:12}  ${w['claude_spend_month_usd']:>7.2f}  {w['name']}  "
+                  f"[{', '.join(w['members']) or 'no members'}]")
+    elif args.cmd == "set-plan":
+        from atlas import auth
+
+        try:
+            auth.set_plan(args.workspace_id, args.plan)
+        except auth.ValidationError as exc:
+            raise SystemExit(str(exc))
+        print(f"workspace {args.workspace_id} is now on the {args.plan} plan")
     elif args.cmd == "llm-check":
         import os
 

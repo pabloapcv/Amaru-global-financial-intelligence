@@ -48,6 +48,8 @@ open("/tmp/report_id", "w").write(r["report_id"])'
 curl -sf -b "$JAR" "$API/api/v1/reports/$(cat /tmp/report_id)/download?format=html" | grep -q "Appendix A"
 curl -sf -b "$JAR" -o /tmp/report.xlsx "$API/api/v1/reports/$(cat /tmp/report_id)/download?format=xlsx"
 head -c 2 /tmp/report.xlsx | grep -q PK
+curl -sf -b "$JAR" -o /tmp/report.pdf "$API/api/v1/reports/$(cat /tmp/report_id)/download?format=pdf"
+head -c 5 /tmp/report.pdf | grep -q '%PDF-'   # native PDF renderer present in the image
 
 echo "== metrics and web"
 curl -sf "$API/metrics" | grep -q 'atlas_research_runs{status="complete"'
