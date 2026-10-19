@@ -62,6 +62,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | Event studies (§11) | Average cumulative abnormal moves around Fed decisions (inferred from the effective fed funds rate since 2009) or custom dates; `run_event_study` tool, added automatically to rate-cut/hike scenario questions, and in Quant Lab |
 | ML forecasting (§11) | In deep research (or `include_ml`), a gradient-boosting model on lagged changes joins the walk-forward forecast competition; it is selected only if it beats the naive baselines (on the current data it does not, and reports say so) |
 | Onboarding (§17 phase 6) | "Get started" checklist on Overview computed from real workspace progress, with a one-click example portfolio |
+| Economic calendar (§8.2) | FOMC meetings parsed from the Federal Reserve Board's public calendar (refreshed daily; `atlas ingest --calendar`); official U.S. release dates from FRED when `FRED_API_KEY` is set, otherwise the next reference period due per U.S. series and never a guessed date. `get_economic_calendar` tool (Daily Market Brief, Global Macro Outlook, Fed and "what to watch" questions), `/api/v1/calendar`, Global Economy card |
 | Volatility regimes (§11) | Realized-vol percentile buckets plus a 2-state Markov-switching model (`detect_regime`), in research and Quant Lab |
 | Positioning & countries (FR-011, §9) | COT index, z-score and crowding flags per market; cross-country comparisons with stale-value flags; country profiles |
 | API (§14) | FastAPI: instruments, quotes, history, macro (with `as_of`), data/pipeline status, research jobs (202 + polling), quant, reports, alerts |
@@ -108,7 +109,7 @@ tests/           unit, integration (pipeline, API, LLM loop), financial_validati
 
 ## Configuration
 
-See `.env.example`. Key variables: `ATLAS_DATABASE_URL`, `ATLAS_OBJECT_STORE`, `ATLAS_LLM` (`auto`/`off`), `ATLAS_LLM_MODEL` (default `claude-opus-5-5`), `ATLAS_LLM_EFFORT`, `ATLAS_SCHEDULER=on` (refresh inside the API process), `NEXT_PUBLIC_API_URL` for the web app.
+See `.env.example`. Key variables: `ATLAS_DATABASE_URL`, `ATLAS_OBJECT_STORE`, `ATLAS_LLM` (`auto`/`off`), `ATLAS_LLM_MODEL` (default `claude-opus-5-5`), `ATLAS_LLM_EFFORT`, `ATLAS_SCHEDULER=on` (refresh inside the API process), `FRED_API_KEY` (optional; official U.S. data release dates), `NEXT_PUBLIC_API_URL` for the web app.
 
 ## Continuous integration
 

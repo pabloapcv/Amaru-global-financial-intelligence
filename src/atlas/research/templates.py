@@ -16,7 +16,8 @@ def _daily(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         steps.append(("compare_performance", {"asset_class": ac}))
     steps.append(("screen_anomalies", {}))
     steps += [("detect_regime", {"dataset_id": d}) for d in ("CMD.CRUDE.BRENT", "FX.USD.BROAD", "EQ.US.SP500")]
-    steps.append(("search_documents", {"query": "economic calendar and market news"}))
+    steps.append(("get_economic_calendar", {"days": 14}))
+    steps.append(("search_documents", {"query": "market news"}))
     return steps
 
 
@@ -48,6 +49,7 @@ def _macro(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     steps += [("get_macro_series", {"series_id": s, "lookback_years": 5}) for s in ("US.GDP.REAL", "US.CPI.HEADLINE", "US.CPI.CORE", "US.UNRATE")]
     steps.append(("compare_performance", {"dataset_ids": ["RATE.US.FEDFUNDS", "RATE.UST.2Y", "RATE.UST.10Y", "RATE.UST.10Y.REAL", "FX.USD.BROAD", "EQ.US.SP500"]}))
     steps += [("detect_regime", {"dataset_id": d}) for d in ("FX.USD.BROAD", "RATE.UST.10Y")]
+    steps.append(("get_economic_calendar", {"days": 60}))
     return steps
 
 
@@ -87,7 +89,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "default_query": "Daily market brief: what moved across commodities, currencies, rates and equities, and what stands out?",
         "depth": "standard", "steps": _daily,
         "brief": "Write a concise daily market brief: biggest movers by asset class, anything statistically unusual, "
-                 "current volatility regimes, and what to watch. No economic calendar is connected, so say so rather than naming upcoming events.",
+                 "current volatility regimes, and what to watch. Name only scheduled events listed by the economic calendar tool, with their ISO dates.",
     },
     "commodity_deep_dive": {
         "name": "Commodity Deep Dive",

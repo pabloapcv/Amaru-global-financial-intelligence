@@ -244,6 +244,22 @@ class SourceDocument(Base):
     storage_uri: Mapped[str | None] = mapped_column(Text)
 
 
+class CalendarEvent(Base):
+    """Scheduled events from official sources (FOMC meetings, statistical release dates)."""
+
+    __tablename__ = "calendar_events"
+
+    event_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    source: Mapped[str] = mapped_column(String(32), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    title: Mapped[str] = mapped_column(Text)
+    start_date: Mapped[date] = mapped_column(Date, index=True)
+    end_date: Mapped[date | None] = mapped_column(Date)
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    url: Mapped[str | None] = mapped_column(Text)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 # ---------------------------------------------------------------- research & output
 
 
