@@ -10,6 +10,7 @@ Values are as declared by the reporter (exports FOB, imports usually CIF).
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import date
 
@@ -20,6 +21,16 @@ from atlas.provider_sdk import FetchResult, ParsedPoint, ProviderAdapter, Provid
 
 BASE = "https://comtradeapi.un.org/public/v1/preview/C/A/HS"
 PACING_SECONDS = 1.2
+MAX_QUOTA_WAIT = 300  # seconds
+
+
+def quota_refill_seconds(message: str) -> int | None:
+    """Seconds until Comtrade's call quota refills, parsed from its 403 message; None if not a quota error."""
+    m = re.search(r"Out of call volume quota.*?replenished in (\d+):(\d+):(\d+)", message, re.S)
+    if not m:
+        return None
+    h, mnt, sec = (int(x) for x in m.groups())
+    return h * 3600 + mnt * 60 + sec
 
 
 def _m49(iso3: str) -> int:
@@ -45,12 +56,22 @@ class ComtradeAdapter(ProviderAdapter):
         )
         self._pacing = pacing
         self._last_call = 0.0
+        self._sleep = time.sleep
 
     def _get(self, params: dict) -> list[dict]:
         wait = self._pacing - (time.monotonic() - self._last_call)
         if wait > 0:
             time.sleep(wait)
-        resp = with_retries(lambda: self._client.get(BASE, params=params), base_delay=3.0)
+        try:
+            resp = with_retries(lambda: self._client.get(BASE, params=params), base_delay=3.0)
+        except ProviderError as exc:
+            # Comtrade's quota error says when the quota refills ("replenished in 00:03:03"); wait and retry
+            # once when that is short, instead of failing the refresh.
+            refill = quota_refill_seconds(str(exc))
+            if refill is None or refill > MAX_QUOTA_WAIT:
+                raise
+            self._sleep(refill + 2)
+            resp = with_retries(lambda: self._client.get(BASE, params=params), base_delay=3.0)
         self._last_call = time.monotonic()
         body = resp.json()
         if body.get("error"):

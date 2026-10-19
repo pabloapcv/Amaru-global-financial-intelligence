@@ -118,6 +118,10 @@ See `.env.example`. Key variables: `ATLAS_DATABASE_URL`, `ATLAS_OBJECT_STORE`, `
 
 `GET /metrics` serves Prometheus text format: HTTP request counts and latency histograms per route template, research runs by status and engine, 30-day pipeline runs by status, datasets by freshness, and LLM configuration. Set `ATLAS_METRICS_TOKEN` to require a bearer token. Outbound requests identify as `ATLAS_USER_AGENT` (default `ATLAS-research/0.1 (+contact URL)`); set your own contact URL in production.
 
+## Acceptance benchmark
+
+`atlas benchmark` measures the spec's acceptance targets (§16) on this deployment's stored data: cached query latency, research latency, numerical traceability and citation validity across representative questions, reproducibility, 30-day pipeline reliability, freshness visibility, and cross-workspace isolation (using two throwaway accounts it removes afterwards). It exits non-zero if any target is missed; `--json` prints the full result.
+
 ## Tests
 
 ```bash

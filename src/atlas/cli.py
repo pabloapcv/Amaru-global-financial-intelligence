@@ -29,6 +29,8 @@ def main(argv: list[str] | None = None) -> None:
     rs.add_argument("--engine", choices=["auto", "llm", "deterministic"], default="auto")
     sub.add_parser("llm-check", help="verify Anthropic credentials with a minimal API request")
     sub.add_parser("workspaces", help="list workspaces, plans, members and this month's Claude spend")
+    bm = sub.add_parser("benchmark", help="measure the spec's acceptance targets (§16) on this deployment's data")
+    bm.add_argument("--json", action="store_true", help="print the full result as JSON")
     sp = sub.add_parser("set-plan", help="change a workspace's plan")
     sp.add_argument("workspace_id")
     sp.add_argument("plan")
@@ -41,7 +43,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    if args.cmd in ("init-db", "ingest", "schedule", "research", "create-user", "workspaces", "set-plan"):
+    if args.cmd in ("init-db", "ingest", "schedule", "research", "create-user", "workspaces", "set-plan", "benchmark"):
         init_db()
         with session_scope() as s:
             sync_registry(s)
@@ -81,6 +83,21 @@ def main(argv: list[str] | None = None) -> None:
         except auth.ValidationError as exc:
             raise SystemExit(str(exc))
         print(f"created user {args.email} in workspace {ws}")
+    elif args.cmd == "benchmark":
+        from atlas.benchmark import run as run_benchmark
+
+        logging.getLogger().setLevel(logging.WARNING)
+        res = run_benchmark()
+        if args.json:
+            print(json.dumps(res, indent=2, default=str))
+        else:
+            for name, r in res.items():
+                if not isinstance(r, dict):
+                    continue
+                detail = {k: v for k, v in r.items() if k not in ("target", "pass", "failures")}
+                print(f"{'PASS' if r['pass'] else 'FAIL'}  {name:22} {r['target']:48} {detail}")
+            print("ALL TARGETS MET" if res["all_pass"] else "SOME TARGETS MISSED")
+        raise SystemExit(0 if res["all_pass"] else 1)
     elif args.cmd == "workspaces":
         from atlas import auth
 
