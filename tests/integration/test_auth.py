@@ -218,3 +218,14 @@ def test_operator_set_plan_changes_limits():
     with pytest.raises(auth.ValidationError):
         auth.set_plan(ws, "platinum")
     assert any(w["workspace_id"] == ws and w["plan"] == "research_pro" for w in auth.list_workspaces())
+
+
+def test_onboarding_checklist_tracks_real_progress(secured):
+    _signup(secured, "olga@example.test", "Olga")
+    steps = {s["key"]: s["done"] for s in secured.get("/api/v1/onboarding").json()["steps"]}
+    assert steps == {"research": False, "portfolio": False, "agent": False, "api_key": False}
+    ex = secured.post("/api/v1/onboarding/example-portfolio").json()
+    assert ex["name"].startswith("Example") and secured.post("/api/v1/onboarding/example-portfolio").json()["portfolio_id"] == ex["portfolio_id"]
+    secured.post("/api/v1/api-keys", json={"name": "nb"})
+    steps = {s["key"]: s["done"] for s in secured.get("/api/v1/onboarding").json()["steps"]}
+    assert steps["portfolio"] and steps["api_key"] and not steps["research"]

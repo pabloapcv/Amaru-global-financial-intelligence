@@ -93,3 +93,13 @@ def test_fingerprint_is_deterministic():
     s = _monthly([1.0, 2.0, 3.0])
     assert analytics.fingerprint(s) == analytics.fingerprint(s.copy())
     assert analytics.fingerprint(s) != analytics.fingerprint(s * 1.0001)
+
+
+def test_ml_forecast_candidate_is_evaluated_but_must_earn_selection():
+    rng = np.random.default_rng(9)
+    s = _monthly(100 * np.exp(np.cumsum(rng.normal(0, 0.04, 200))))
+    res = analytics.forecast(s, unit="usd", frequency="monthly", horizon_months=3, include_ml=True)
+    assert "gradient_boosting" in res["evaluation"] and res["evaluation"]["gradient_boosting"]["mae"] is not None
+    if res["selected_method"] == "gradient_boosting":
+        assert res["beats_naive_baseline"]
+    assert "gradient_boosting" not in analytics.forecast(s, unit="usd", frequency="monthly")["evaluation"]

@@ -347,7 +347,8 @@ def t_run_forecast(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         raise ToolError("horizon_months must be 1–24")
     series, metas = _load([dsid])
     try:
-        res = analytics.forecast(series[dsid], unit=ds.unit, frequency=ds.frequency, horizon_months=h)
+        res = analytics.forecast(series[dsid], unit=ds.unit, frequency=ds.frequency, horizon_months=h,
+                                 include_ml=bool(args.get("include_ml", False)))
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
     s = series[dsid]
@@ -764,8 +765,10 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "run_forecast": {
         "fn": t_run_forecast,
-        "description": "Walk-forward-evaluated statistical forecast vs naive baselines, with p10/p90 band. Reports whether it beats the baseline.",
-        "schema": {"type": "object", "properties": {"dataset_id": _ID, "horizon_months": {"type": "integer"}}, "required": ["dataset_id"]},
+        "description": "Walk-forward-evaluated statistical forecast vs naive baselines, with p10/p90 band. Reports whether it beats the baseline. include_ml adds a gradient-boosting candidate, selected only if it wins the walk-forward test.",
+        "schema": {"type": "object", "properties": {"dataset_id": _ID, "horizon_months": {"type": "integer"},
+                                                    "include_ml": {"type": "boolean", "description": "Also evaluate a gradient-boosting model (slower)."}},
+                   "required": ["dataset_id"]},
     },
     "run_scenario": {
         "fn": t_run_scenario,

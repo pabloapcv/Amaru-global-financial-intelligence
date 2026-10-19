@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, fmt, type Instrument, type Quote } from "@/lib/api";
 import { Card, Change, ErrorNote, FreshnessBadge, PageHeader } from "@/components/ui";
+import GetStarted from "@/components/GetStarted";
 
 const GROUPS: { title: string; ids: string[] }[] = [
   { title: "Commodities", ids: ["CMD.SUGAR.ISA", "CMD.COPPER.LME", "CMD.CRUDE.BRENT", "CMD.CRUDE.WTI", "CMD.NATGAS.HH", "CMD.COFFEE.ARABICA", "CMD.WHEAT.USHRW", "CMD.GOLD"] },
@@ -64,6 +65,7 @@ export default function Overview() {
         subtitle="Latest stored observations from connected public sources. Reference and benchmark prices, published with a lag — not live tradable quotes."
         actions={<Link href="/research"><button>Ask ATLAS</button></Link>}
       />
+      <GetStarted />
       <ErrorNote error={error} />
       {!error && instruments.length === 0 && <p className="muted">Loading latest observations…</p>}
       <div className="grid grid-4" style={{ marginBottom: 18 }}>

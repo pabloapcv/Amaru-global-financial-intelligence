@@ -21,7 +21,8 @@ PANDAS_FREQ = {"daily": "B", "weekly": "W-FRI", "monthly": "MS", "quarterly": "Q
 FREQ_RANK = {"daily": 0, "weekly": 1, "monthly": 2, "quarterly": 3, "annual": 4}
 LEVEL_UNITS = ("percent",)
 METHOD_NAMES = {"no_change": "no-change", "seasonal_naive": "seasonal-naive", "drift": "drift",
-                "damped_trend_ets": "damped-trend exponential smoothing", "arima_110": "ARIMA(1,1,0)"}  # series quoted in percent are analysed in changes, not log returns
+                "damped_trend_ets": "damped-trend exponential smoothing", "arima_110": "ARIMA(1,1,0)",
+                "gradient_boosting": "gradient boosting (lagged changes)"}  # series quoted in percent are analysed in changes, not log returns
 
 
 def fingerprint(*series: pd.Series) -> str:
@@ -359,7 +360,32 @@ def _arima(train: pd.Series, h: int) -> np.ndarray:
     return np.asarray(fit.forecast(h))
 
 
-def forecast(series: pd.Series, *, unit: str, frequency: str, horizon_months: int = 3, folds: int = 24) -> dict[str, Any]:
+GBM_LAGS = 12
+
+
+def _gbm(train: pd.Series, h: int) -> np.ndarray:
+    """Gradient-boosted direct forecast: features are the last GBM_LAGS period changes, the target is the
+    change over the next h periods. Interim periods are interpolated linearly (only the h-step value is
+    evaluated). Fixed seed for reproducibility."""
+    from sklearn.ensemble import HistGradientBoostingRegressor
+
+    y = train.to_numpy(dtype=float)[-144:]
+    d = np.diff(y)
+    X, t = [], []
+    for i in range(GBM_LAGS, len(d) - h + 1):
+        X.append(d[i - GBM_LAGS:i])
+        t.append(y[i + h] - y[i])
+    if len(X) < 30:
+        raise ValueError("not enough history for the gradient-boosting model")
+    model = HistGradientBoostingRegressor(max_iter=60, learning_rate=0.1, max_depth=3, min_samples_leaf=10,
+                                          l2_regularization=1.0, random_state=0)
+    model.fit(np.asarray(X), np.asarray(t))
+    step = float(model.predict(d[-GBM_LAGS:].reshape(1, -1))[0])
+    return y[-1] + step * np.arange(1, h + 1) / h
+
+
+def forecast(series: pd.Series, *, unit: str, frequency: str, horizon_months: int = 3, folds: int = 24,
+             include_ml: bool = False) -> dict[str, Any]:
     """Walk-forward evaluated forecast, always compared against naive baselines (spec §11)."""
     kind = transform_kind(unit)
     work = resample(series, "monthly", "mean") if frequency in ("daily", "weekly") else series
@@ -376,6 +402,8 @@ def forecast(series: pd.Series, *, unit: str, frequency: str, horizon_months: in
         "damped_trend_ets": lambda tr: _ets(tr.iloc[-120:], h),
         "arima_110": lambda tr: _arima(tr.iloc[-120:], h),
     }
+    if include_ml:  # slower (~1-2 s); used by deep research and on request
+        methods["gradient_boosting"] = lambda tr: _gbm(tr, h)
     min_train = 36
     origins = list(range(max(min_train, len(y) - folds - h), len(y) - h))
     if len(origins) < 6:
