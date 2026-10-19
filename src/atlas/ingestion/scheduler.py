@@ -25,6 +25,10 @@ def run_once() -> int:
     docs = documents.refresh_if_due()
     if docs:
         log.info("document feeds refreshed: %s", docs)
+        if any(v.get("new") for v in docs.values()):
+            from atlas.agents import evaluate_release_agents
+
+            evaluate_release_agents()
     due = due_datasets()
     if due:
         log.info("refreshing %d due dataset(s)", len(due))

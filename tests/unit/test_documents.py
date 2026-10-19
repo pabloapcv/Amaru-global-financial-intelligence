@@ -69,3 +69,41 @@ def test_search_documents_tool_records_evidence():
     assert out["results"][0]["publisher"] == "U.S. Bureau of Economic Analysis"
     assert "No commercial news wire" in out["coverage"]
     assert ctx.evidence[0].sources[0]["dataset_id"] == "DOCS.BEA"
+
+
+def test_release_agent_fires_once_per_new_release_and_cites_it(monkeypatch):
+    import datetime as dt
+
+    from sqlalchemy import update
+
+    from atlas import agents
+    from atlas.data.db import ResearchRun, SourceDocument, session_scope
+
+    with pytest.raises(agents.AgentError):
+        agents.validate([], [{"type": "official_release", "keywords": " , "}], {"query": "why?"})
+    with pytest.raises(agents.AgentError):  # market triggers still need instruments
+        agents.validate([], [{"type": "anomaly", "z": 3}], {"query": "why?"})
+
+    a = agents.create("Fed watch", [], [{"type": "official_release", "keywords": "discount rate"}],
+                      {"query": "What does this release imply for rates?", "engine": "deterministic"}, 24, False, "local", "local")
+    # Nothing has been indexed since the agent was created.
+    assert agents.check_agent(a["agent_id"], background=False)["fired"] is False
+
+    # A newly indexed matching release fires the agent once; the research cites the release.
+    later = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) + dt.timedelta(minutes=1)
+    with session_scope() as s:
+        s.execute(update(SourceDocument).where(SourceDocument.title.like("Minutes%")).values(
+            first_seen_at=later, published_at=later - dt.timedelta(hours=2)))
+    monkeypatch.setattr(agents, "utcnow", lambda: later + dt.timedelta(minutes=1))
+    r = agents.check_agent(a["agent_id"], background=False)
+    assert r["fired"] and "discount rate" in r["findings"][0]["message"]
+    with session_scope() as s:
+        res = s.get(ResearchRun, r["run_id"]).result
+    assert res["evidence"][0]["tool"] == "search_documents"
+    assert res["verification"]["invalid_citations"] == []
+
+    # The same release does not fire the next automatic check.
+    monkeypatch.setattr(agents, "utcnow", lambda: later + dt.timedelta(hours=30))
+    assert agents.check_agent(a["agent_id"], background=False)["fired"] is False
+    # A manual check looks back a week by publication date.
+    assert agents.check_agent(a["agent_id"], background=False, manual=True)["findings"]

@@ -11,7 +11,7 @@ type Agent = {
   agent_id: string; name: string; watch: string[]; triggers: Trigger[]; action: { template: string; query: string; engine?: string };
   cooldown_hours: number; notify_email: boolean; status: string; last_checked_at: string | null; last_fired_at: string | null; events: AgentEvent[];
 };
-type TriggerSpec = Record<string, { label: string; param: string; default: number; help: string; extra?: Record<string, number> }>;
+type TriggerSpec = Record<string, { label: string; param: string; default: number | string; help: string; kind?: "text"; extra?: Record<string, number> }>;
 
 export default function Agents({ instruments }: { instruments: Instrument[] }) {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -64,20 +64,22 @@ export default function Agents({ instruments }: { instruments: Instrument[] }) {
           <select multiple value={watch} onChange={(e) => setWatch([...e.target.selectedOptions].map((o) => o.value))} style={{ height: 120 }} aria-label="Watched instruments">
             {instruments.map((i) => <option key={i.dataset_id} value={i.dataset_id}>{i.name}</option>)}
           </select>
-          <p className="muted" style={{ fontSize: 11.5, margin: "4px 0 0" }}>⌘/Ctrl-click to select several.</p>
+          <p className="muted" style={{ fontSize: 11.5, margin: "4px 0 0" }}>⌘/Ctrl-click to select several. Agents with only an official-release trigger need no instruments.</p>
         </div>
         <label style={{ marginTop: 12 }}>Triggers (any fires the agent)</label>
         {triggers.map((t, i) => {
           const spec = specs[t.type];
           return (
-            <div className="row" key={i} style={{ flexWrap: "nowrap", marginBottom: 6 }}>
+            <div className="row" key={i} style={{ flexWrap: spec?.kind === "text" ? "wrap" : "nowrap", marginBottom: 6 }}>
               <select value={t.type} onChange={(e) => {
                 const sp = specs[e.target.value];
                 setTriggers(triggers.map((x, j) => (j === i ? { type: e.target.value, [sp.param]: sp.default, ...(sp.extra ?? {}) } : x)));
               }}>
                 {Object.entries(specs).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
-              {spec && <input type="number" step="any" style={{ width: 64, flex: "none" }} value={t[spec.param] as number} title={spec.help}
+              {spec && spec.kind === "text" && <input type="text" style={{ minWidth: 0, flex: "1 1 180px" }} value={t[spec.param] as string} title={spec.help}
+                placeholder="FOMC statement, GDP" onChange={(e) => setTriggers(triggers.map((x, j) => (j === i ? { ...x, [spec.param]: e.target.value } : x)))} aria-label={spec.param} />}
+              {spec && spec.kind !== "text" && <input type="number" step="any" style={{ width: 64, flex: "none" }} value={t[spec.param] as number} title={spec.help}
                 onChange={(e) => setTriggers(triggers.map((x, j) => (j === i ? { ...x, [spec.param]: parseFloat(e.target.value) } : x)))} aria-label={spec.param} />}
               <button className="secondary" onClick={() => setTriggers(triggers.filter((_, j) => j !== i))} aria-label="Remove trigger">×</button>
             </div>
@@ -91,7 +93,7 @@ export default function Agents({ instruments }: { instruments: Instrument[] }) {
         <div className="field"><label htmlFor="aq">Research question</label><textarea id="aq" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
         <label className="row" style={{ fontWeight: 400, marginTop: 8 }}><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} style={{ width: "auto" }} /> Email workspace owners when it fires</label>
         <button style={{ marginTop: 12 }} onClick={create}>Create agent</button>
-        <p className="muted" style={{ fontSize: 12 }}>Agents are checked automatically after each data refresh; a 24-hour cooldown prevents repeat reports.</p>
+        <p className="muted" style={{ fontSize: 12 }}>Agents are checked automatically after each data refresh (release triggers when new Fed, BEA or CFTC releases are indexed); a 24-hour cooldown prevents repeat reports.</p>
         <ErrorNote error={error} />
       </Card>
       <div className="stack">
@@ -107,7 +109,7 @@ export default function Agents({ instruments }: { instruments: Instrument[] }) {
               </div>
             }>
             <div className="muted" style={{ fontSize: 12.5 }}>
-              Watches {a.watch.map(nameOf).join(", ")} · triggers: {a.triggers.map((t) => specs[t.type]?.label ?? t.type).join(", ")} · runs {templates.find((t) => t.key === a.action.template)?.name ?? a.action.template}
+              {a.watch.length ? <>Watches {a.watch.map(nameOf).join(", ")}</> : "Watches official releases"} · triggers: {a.triggers.map((t) => (specs[t.type]?.label ?? t.type) + (specs[t.type]?.kind === "text" ? ` (${t[specs[t.type].param]})` : "")).join(", ")} · runs {templates.find((t) => t.key === a.action.template)?.name ?? a.action.template}
             </div>
             <div className="muted" style={{ fontSize: 12 }}>Last checked {a.last_checked_at?.replace("T", " ").slice(0, 16) ?? "never"} · last fired {a.last_fired_at?.replace("T", " ").slice(0, 16) ?? "never"}</div>
             <ul className="list-tight" style={{ marginTop: 6 }}>
