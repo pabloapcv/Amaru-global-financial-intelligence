@@ -866,7 +866,7 @@ def check_agent(agent_id: str, force: bool = False, p: Principal = Depends(princ
     if not agents.get_owned(agent_id, p.workspace_id):
         _404("agent")
     _quota(p.workspace_id, "research_per_day")
-    return agents.check_agent(agent_id, force=force)
+    return agents.check_agent(agent_id, force=force, manual=True)
 
 
 @api.post("/agents/{agent_id}/{action}", status_code=204)

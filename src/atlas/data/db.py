@@ -246,6 +246,7 @@ class SourceDocument(Base):
     category: Mapped[str | None] = mapped_column(String(128))
     summary: Mapped[str | None] = mapped_column(Text)
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime)
+    first_seen_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
 
 
 class CalendarEvent(Base):
@@ -538,6 +539,7 @@ _ADDED_COLUMNS = [
     ("source_documents", "category", "VARCHAR(128)", None),
     ("source_documents", "summary", "TEXT", None),
     ("source_documents", "fetched_at", "TIMESTAMP", None),
+    ("source_documents", "first_seen_at", "TIMESTAMP", None),
 ]
 
 

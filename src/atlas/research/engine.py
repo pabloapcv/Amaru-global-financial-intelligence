@@ -66,7 +66,7 @@ def _save_usage(run_id: str, researchers: list) -> None:
 
 # ---------------------------------------------------------------- result cache
 
-CACHE_CONFIG_KEYS = ("depth", "engine", "template", "lookback_years", "horizon_months", "assets", "formats")
+CACHE_CONFIG_KEYS = ("depth", "engine", "template", "lookback_years", "horizon_months", "assets", "formats", "documents_query")
 
 
 def cache_key(query: str, config: dict[str, Any]) -> str:
@@ -157,6 +157,9 @@ def execute_run(run_id: str) -> dict[str, Any]:
         from atlas.research import templates
 
         plan = templates.apply(plan, config.get("template"))
+        if config.get("documents_query"):  # e.g. an agent fired by an official release: cite the release
+            plan["steps"] = [{"tool": "search_documents", "args": {"query": config["documents_query"], "days": 14}}] + [
+                st for st in plan["steps"] if st["tool"] != "search_documents"]
         problems = validate_plan(plan)
         if problems:
             raise ValueError("invalid research plan: " + "; ".join(problems))

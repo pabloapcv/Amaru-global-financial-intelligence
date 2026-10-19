@@ -89,7 +89,7 @@ def _upsert(docs: list[dict[str, Any]]) -> int:
         for d in docs:
             row = existing.get(d["url"])
             if row is None:
-                s.add(SourceDocument(fetched_at=now, **d))
+                s.add(SourceDocument(fetched_at=now, first_seen_at=now, **d))
                 added += 1
             else:
                 for k, v in d.items():
@@ -115,6 +115,31 @@ def refresh(client: httpx.Client | None = None) -> dict[str, Any]:
             log.warning("feed %s failed: %s", feed["source"], exc)
             status[feed["source"]] = {"ok": False, "error": str(exc)[:200]}
     return status
+
+
+def new_since(since: datetime, keywords: list[str], sources: list[str] | None = None,
+              limit: int = 5, by_published: bool = False) -> list[dict[str, Any]]:
+    """Documents first indexed after `since` (and published no earlier than two days before it), or
+    with `by_published` simply published after `since`, whose title or summary contains any keyword
+    phrase as whole words."""
+    pats = [re.compile(rf"\b{re.escape(k.strip())}\b", re.I) for k in keywords if k.strip()]
+    with session_scope() as s:
+        if by_published:
+            q = select(SourceDocument).where(SourceDocument.published_at >= since)
+        else:
+            q = select(SourceDocument).where(
+                SourceDocument.first_seen_at > since,
+                or_(SourceDocument.published_at.is_(None), SourceDocument.published_at >= since - timedelta(days=2)))
+        if sources:
+            q = q.where(SourceDocument.source.in_(sources))
+        rows = s.execute(q.order_by(SourceDocument.published_at.desc())).scalars().all()
+        out = []
+        for r in rows:
+            hit = next((p.pattern for p in pats if p.search(r.title) or p.search(r.summary or "")), None)
+            if hit:
+                out.append({"title": r.title, "publisher": r.publisher, "source": r.source, "url": r.url,
+                            "published": r.published_at.date().isoformat() if r.published_at else None})
+    return out[:limit]
 
 
 def last_fetched() -> datetime | None:
