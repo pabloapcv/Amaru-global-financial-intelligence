@@ -60,6 +60,8 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | Trade flows (FR-016) | Annual exports/imports/balance and HS-chapter product mix per pair; `get_trade_flows` tool and Global Economy card |
 | Portfolio risk (FR-015) | Saved long/short portfolios per workspace: volatility, historical/parametric VaR and CVaR, risk contributions, correlation, factor betas (dollar, 10Y yield, Brent), historical stress tests (2008, COVID, 2022); `analyze_portfolio` tool and Portfolio page |
 | Event studies (§11) | Average cumulative abnormal moves around Fed decisions (inferred from the effective fed funds rate since 2009) or custom dates; `run_event_study` tool, added automatically to rate-cut/hike scenario questions, and in Quant Lab |
+| ML forecasting (§11) | In deep research (or `include_ml`), a gradient-boosting model on lagged changes joins the walk-forward forecast competition; it is selected only if it beats the naive baselines (on the current data it does not, and reports say so) |
+| Onboarding (§17 phase 6) | "Get started" checklist on Overview computed from real workspace progress, with a one-click example portfolio |
 | Volatility regimes (§11) | Realized-vol percentile buckets plus a 2-state Markov-switching model (`detect_regime`), in research and Quant Lab |
 | Positioning & countries (FR-011, §9) | COT index, z-score and crowding flags per market; cross-country comparisons with stale-value flags; country profiles |
 | API (§14) | FastAPI: instruments, quotes, history, macro (with `as_of`), data/pipeline status, research jobs (202 + polling), quant, reports, alerts |

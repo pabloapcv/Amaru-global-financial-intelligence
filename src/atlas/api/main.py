@@ -298,6 +298,46 @@ def revoke_api_key(key_id: str, p: Principal = Depends(principal)) -> None:
         _404("API key")
 
 
+# ---------------------------------------------------------------- onboarding
+
+
+EXAMPLE_PORTFOLIO = {
+    "name": "Example: commodity tilt",
+    "holdings": [{"dataset_id": "CMD.CRUDE.BRENT", "weight": 0.3}, {"dataset_id": "CMD.COPPER.LME", "weight": 0.3},
+                 {"dataset_id": "EQ.US.SP500", "weight": 0.4}],
+}
+
+
+@api.get("/onboarding")
+def onboarding(p: Principal = Depends(principal)) -> dict[str, Any]:
+    """First-run checklist, computed from what the workspace has actually done."""
+    from atlas import agents, portfolios
+
+    runs = engine.list_runs(1, p.workspace_id)
+    steps = [
+        {"key": "research", "title": "Ask your first research question", "done": bool(runs), "href": "/research",
+         "help": "Pick an example or ask your own; every figure is cited and verified."},
+        {"key": "portfolio", "title": "Analyze a portfolio", "done": bool(portfolios.list_portfolios(p.workspace_id)), "href": "/portfolio",
+         "help": "See volatility, value at risk and stress tests for your holdings."},
+        {"key": "agent", "title": "Set up a monitoring agent", "done": bool(agents.list_agents(p.workspace_id)), "href": "/intelligence",
+         "help": "Get a research report automatically when a market does something unusual."},
+        {"key": "api_key", "title": "Create an API key", "done": bool(auth.list_api_keys(p)) or p.via == "local", "href": "/account",
+         "help": "Use ATLAS from scripts and notebooks."},
+    ]
+    return {"steps": steps, "complete": all(s["done"] for s in steps)}
+
+
+@api.post("/onboarding/example-portfolio", status_code=201)
+def create_example_portfolio(p: Principal = Depends(require_verified)) -> dict[str, Any]:
+    """One click to a working Portfolio page: a clearly labelled example the user can edit or delete."""
+    from atlas import portfolios
+
+    existing = portfolios.find_by_name(EXAMPLE_PORTFOLIO["name"], p.workspace_id)
+    if existing:
+        return existing
+    return portfolios.save(EXAMPLE_PORTFOLIO["name"], EXAMPLE_PORTFOLIO["holdings"], p.workspace_id, p.user_id)
+
+
 # ---------------------------------------------------------------- reference & market data
 
 
@@ -501,6 +541,7 @@ class QuantRequest(BaseModel):
     horizon_months: int = 3
     threshold: float = 3.5
     event_type: Literal["fed_hike", "fed_cut", "fed_change", "custom"] = "fed_change"
+    include_ml: bool = False
     dates: list[str] = Field(default_factory=list)
 
 
@@ -512,7 +553,8 @@ def quant_analyze(req: QuantRequest) -> dict[str, Any]:
         "correlation": ("calculate_correlation", {"dataset_ids": req.dataset_ids, "lookback_years": req.lookback_years}),
         "regression": ("run_regression", {"dependent": req.dependent, "explanatory": req.explanatory, "lookback_years": req.lookback_years}),
         "anomalies": ("detect_anomalies", {"dataset_id": (req.dataset_ids or [None])[0], "threshold": req.threshold}),
-        "forecast": ("run_forecast", {"dataset_id": (req.dataset_ids or [None])[0], "horizon_months": req.horizon_months}),
+        "forecast": ("run_forecast", {"dataset_id": (req.dataset_ids or [None])[0], "horizon_months": req.horizon_months,
+                                      "include_ml": req.include_ml}),
         "scenario": ("run_scenario", {"asset": req.asset, "driver": req.driver, "shock": req.shock, "lookback_years": req.lookback_years}),
         "seasonality": ("get_seasonality", {"dataset_id": (req.dataset_ids or [None])[0]}),
         "performance": ("compare_performance", {"dataset_ids": req.dataset_ids}),

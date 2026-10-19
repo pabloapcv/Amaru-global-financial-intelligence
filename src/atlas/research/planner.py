@@ -188,7 +188,10 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
         add("run_regression", dependent=sourced[0], explanatory=sourced[1:4], lookback_years=lookback)
     if ("forecast" in intents or depth == "deep") and sourced:
         for e in sourced[:2]:
-            add("run_forecast", dataset_id=e, horizon_months=horizon)
+            if depth == "deep":
+                add("run_forecast", dataset_id=e, horizon_months=horizon, include_ml=True)
+            else:
+                add("run_forecast", dataset_id=e, horizon_months=horizon)
     if depth == "deep" or re.search(r"regime|volatil|turbulen|calm|risk", q):
         for e in sourced[:3]:
             add("detect_regime", dataset_id=e)
