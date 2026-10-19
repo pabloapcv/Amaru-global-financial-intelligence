@@ -101,6 +101,75 @@ function CountryComparison() {
   );
 }
 
+type CalEvent = { date: string; end_date: string | null; kind: string; title: string; source: string; url: string | null; detail: { datasets?: { dataset_id: string; name: string }[] } };
+type SeriesDue = { dataset_id: string; name: string; frequency: string; last_period: string; next_period_due: string | null; official_release_date: string | null };
+type Calendar = { from: string; to: string; events: CalEvent[]; series_due: SeriesDue[]; sources: Record<string, string>; notes: string[] };
+
+const SOURCE_NAMES: Record<string, string> = { fomc: "Federal Reserve Board", fred_releases: "FRED release calendar" };
+
+function fmtDay(iso: string) {
+  return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function EconomicCalendar() {
+  const [days, setDays] = useState(60);
+  const [cal, setCal] = useState<Calendar | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  useEffect(() => {
+    api<Calendar>(`/api/v1/calendar?days=${days}`).then(setCal).catch(setError);
+  }, [days]);
+  const fetched = cal && Object.entries(cal.sources).map(([s, at]) => `${SOURCE_NAMES[s] ?? s}, fetched ${at.replace("T", " ")} UTC`).join(" · ");
+
+  return (
+    <Card
+      title="Economic calendar"
+      actions={<div className="seg">{[30, 60, 120].map((d) => <button key={d} className={d === days ? "on" : ""} onClick={() => setDays(d)}>{d}d</button>)}</div>}
+    >
+      <ErrorNote error={error} />
+      {cal && (
+        <>
+          {cal.events.length === 0 ? (
+            <p className="muted">No scheduled events in the next {days} days.</p>
+          ) : (
+            <table>
+              <tbody>
+                {cal.events.map((e) => (
+                  <tr key={`${e.source}-${e.date}-${e.title}`}>
+                    <td style={{ whiteSpace: "nowrap" }}>{fmtDay(e.date)}{e.end_date && e.end_date !== e.date ? ` – ${fmtDay(e.end_date)}` : ""}</td>
+                    <td>
+                      {e.url ? <a href={e.url} target="_blank" rel="noreferrer">{e.title}</a> : e.title}
+                      {e.detail.datasets && <div className="muted" style={{ fontSize: 11.5 }}>{e.detail.datasets.map((d) => d.name).join(" · ")}</div>}
+                    </td>
+                    <td className="num muted">{e.kind === "fomc_meeting" ? "policy" : "data"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {cal.series_due.length > 0 && (
+            <>
+              <h4 style={{ margin: "14px 0 6px" }}>Next U.S. data due</h4>
+              <table>
+                <tbody>
+                  {cal.series_due.map((d) => (
+                    <tr key={d.dataset_id}>
+                      <td>{d.name}</td>
+                      <td className="num">{d.next_period_due ?? "—"}</td>
+                      <td className="num muted">{d.official_release_date ? fmtDay(d.official_release_date) : "date not listed"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+          {cal.notes.map((n) => <p key={n} className="muted" style={{ fontSize: 12, marginTop: 10 }}>{n}</p>)}
+          {fetched && <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>Source: {fetched}</p>}
+        </>
+      )}
+    </Card>
+  );
+}
+
 export default function Economy() {
   const [series, setSeries] = useState<Instrument[]>([]);
   const [selected, setSelected] = useState("US.CPI.HEADLINE");
@@ -112,9 +181,10 @@ export default function Economy() {
 
   return (
     <>
-      <PageHeader title="Global economy" subtitle="Country comparisons (World Bank WDI), bilateral trade (UN Comtrade), and monthly U.S. series with point-in-time vintages." />
+      <PageHeader title="Global economy" subtitle="Economic calendar (Federal Reserve), country comparisons (World Bank WDI), bilateral trade (UN Comtrade), and monthly U.S. series with point-in-time vintages." />
       <ErrorNote error={error} />
       <div className="stack">
+        <EconomicCalendar />
         <CountryComparison />
         <TradeFlows />
         <div className="split">

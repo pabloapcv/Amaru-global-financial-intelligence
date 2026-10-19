@@ -318,11 +318,30 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             )
         lines.append("")
 
+    # Calendar --------------------------------------------------------------------
+    for e in by_tool.get("get_economic_calendar", []):
+        r = e["result"]
+        lines += [f"## What to watch ({r['from']} to {r['to']})", ""]
+        for ev in r["events"]:
+            when = ev["date"] + (f" to {ev['end_date']}" if ev.get("end_date") and ev["end_date"] != ev["date"] else "")
+            extra = ", with the Summary of Economic Projections" if ev.get("with_projections") else ""
+            covers = f" (covers {', '.join(_name(d) for d in ev['datasets'])})" if ev.get("datasets") else ""
+            lines.append(f"- {when}: {ev['title'].replace(' (with projections)', '')}{extra}{covers} [{e['label']}].")
+        if not r["events"]:
+            lines.append(f"- No scheduled events are listed in this window [{e['label']}].")
+        pending = [d for d in r["series_due"] if not d.get("official_release_date")]
+        if pending:
+            lines.append("- Next data due (reference period; no official release date stored): "
+                         + "; ".join(f"{d['name']} for {d['next_period_due']}" for d in pending) + f" [{e['label']}].")
+        lines.append("")
+
     # Limitations -----------------------------------------------------------------
     lim = []
     for e in evidence:
         if e["tool"].endswith("_unavailable"):
             lim.append(f"- {e['result']['reason']} [{e['label']}]")
+    for e in by_tool.get("get_economic_calendar", []):
+        lim += [f"- {n} [{e['label']}]" for n in e["result"]["notes"]]
     for e in by_tool.get("get_data_status", []):
         for d in e["result"]["datasets"]:
             if d["freshness"] not in ("current",):

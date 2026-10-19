@@ -419,6 +419,13 @@ def data_status() -> list[dict[str, Any]]:
     return access.data_status()
 
 
+@api.get("/calendar")
+def economic_calendar(days: int = Query(60, ge=1, le=400)) -> dict[str, Any]:
+    from atlas import calendar
+
+    return calendar.upcoming(days)
+
+
 @api.get(f"/pipelines/status")
 def pipelines_status(limit: int = 50) -> dict[str, Any]:
     return access.pipeline_status(limit)

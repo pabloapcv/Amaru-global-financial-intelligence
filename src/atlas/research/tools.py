@@ -681,6 +681,30 @@ def t_run_event_study(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     return {"evidence_id": label, **result}
 
 
+def t_get_economic_calendar(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import calendar
+
+    days = int(args.get("days", 30))
+    if not 1 <= days <= 400:
+        raise ToolError("days must be between 1 and 400")
+    cal = calendar.upcoming(days)
+    if not cal["events"] and not cal["series_due"]:
+        raise ToolError("DATA UNAVAILABLE — the economic calendar has not been fetched yet. Disclose this gap.")
+    result = {k: cal[k] for k in ("from", "to", "series_due", "notes", "sources")}
+    result["events"] = [{k: e[k] for k in ("date", "end_date", "kind", "title", "source")}
+                        | ({"with_projections": True} if e["detail"].get("summary_of_economic_projections") else {})
+                        | ({"datasets": [d["dataset_id"] for d in e["detail"].get("datasets", [])]} if e["kind"] == "data_release" else {})
+                        for e in cal["events"]]
+    names = {"fomc": "Federal Reserve Board, FOMC meeting calendar", "fred_releases": "FRED release calendar (Federal Reserve Bank of St. Louis)"}
+    citation = "; ".join(f"{names.get(src, src)} — fetched {at}" for src, at in cal["sources"].items()) or "ATLAS calendar store"
+    sources = [{"dataset_id": f"CALENDAR.{src.upper()}", "name": names.get(src, src), "citation": names.get(src, src),
+                "url": calendar.FOMC_URL if src == "fomc" else "https://fred.stlouisfed.org/releases/calendar",
+                "observation_through": None, "ingested_at": at, "freshness": "current", "price_basis": "schedule"}
+               for src, at in cal["sources"].items()]
+    label = ctx.add("get_economic_calendar", args, result, citation, sources)
+    return {"evidence_id": label, **result}
+
+
 def _unavailable(kind: str, needed: str) -> Callable[[ToolContext, dict[str, Any]], dict[str, Any]]:
     def tool(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         result = {
@@ -838,6 +862,11 @@ TOOLS: dict[str, dict[str, Any]] = {
         "fn": _unavailable("futures_curve", "a licensed ICE/CME settlement feed"),
         "description": "Futures term structure, spreads and open interest. Currently not connected — call it to record the gap.",
         "schema": {"type": "object", "properties": {"underlying": {"type": "string"}}, "required": ["underlying"]},
+    },
+    "get_economic_calendar": {
+        "fn": t_get_economic_calendar,
+        "description": "Scheduled events in the next `days` (default 30): FOMC meetings from the Federal Reserve Board's calendar and, when configured, official U.S. data release dates from FRED. Also lists the next reference period due for each tracked U.S. macro series. Never infer release dates that are not listed.",
+        "schema": {"type": "object", "properties": {"days": {"type": "integer", "description": "Look-ahead window in days (1-400)."}}, "required": []},
     },
     "search_documents": {
         "fn": _unavailable("documents", "a licensed news / research document index"),

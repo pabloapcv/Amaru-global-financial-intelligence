@@ -225,6 +225,9 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
         add("get_fundamentals", commodity=get_dataset(primary[0]).name)  # type: ignore[union-attr]
         if depth != "quick":
             add("get_futures_curve", underlying=primary[0])
+    if re.search(r"\b(calendar|upcoming|next (fed|fomc)|fomc meeting|fed meeting|when (is|does|will)|release dates?|data releases?|scheduled|what to watch)", q) \
+            or ("scenario" in intents and _shock(q) and _shock(q)[0].startswith("RATE.")):
+        add("get_economic_calendar", days=90 if re.search(r"\b(quarter|months?)\b", q) else 45)
     if "market_update" in intents and depth != "quick":
         add("search_documents", query=query)
 
