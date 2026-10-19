@@ -111,3 +111,25 @@ def test_agent_validation():
         validate(["CMD.SUGAR.ISA"], [{"type": "moon_phase"}], ok_action)
     with pytest.raises(AgentError, match="template"):
         validate(["CMD.SUGAR.ISA"], [{"type": "anomaly"}], {"template": "nope", "query": "why?"})
+
+
+def test_comtrade_waits_out_short_quota_and_retries():
+    import httpx
+
+    from atlas.ingestion.comtrade import ComtradeAdapter, quota_refill_seconds
+
+    msg = 'HTTP 403: { "statusCode": 403, "message": "Out of call volume quota. Quota will be replenished in 00:03:03." }'
+    assert quota_refill_seconds(msg) == 183 and quota_refill_seconds("HTTP 500") is None
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(403, text=msg.split(": ", 1)[1])
+        return httpx.Response(200, json={"data": [{"flowCode": "X", "primaryValue": 1.0}], "error": ""})
+
+    a = ComtradeAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)), pacing=0)
+    slept = []
+    a._sleep = slept.append
+    assert a._get({"x": 1}) == [{"flowCode": "X", "primaryValue": 1.0}]
+    assert slept == [185] and calls["n"] == 2
