@@ -122,3 +122,27 @@ pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 
 .nav-account small { display: block; color: var(--muted); font-size: 11.5px; }
 .nav-account:hover, .nav-account.active { background: var(--panel-2); text-decoration: none; }
 body:has(.login-page) .shell { grid-template-columns: 1fr; }
+
+/* Phone and narrow layouts: let grid/flex children shrink, wrap headers, keep the nav to one scrolling row. */
+.main { min-width: 0; }
+.page-head > * { min-width: 0; }
+.kv { grid-template-columns: auto minmax(0, 1fr); }
+.kv dd { overflow-wrap: anywhere; }
+@media (max-width: 960px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .page-head { flex-wrap: wrap; align-items: flex-start; }
+  .card-head { align-items: flex-start; }
+  .nav { padding: 10px 12px 6px; }
+  .brand { padding: 0 6px 8px; }
+  .nav ul { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .nav ul::-webkit-scrollbar { display: none; }
+  .nav li a { white-space: nowrap; padding: 6px 10px; }
+  .nav-account { display: none; }
+  .card table { display: block; overflow-x: auto; }
+}
+.nav-account-mobile { display: none; }
+@media (max-width: 960px) { .nav-account-mobile { display: list-item; } }
+@media (max-width: 960px) {
+  .card-head .row { flex-wrap: wrap; }
+  .card-head select { max-width: 100%; }
+}

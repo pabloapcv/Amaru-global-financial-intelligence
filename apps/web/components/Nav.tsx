@@ -44,6 +44,7 @@ export default function Nav() {
             </li>
           );
         })}
+        {account && <li className="nav-account-mobile"><Link href="/account" className={path.startsWith("/account") ? "active" : ""}><span>Account</span></Link></li>}
       </ul>
       {account && (
         <Link href="/account" className={`nav-account ${path.startsWith("/account") ? "active" : ""}`}>
