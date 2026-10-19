@@ -705,6 +705,24 @@ def t_get_economic_calendar(ctx: ToolContext, args: dict[str, Any]) -> dict[str,
     return {"evidence_id": label, **result}
 
 
+def t_search_documents(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import documents
+
+    days = int(args.get("days", 30))
+    if not 1 <= days <= 730:
+        raise ToolError("days must be between 1 and 730")
+    res = documents.search(str(args.get("query", "")), days=days, limit=int(args.get("limit", 8)))
+    if not res["indexed_sources"]:
+        raise ToolError("DATA UNAVAILABLE — the document index has not been fetched yet. Disclose this gap.")
+    pubs = {d["source"]: d["publisher"] for d in res["results"]}
+    citation = "Official press-release feeds: " + ", ".join(f["publisher"] for f in documents.FEEDS if f["source"] in res["indexed_sources"])
+    sources = [{"dataset_id": f"DOCS.{src.upper()}", "name": f"{pub} press releases", "citation": f"{pub}, press release feed",
+                "url": next(f["url"] for f in documents.FEEDS if f["source"] == src), "observation_through": None,
+                "ingested_at": None, "freshness": "current", "price_basis": "document"} for src, pub in pubs.items()]
+    label = ctx.add("search_documents", args, res, citation, sources)
+    return {"evidence_id": label, **res}
+
+
 def _unavailable(kind: str, needed: str) -> Callable[[ToolContext, dict[str, Any]], dict[str, Any]]:
     def tool(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         result = {
@@ -869,9 +887,13 @@ TOOLS: dict[str, dict[str, Any]] = {
         "schema": {"type": "object", "properties": {"days": {"type": "integer", "description": "Look-ahead window in days (1-400)."}}, "required": []},
     },
     "search_documents": {
-        "fn": _unavailable("documents", "a licensed news / research document index"),
-        "description": "Search news and research documents. Currently not connected — call it to record the gap.",
-        "schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+        "fn": t_search_documents,
+        "description": "Keyword search over official press releases (Federal Reserve Board, BEA, CFTC) from the last `days` (default 30); an empty query returns the latest releases. Returns titles, dates, links and summaries. No commercial news wire or sell-side research is connected: say so when the question needs news.",
+        "schema": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "Keywords, e.g. 'GDP', 'discount rate', 'swap'."},
+            "days": {"type": "integer", "description": "Look-back window in days (1-730)."},
+            "limit": {"type": "integer", "description": "Maximum results (default 8)."},
+        }, "required": ["query"]},
     },
 }
 

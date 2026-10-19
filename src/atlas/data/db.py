@@ -242,6 +242,10 @@ class SourceDocument(Base):
     url: Mapped[str | None] = mapped_column(Text)
     published_at: Mapped[datetime | None] = mapped_column(DateTime)
     storage_uri: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str | None] = mapped_column(String(32), index=True)
+    category: Mapped[str | None] = mapped_column(String(128))
+    summary: Mapped[str | None] = mapped_column(Text)
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class CalendarEvent(Base):
@@ -530,6 +534,10 @@ _ADDED_COLUMNS = [
     ("research_runs", "cache_key", "VARCHAR(64)", None),
     ("research_runs", "cached_from", "VARCHAR(32)", None),
     ("users", "email_verified_at", "TIMESTAMP", None),
+    ("source_documents", "source", "VARCHAR(32)", None),
+    ("source_documents", "category", "VARCHAR(128)", None),
+    ("source_documents", "summary", "TEXT", None),
+    ("source_documents", "fetched_at", "TIMESTAMP", None),
 ]
 
 

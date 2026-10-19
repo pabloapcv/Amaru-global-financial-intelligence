@@ -63,6 +63,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | ML forecasting (§11) | In deep research (or `include_ml`), a gradient-boosting model on lagged changes joins the walk-forward forecast competition; it is selected only if it beats the naive baselines (on the current data it does not, and reports say so) |
 | Onboarding (§17 phase 6) | "Get started" checklist on Overview computed from real workspace progress, with a one-click example portfolio |
 | Economic calendar (§8.2) | FOMC meetings parsed from the Federal Reserve Board's public calendar (refreshed daily; `atlas ingest --calendar`); official U.S. release dates from FRED when `FRED_API_KEY` is set, otherwise the next reference period due per U.S. series and never a guessed date. `get_economic_calendar` tool (Daily Market Brief, Global Macro Outlook, Fed and "what to watch" questions), `/api/v1/calendar`, Global Economy card |
+| Official documents (§8.2) | Press-release feeds from the Federal Reserve Board, BEA and CFTC indexed every 6 hours (`atlas ingest --documents`); `search_documents` returns dated, linked releases as evidence and a "Recent official releases" report section; Intelligence › Releases. No commercial news wire is connected, and results say so |
 | Volatility regimes (§11) | Realized-vol percentile buckets plus a 2-state Markov-switching model (`detect_regime`), in research and Quant Lab |
 | Positioning & countries (FR-011, §9) | COT index, z-score and crowding flags per market; cross-country comparisons with stale-value flags; country profiles |
 | API (§14) | FastAPI: instruments, quotes, history, macro (with `as_of`), data/pipeline status, research jobs (202 + polling), quant, reports, alerts |
@@ -77,7 +78,8 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 - **Coverage gaps are disclosed, not filled.**
   - Gold and silver have no free redistributable price source, so their prices show as `no_source`. Their CFTC positioning is available.
   - World Bank data is annual and lagged; values far older than peers are flagged and excluded from rankings.
-  - Fundamentals, futures curves and documents are tools that return "not connected". The gap is recorded as evidence.
+  - Fundamentals and futures curves are tools that return "not connected". The gap is recorded as evidence.
+  - Document search covers official press releases only (Fed, BEA, CFTC); BLS blocks automated feed access. There is no news wire or sell-side research.
 - **Stack differences from the spec:**
   - SQLite by default; Postgres/Timescale via `ATLAS_DATABASE_URL`.
   - A thread pool instead of Celery/Redis, and a polling scheduler instead of Dagster.

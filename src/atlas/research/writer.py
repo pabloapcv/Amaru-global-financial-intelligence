@@ -335,6 +335,14 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
                          + "; ".join(f"{d['name']} for {d['next_period_due']}" for d in pending) + f" [{e['label']}].")
         lines.append("")
 
+    # Official releases ------------------------------------------------------------
+    docs = [(e, d) for e in by_tool.get("search_documents", []) for d in e["result"]["results"]]
+    if docs:
+        lines += ["## Recent official releases", ""]
+        for e, d in docs[:8]:
+            lines.append(f"- {d['published'] or 'undated'} · {d['publisher']}: [{d['title']}]({d['url']}) [{e['label']}].")
+        lines.append("")
+
     # Limitations -----------------------------------------------------------------
     lim = []
     for e in evidence:
@@ -342,6 +350,9 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             lim.append(f"- {e['result']['reason']} [{e['label']}]")
     for e in by_tool.get("get_economic_calendar", []):
         lim += [f"- {n} [{e['label']}]" for n in e["result"]["notes"]]
+    for e in by_tool.get("search_documents", []):
+        found = "" if e["result"]["results"] else f" No release matched \"{e['result']['query']}\" in the last {e['result']['days']} days."
+        lim.append(f"- Documents: {e['result']['coverage']}{found} [{e['label']}]")
     for e in by_tool.get("get_data_status", []):
         for d in e["result"]["datasets"]:
             if d["freshness"] not in ("current",):
