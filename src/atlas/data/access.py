@@ -17,6 +17,7 @@ from sqlalchemy import case, func, select
 
 from atlas.data.db import (
     DatasetState,
+    FundamentalObservation,
     MacroObservation,
     MarketObservation,
     PipelineRun,
@@ -106,6 +107,11 @@ def series_meta(dataset_id: str) -> SeriesMeta:
                 func.min(TradeFlow.year), func.max(TradeFlow.year), func.max(TradeFlow.ingested_at),
                 func.count(func.distinct(TradeFlow.year)),
             ).where(TradeFlow.dataset_id == dataset_id, TradeFlow.cmd_code == "TOTAL")
+        elif ds.kind == "fundamentals":
+            q = select(
+                func.min(FundamentalObservation.market_year), func.max(FundamentalObservation.market_year),
+                func.max(FundamentalObservation.ingested_at), func.count(func.distinct(FundamentalObservation.market_year)),
+            ).where(FundamentalObservation.dataset_id == dataset_id)
         elif ds.kind == "positioning":
             q = select(
                 func.min(PositioningObservation.report_date), func.max(PositioningObservation.report_date),
@@ -176,6 +182,14 @@ def get_series(
             if start:
                 q = q.where(TradeFlow.year >= start)
             rows = s.execute(q.order_by(TradeFlow.year)).all()
+        elif ds.kind == "fundamentals":
+            # Primary value: world production (sum over countries) per market year.
+            q = select(FundamentalObservation.market_year, func.sum(FundamentalObservation.value)).where(
+                FundamentalObservation.dataset_id == dataset_id, FundamentalObservation.attribute == "production",
+            ).group_by(FundamentalObservation.market_year)
+            if start:
+                q = q.where(FundamentalObservation.market_year >= start)
+            rows = s.execute(q.order_by(FundamentalObservation.market_year)).all()
         elif ds.kind == "positioning":
             # Primary value: net non-commercial (speculative) position in contracts.
             net = PositioningObservation.noncomm_long - PositioningObservation.noncomm_short
@@ -228,6 +242,24 @@ def get_trade(dataset_id: str) -> tuple[pd.DataFrame, SeriesMeta]:
         raise DataUnavailable(f"{dataset_id}: no stored observations ({meta.freshness}: {meta.freshness_note})")
     df = pd.DataFrame(rows, columns=["year", "flow", "cmd_code", "value_usd"])
     df["year"] = pd.to_datetime(df["year"]).dt.year
+    return df, meta
+
+
+def get_fundamentals(dataset_id: str) -> tuple[pd.DataFrame, SeriesMeta]:
+    """Balance-sheet rows: market_year, country_code, country_name, attribute, value, release,
+    prev_value, prev_release."""
+    ds = get_dataset(dataset_id)
+    if ds is None or ds.kind != "fundamentals":
+        raise KeyError(f"'{dataset_id}' is not a fundamentals dataset")
+    meta = series_meta(dataset_id)
+    cols = ["market_year", "country_code", "country_name", "attribute", "value", "release", "prev_value", "prev_release"]
+    with session_scope() as s:
+        rows = s.execute(select(*[getattr(FundamentalObservation, c) for c in cols])
+                         .where(FundamentalObservation.dataset_id == dataset_id)).all()
+    if not rows:
+        raise DataUnavailable(f"{dataset_id}: no stored observations ({meta.freshness}: {meta.freshness_note})")
+    df = pd.DataFrame(rows, columns=cols)
+    df["market_year"] = pd.to_datetime(df["market_year"]).dt.year
     return df, meta
 
 

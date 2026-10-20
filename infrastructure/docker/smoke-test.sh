@@ -24,8 +24,9 @@ curl -sf -c "$JAR" -H 'content-type: application/json' \
 test "$(curl -s -o /dev/null -w '%{http_code}' "$API/api/v1/instruments")" = 401   # no cookie -> rejected
 curl -sf -b "$JAR" "$API/api/v1/account" | grep -q "$EMAIL"
 
-echo "== ingest (real FRED + CFTC data)"
-$COMPOSE exec -T api atlas ingest CMD.SUGAR.ISA FX.USDBRL CMD.CRUDE.BRENT COT.SUGAR11 | grep -v '^INFO' || true
+echo "== ingest (real FRED, CFTC and USDA PSD data)"
+$COMPOSE exec -T api atlas ingest CMD.SUGAR.ISA FX.USDBRL CMD.CRUDE.BRENT COT.SUGAR11 FUND.SUGAR | grep -v '^INFO' || true
+curl -sf -b "$JAR" "$API/api/v1/fundamentals?id=CMD.SUGAR.ISA" | python3 -c 'import json,sys; r=json.load(sys.stdin)["result"]; assert r["balance"] and r["top_producers"], r; print("USDA sugar", r["latest_market_year"], "stocks-to-use", r["stocks_to_use"]["latest_pct"])'
 
 echo "== research through the API"
 RUN=$(curl -sf -b "$JAR" -H 'content-type: application/json' \

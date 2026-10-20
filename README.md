@@ -45,7 +45,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | Spec area | Implementation |
 |---|---|
 | Canonical registry (§5, §7.4) | `src/atlas/instruments/registry.json`: 27 instruments, 6 U.S. macro series, 13 CFTC positioning series, 208 country series (26 countries × 8 WDI indicators); NL resolution of instruments and countries |
-| Data sources | FRED (prices, FX, rates, U.S. macro), CFTC Commitments of Traders (weekly positioning), World Bank WDI (annual country data), UN Comtrade (bilateral trade, 12 pre-loaded pairs incl. Bolivia–US). None needs an API key |
+| Data sources | FRED (prices, FX, rates, U.S. macro), CFTC Commitments of Traders (weekly positioning), World Bank WDI (annual country data), UN Comtrade (bilateral trade, 12 pre-loaded pairs incl. Bolivia–US), USDA FAS PSD (supply-and-demand balance sheets). None needs an API key |
 | Ingestion pipeline (§7) | `src/atlas/ingestion/`: raw payload storage, validation, normalization, idempotent upserts, incremental watermarks, retries/backoff, replay, refresh scheduler |
 | Point-in-time macro (§7.3) | Revised values are stored as new vintages; `get_series(as_of=...)` reproduces past views |
 | Freshness (§5) | Observation date, ingestion time, last check and a status (`current/delayed/stale/no_source/failing`) for every dataset |
@@ -62,6 +62,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | Event studies (§11) | Average cumulative abnormal moves around Fed decisions (inferred from the effective fed funds rate since 2009) or custom dates; `run_event_study` tool, added automatically to rate-cut/hike scenario questions, and in Quant Lab |
 | ML forecasting (§11) | In deep research (or `include_ml`), a gradient-boosting model on lagged changes joins the walk-forward forecast competition; it is selected only if it beats the naive baselines (on the current data it does not, and reports say so) |
 | Onboarding (§17 phase 6) | "Get started" checklist on Overview computed from real workspace progress, with a one-click example portfolio |
+| Supply and demand (FR-013) | USDA PSD balance sheets for sugar, coffee, corn, wheat, soybeans, cotton and rice by country and market year since 1990, through the same pipeline (raw payloads, quality checks, freshness); USDA revisions keep the previous value and report month. `get_fundamentals` gives world or country production, consumption, trade, ending stocks, stocks-to-use versus 20 years, top producers/exporters and revisions; a "Supply and demand" report section; `/api/v1/fundamentals`; a Markets card with a country view. Energy and metals return a recorded gap |
 | Economic calendar (§8.2) | FOMC meetings parsed from the Federal Reserve Board's public calendar (refreshed daily; `atlas ingest --calendar`); official U.S. release dates from FRED when `FRED_API_KEY` is set, otherwise the next reference period due per U.S. series and never a guessed date. `get_economic_calendar` tool (Daily Market Brief, Global Macro Outlook, Fed and "what to watch" questions), `/api/v1/calendar`, Global Economy card |
 | Official documents (§8.2) | Press-release feeds from the Federal Reserve Board, BEA and CFTC indexed every 6 hours (`atlas ingest --documents`); `search_documents` returns dated, linked releases as evidence and a "Recent official releases" report section; Intelligence › Releases. No commercial news wire is connected, and results say so |
 | Volatility regimes (§11) | Realized-vol percentile buckets plus a 2-state Markov-switching model (`detect_regime`), in research and Quant Lab |
@@ -78,7 +79,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 - **Coverage gaps are disclosed, not filled.**
   - Gold and silver have no free redistributable price source, so their prices show as `no_source`. Their CFTC positioning is available.
   - World Bank data is annual and lagged; values far older than peers are flagged and excluded from rankings.
-  - Fundamentals and futures curves are tools that return "not connected". The gap is recorded as evidence.
+  - Supply-and-demand data covers USDA PSD agricultural commodities only; energy, metals and cocoa fundamentals and all futures curves return "not connected", recorded as evidence.
   - Document search covers official press releases only (Fed, BEA, CFTC); BLS blocks automated feed access. There is no news wire or sell-side research.
 - **Stack differences from the spec:**
   - SQLite by default; Postgres/Timescale via `ATLAS_DATABASE_URL`.

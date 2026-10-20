@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from atlas.config import settings
 from atlas.data.db import (
     DatasetState,
+    FundamentalObservation,
     MacroObservation,
     MarketObservation,
     PipelineRun,
@@ -72,7 +73,7 @@ def _previous_values(session: Session, ds: Dataset) -> list[float]:
             .order_by(MarketObservation.observed_at.desc())
             .limit(60)
         ).scalars().all()
-    elif ds.kind in ("positioning", "trade"):
+    elif ds.kind in ("positioning", "trade", "fundamentals"):
         return []
     else:
         rows = session.execute(
@@ -166,6 +167,36 @@ def _publish_trade(session: Session, ds: Dataset, points: list[ParsedPoint], run
     return inserted, revised
 
 
+def _publish_fundamentals(session: Session, ds: Dataset, points: list[ParsedPoint], run_id: str, raw_id: str) -> tuple[int, int]:
+    """Upsert balance-sheet rows; a changed value keeps the previous value and USDA release month."""
+    if not points:
+        return 0, 0
+    first = min(p.observed_at for p in points)
+    existing = {
+        (o.market_year, o.country_code, o.attribute): o
+        for o in session.execute(select(FundamentalObservation).where(
+            FundamentalObservation.dataset_id == ds.dataset_id, FundamentalObservation.market_year >= first)).scalars()
+    }
+    inserted = revised = 0
+    for p in points:
+        dims = dict(p.dims or ())
+        release = int((p.fields or {}).get("release", 0))
+        cur = existing.get((p.observed_at, dims["country"], dims["attribute"]))
+        if cur is None:
+            session.add(FundamentalObservation(
+                dataset_id=ds.dataset_id, market_year=p.observed_at, country_code=dims["country"],
+                country_name=dims["country_name"], attribute=dims["attribute"], value=p.value, release=release,
+                provider_id=ds.provider_id, pipeline_run_id=run_id, raw_id=raw_id))
+            inserted += 1
+        elif abs(cur.value - p.value) > 1e-9 * max(1.0, abs(cur.value)):
+            cur.prev_value, cur.prev_release = cur.value, cur.release
+            cur.value, cur.release, cur.pipeline_run_id, cur.raw_id, cur.ingested_at = p.value, release, run_id, raw_id, utcnow()
+            revised += 1
+        elif release > cur.release:
+            cur.release = release  # re-confirmed unchanged in a newer report
+    return inserted, revised
+
+
 def _publish_macro(session: Session, ds: Dataset, points: list[ParsedPoint], run_id: str, raw_id: str) -> tuple[int, int]:
     """Point-in-time publish: a changed value is stored as a new vintage, never overwritten."""
     if not points:
@@ -244,9 +275,9 @@ def ingest_dataset(
             clean, findings, metrics = quality.run_checks(
                 points,
                 frequency=ds.frequency,
-                allow_non_positive=ds.kind in ("macro", "positioning") or asset_class in NON_POSITIVE_OK,
+                allow_non_positive=ds.kind in ("macro", "positioning", "fundamentals") or asset_class in NON_POSITIVE_OK,
                 # Level-ratio unit checks are meaningless for series that cross zero (net positions, growth rates).
-                previous_values=None if ds.kind in ("positioning", "trade") or "percent" in ds.unit else _previous_values(s, ds),
+                previous_values=None if ds.kind in ("positioning", "trade", "fundamentals") or "percent" in ds.unit else _previous_values(s, ds),
             )
             result.findings = quality.to_json(findings)
             run_row = s.get(PipelineRun, run_id)
@@ -265,7 +296,7 @@ def ingest_dataset(
                 state.consecutive_failures = (state.consecutive_failures or 0) + 1
             else:
                 publish = {"market": _publish_market, "macro": _publish_macro, "positioning": _publish_positioning,
-                           "trade": _publish_trade}[ds.kind]
+                           "trade": _publish_trade, "fundamentals": _publish_fundamentals}[ds.kind]
                 ins, rev = publish(s, ds, clean, run_id, raw.raw_id)
                 result.rows_inserted, result.rows_revised = ins, rev
                 run_row.rows_inserted, run_row.rows_revised = ins, rev
