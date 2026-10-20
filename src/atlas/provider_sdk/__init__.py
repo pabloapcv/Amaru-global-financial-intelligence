@@ -94,10 +94,12 @@ def get_adapter(provider_id: str) -> ProviderAdapter:
     from atlas.ingestion.cftc import CftcAdapter
     from atlas.ingestion.comtrade import ComtradeAdapter
     from atlas.ingestion.fred import FredAdapter
+    from atlas.ingestion.psd import PsdAdapter
     from atlas.ingestion.worldbank import WorldBankAdapter
 
     adapters: dict[str, Callable[[], ProviderAdapter]] = {
         "fred": FredAdapter, "cftc": CftcAdapter, "worldbank": WorldBankAdapter, "comtrade": ComtradeAdapter,
+        "usda_psd": PsdAdapter,
     }
     if provider_id not in adapters:
         raise ProviderError(f"no adapter registered for provider '{provider_id}'")

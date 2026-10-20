@@ -814,6 +814,23 @@ def positioning(id: str, lookback_years: float = 3) -> dict[str, Any]:
     return {"result": json.loads(out), "chart": ev.chart, "citation": ev.citation}
 
 
+@api.get("/fundamentals")
+def fundamentals(id: str, country: str | None = None) -> dict[str, Any]:
+    """USDA supply-and-demand balance for a commodity (price instrument id, FUND.* id or name)."""
+    import json
+
+    from atlas.instruments import fundamentals_for
+
+    if fundamentals_for(id) is None:
+        raise HTTPException(404, f"no supply-and-demand data for '{id}'")
+    ctx = T.ToolContext()
+    out, err = T.execute(ctx, "get_fundamentals", {"commodity": id, **({"geography": country} if country else {})})
+    if err:
+        raise HTTPException(409, json.loads(out).get("error"))
+    ev = ctx.evidence[-1]
+    return {"result": json.loads(out), "chart": ev.chart, "citation": ev.citation}
+
+
 # ---------------------------------------------------------------- monitoring agents
 
 

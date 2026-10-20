@@ -109,9 +109,25 @@ class FakeFred:
                 rows.append({"year": last, "flow": flow, "cmd": ch, "value": float(rng.uniform(1e6, 5e7))})
         return json.dumps({"reporter": reporter, "partner": partner, "rows": rows}).encode()
 
+    def _psd(self, symbol: str) -> bytes:
+        rng = np.random.default_rng(abs(hash(symbol)) % 2**32)
+        last = pd.Timestamp.today().year
+        lines = ["market_year,country_code,country_name,attribute,value,release"]
+        for code, name, scale in (("BR", "Brazil", 40000), ("IN", "India", 30000), ("US", "United States", 20000), ("TH", "Thailand", 10000)):
+            for y in range(last - 24, last + 1):
+                prod = scale * (1 + 0.02 * (y - last + 24)) * float(rng.uniform(0.9, 1.1))
+                cons = prod * float(rng.uniform(0.7, 1.05))
+                vals = {"production": prod, "consumption": cons, "exports": prod * 0.4, "imports": prod * 0.1,
+                        "ending_stocks": cons * float(rng.uniform(0.15, 0.35)), "beginning_stocks": cons * 0.2}
+                for attr, v in vals.items():
+                    lines.append(f"{y},{code},{name},{attr},{v:.1f},{last}-0{min(9, 1 + y % 9)}")
+        return ("\n".join(lines) + "\n").encode()
+
     def _series(self, symbol: str) -> bytes:
         if symbol in self.overrides:
             return self.overrides[symbol]
+        if symbol.startswith("psd_"):
+            return self._psd(symbol)
         if _is_trade(symbol):
             return self._trade(symbol)
         if ":" in symbol:
@@ -138,7 +154,7 @@ class FakeFred:
 
         self.calls.append((symbol, since))
         payload = self._series(symbol)
-        if since and (":" in symbol or symbol.isdigit()):
+        if since and (":" in symbol or symbol.isdigit() or symbol.startswith("psd_")):
             pass  # JSON fakes return full history; idempotent publish handles the overlap
         elif since:
             lines = payload.decode().splitlines()
@@ -152,8 +168,10 @@ class FakeFred:
 
         from atlas.ingestion.comtrade import ComtradeAdapter
 
-        cls = (ComtradeAdapter if _is_trade(symbol) else WorldBankAdapter if ":" in symbol
-               else CftcAdapter if symbol.isdigit() else FredAdapter)
+        from atlas.ingestion.psd import PsdAdapter
+
+        cls = (PsdAdapter if symbol.startswith("psd_") else ComtradeAdapter if _is_trade(symbol)
+               else WorldBankAdapter if ":" in symbol else CftcAdapter if symbol.isdigit() else FredAdapter)
         return cls.parse(cls.__new__(cls), symbol, payload)
 
     def citation(self, symbol):

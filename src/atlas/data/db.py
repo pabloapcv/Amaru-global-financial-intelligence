@@ -185,6 +185,29 @@ class TradeFlow(Base):
     raw_id: Mapped[str | None] = mapped_column(String(32))
 
 
+class FundamentalObservation(Base):
+    """Supply-and-demand balance (USDA PSD) by commodity dataset, country, market year and attribute.
+    A revision overwrites the value and keeps the previous value and release month."""
+
+    __tablename__ = "fundamental_observations"
+    __table_args__ = (UniqueConstraint("dataset_id", "market_year", "country_code", "attribute", name="uq_fundamental"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dataset_id: Mapped[str] = mapped_column(String(64), index=True)
+    market_year: Mapped[date] = mapped_column(Date)  # Jan 1 of the market year's first calendar year
+    country_code: Mapped[str] = mapped_column(String(8))
+    country_name: Mapped[str] = mapped_column(String(128))
+    attribute: Mapped[str] = mapped_column(String(32))
+    value: Mapped[float] = mapped_column(Float)
+    release: Mapped[int] = mapped_column(Integer)  # USDA estimate month, YYYYMM
+    prev_value: Mapped[float | None] = mapped_column(Float)
+    prev_release: Mapped[int | None] = mapped_column(Integer)
+    provider_id: Mapped[str] = mapped_column(String(32))
+    ingested_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    pipeline_run_id: Mapped[str | None] = mapped_column(String(32))
+    raw_id: Mapped[str | None] = mapped_column(String(32))
+
+
 # ---------------------------------------------------------------- lineage & pipeline
 
 

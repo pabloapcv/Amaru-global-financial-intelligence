@@ -221,8 +221,22 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
     if "comparison" in intents and not sourced and not country_codes:
         ac = "commodity" if "commodit" in q else "fx" if "currenc" in q else None
         add("compare_performance", **({"asset_class": ac} if ac else {}))
+    fundamentals_q = re.search(r"\b(supply|demand|stocks?|stockpiles?|inventor(y|ies)|production|harvest|crops?|balance sheet|fundamentals?|wasde|usda|shortage|surplus|deficit|exporters?|producers?|tight(ness)?|glut|oversupplied|undersupplied)\b", q)
     if any(get_dataset(e).meta.get("asset_class") == "commodity" for e in primary):  # type: ignore[union-attr]
-        add("get_fundamentals", commodity=get_dataset(primary[0]).name)  # type: ignore[union-attr]
+        commodities = [e for e in primary if get_dataset(e).meta.get("asset_class") == "commodity"]  # type: ignore[union-attr]
+        for e in commodities[:3] if fundamentals_q else commodities[:1]:
+            add("get_fundamentals", commodity=get_dataset(e).name)  # type: ignore[union-attr]
+    from atlas.instruments import fundamentals_for
+
+    extra = fundamentals_for(q)
+    if extra and fundamentals_q and not any(fundamentals_for(get_dataset(e).name) == extra for e in primary):  # type: ignore[union-attr]
+        add("get_fundamentals", commodity=extra.removeprefix("FUND.").lower())  # e.g. cotton or rice: no price series
+    if fundamentals_q and country_codes:
+        from atlas.instruments import countries as _countries
+
+        names = {c["iso3"]: c["name"] for c in _countries()}
+        for st in [st for st in steps if st["tool"] == "get_fundamentals"][:2]:
+            add("get_fundamentals", commodity=st["args"]["commodity"], geography=names.get(country_codes[0], country_codes[0]))
         if depth != "quick":
             add("get_futures_curve", underlying=primary[0])
     if re.search(r"\b(calendar|upcoming|next (fed|fomc)|fomc meeting|fed meeting|when (is|does|will)|release dates?|data releases?|scheduled|what to watch)", q) \

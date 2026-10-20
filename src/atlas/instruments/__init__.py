@@ -101,6 +101,18 @@ def datasets() -> dict[str, Dataset]:
             meta={"reporter": rep, "partner": par, "asset_class": "trade", "refresh": "weekly_poll",
                   "description": f"{names[rep]}'s declared goods trade with {names[par]} (UN Comtrade, annual, USD): totals and HS-chapter breakdown."},
         )
+    fund = reg.get("fundamentals", {})
+    for c in fund.get("commodities", []):
+        fid = f"FUND.{c['key']}"
+        out[fid] = Dataset(
+            dataset_id=fid, kind="fundamentals", name=f"{c['name']}: supply and demand by country (USDA PSD)",
+            provider_id=fund["provider_id"], provider_symbol=c["provider_symbol"], frequency="annual", unit=c["unit"],
+            # No keywords: commodity questions resolve to the price instrument; fundamentals attach to it.
+            tags=("fundamentals", c["key"].lower()),
+            meta={**c, "asset_class": "fundamentals", "refresh": "weekly_poll",
+                  "description": f"{c['name']} production, consumption, trade and stocks by country and market year "
+                                 f"(USDA FAS PSD; the latest market year is a USDA projection, revised monthly)."},
+        )
     for s in reg["macro_series"]:
         out[s["series_id"]] = Dataset(
             dataset_id=s["series_id"],
@@ -115,6 +127,16 @@ def datasets() -> dict[str, Dataset]:
             meta=s,
         )
     return out
+
+
+def fundamentals_for(text_or_id: str) -> str | None:
+    """FUND.* dataset for a commodity key, alias, name or price instrument id; None if not covered."""
+    t = _norm(text_or_id)
+    for c in load_registry().get("fundamentals", {}).get("commodities", []):
+        if text_or_id in (f"FUND.{c['key']}", c.get("instrument_id")) or t == c["key"].lower() \
+                or any(re.search(rf"\b{re.escape(a)}\b", t) for a in c["aliases"]):
+            return f"FUND.{c['key']}"
+    return None
 
 
 def trade_dataset_id(reporter: str, partner: str) -> str:

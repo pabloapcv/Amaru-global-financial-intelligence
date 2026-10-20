@@ -705,6 +705,34 @@ def t_get_economic_calendar(ctx: ToolContext, args: dict[str, Any]) -> dict[str,
     return {"evidence_id": label, **result}
 
 
+def t_get_fundamentals(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas.data.access import get_fundamentals
+    from atlas.instruments import fundamentals_for, load_registry
+
+    fid = fundamentals_for(str(args["commodity"]))
+    if fid is None:
+        covered = ", ".join(c["name"].lower() for c in load_registry().get("fundamentals", {}).get("commodities", []))
+        return _unavailable("fundamentals", f"a supply-demand source for {args['commodity']} (USDA PSD covers {covered}; "
+                                            "energy and metals need EIA / ICSG / LME data)")(ctx, args)
+    ds = _ds(fid)
+    try:
+        df, meta = get_fundamentals(fid)
+    except DataUnavailable as exc:
+        raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap; do not estimate the value.") from exc
+    try:
+        res = analytics.fundamentals_balance(df, unit=ds.unit, country=args.get("geography") or None)
+    except ValueError as exc:
+        raise ToolError(f"{exc}. Use a country name as USDA spells it (e.g. Brazil, United States, European Union).") from exc
+    years = res.pop("_chart_years")
+    result = {"dataset_id": fid, "commodity": ds.meta["name"], **res}
+    chart = {"type": "line", "title": f"{ds.meta['name']}: {res['geography'].lower() if res['geography'] == 'World' else res['geography']} production and consumption (USDA PSD)",
+             "unit": ds.unit, "series": [
+                 {"name": name, "points": [{"date": f"{y['market_year']}-01-01", "value": y[key]} for y in years if y[key] is not None]}
+                 for name, key in (("Production", "production"), ("Consumption", "consumption"))]}
+    label = ctx.add("get_fundamentals", args, result, _cite([meta]) + f"; USDA report of {res['usda_release']}", [_source(meta)], chart)
+    return {"evidence_id": label, **result}
+
+
 def t_search_documents(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     from atlas import documents
 
@@ -872,9 +900,13 @@ TOOLS: dict[str, dict[str, Any]] = {
         }, "required": ["dataset_id"]},
     },
     "get_fundamentals": {
-        "fn": _unavailable("fundamentals", "USDA PSD / UNICA / ISO / ICSG supply-demand connectors"),
-        "description": "Supply/demand fundamentals (production, stocks, crush, trade). Currently not connected — call it to record the gap.",
-        "schema": {"type": "object", "properties": {"commodity": {"type": "string"}, "metric": {"type": "string"}, "geography": {"type": "string"}}, "required": ["commodity"]},
+        "fn": t_get_fundamentals,
+        "description": "USDA supply-and-demand balance sheet for an agricultural commodity (sugar, coffee, corn, wheat, soybeans, cotton, rice): production, consumption, trade, ending stocks and stocks-to-use for recent market years (world, or one country via geography), year-on-year changes, stocks-to-use versus 20 years, top producers/exporters and revisions since the previous USDA report. The latest market year is a USDA projection. Other commodities return a recorded data gap.",
+        "schema": {"type": "object", "properties": {
+            "commodity": {"type": "string", "description": "Commodity name or price dataset id, e.g. 'sugar' or CMD.CORN.US."},
+            "metric": {"type": "string", "description": "Optional focus (e.g. 'ending stocks'); the full balance is always returned."},
+            "geography": {"type": "string", "description": "Optional country as USDA names it (e.g. Brazil); default world."},
+        }, "required": ["commodity"]},
     },
     "get_futures_curve": {
         "fn": _unavailable("futures_curve", "a licensed ICE/CME settlement feed"),

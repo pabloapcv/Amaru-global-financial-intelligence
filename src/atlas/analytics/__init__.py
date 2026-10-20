@@ -862,3 +862,84 @@ def event_study(
         },
         "fingerprint": fingerprint(series),
     }
+
+
+def _my(y: int) -> str:
+    return f"{y}/{(y + 1) % 100:02d}"
+
+
+def fundamentals_balance(df: pd.DataFrame, *, unit: str, country: str | None = None, years: int = 6) -> dict[str, Any]:
+    """Supply-and-demand summary from USDA PSD rows (world = sum over reporting countries).
+
+    Stocks-to-use = ending stocks / consumption. The latest market year is a USDA projection and the one
+    before an estimate; revisions compare each value with the previous USDA report.
+    """
+    if country:
+        sel = df[df["country_name"].str.lower() == country.lower()]
+        if sel.empty:
+            raise ValueError(f"no USDA balance for '{country}'")
+        geo = sel["country_name"].iloc[0]
+    else:
+        sel, geo = df, "World"
+    wide = sel.pivot_table(index="market_year", columns="attribute", values="value", aggfunc="sum").sort_index()
+    for col in ("production", "consumption", "exports", "imports", "ending_stocks", "beginning_stocks"):
+        if col not in wide:
+            wide[col] = np.nan
+    wide["stocks_to_use_pct"] = np.where(wide["consumption"] > 0, wide["ending_stocks"] / wide["consumption"] * 100, np.nan)
+    latest = int(wide.index.max())
+    status = {_my(latest): "USDA projection", _my(latest - 1): "USDA estimate"}
+    release = int(sel.loc[sel["market_year"] == latest, "release"].max())
+
+    def r(v: Any, nd: int = 1) -> float | None:
+        return None if v is None or pd.isna(v) else round(float(v), nd)
+
+    balance = [{"market_year": _my(int(y)), "status": status.get(_my(int(y)), "historical"),
+                **{c: r(row[c]) for c in ("production", "consumption", "exports", "imports", "ending_stocks")},
+                "stocks_to_use_pct": r(row["stocks_to_use_pct"], 2)}
+               for y, row in wide.tail(years).iterrows()]
+    cur, prev = wide.loc[latest], wide.loc[latest - 1] if latest - 1 in wide.index else None
+
+    def pct(a: Any, b: Any) -> float | None:
+        return None if b is None or pd.isna(a) or pd.isna(b) or b == 0 else round((float(a) / float(b) - 1) * 100, 2)
+
+    changes = {} if prev is None else {
+        "production_pct": pct(cur["production"], prev["production"]),
+        "consumption_pct": pct(cur["consumption"], prev["consumption"]),
+        "ending_stocks_pct": pct(cur["ending_stocks"], prev["ending_stocks"]),
+        "stocks_to_use_change_pp": r(cur["stocks_to_use_pct"] - prev["stocks_to_use_pct"], 2),
+    }
+    hist = wide["stocks_to_use_pct"].loc[latest - 20: latest - 1].dropna()
+    stu = {"latest_pct": r(cur["stocks_to_use_pct"], 2), "history_years": int(len(hist)),
+           "mean_pct": r(hist.mean(), 2) if len(hist) else None,
+           "percentile": r((hist < cur["stocks_to_use_pct"]).mean() * 100, 1) if len(hist) and not pd.isna(cur["stocks_to_use_pct"]) else None}
+
+    out: dict[str, Any] = {"geography": geo, "unit": unit, "latest_market_year": _my(latest), "status": status,
+                           "usda_release": f"{release // 100}-{release % 100:02d}", "balance": balance,
+                           "change_vs_prior_year": changes, "stocks_to_use": stu}
+    if not country:
+        ly = df[df["market_year"] == latest]
+        for attr, key in (("production", "top_producers"), ("exports", "top_exporters")):
+            a = ly[ly["attribute"] == attr]
+            total = a["value"].sum()
+            out[key] = [{"country": row.country_name, "value": r(row.value), "share_pct": r(row.value / total * 100, 1)}
+                        for row in a.nlargest(5, "value").itertuples()] if total > 0 else []
+    revs = []
+    for y in (latest, latest - 1):
+        for attr in ("production", "ending_stocks", "consumption"):
+            rows = sel[(sel["market_year"] == y) & (sel["attribute"] == attr)]
+            changed = rows[rows["prev_value"].notna()]
+            if changed.empty:
+                continue
+            now_v = rows["value"].sum()
+            before = now_v - changed["value"].sum() + changed["prev_value"].sum()
+            if abs(now_v - before) > 1e-9:
+                revs.append({"market_year": _my(y), "attribute": attr, "previous": r(before), "current": r(now_v),
+                             "change": r(now_v - before), "change_pct": pct(now_v, before),
+                             "previous_release": f"{int(changed['prev_release'].max()) // 100}-{int(changed['prev_release'].max()) % 100:02d}"})
+    out["revisions_vs_previous_report"] = revs
+    out["method"] = {"stocks_to_use": "ending stocks / consumption (domestic use or total disappearance)",
+                     "world": "sum over reporting countries" if not country else None,
+                     "percentile": "share of the previous 20 market years with a lower stocks-to-use ratio"}
+    out["_chart_years"] = [{"market_year": int(y), **{c: r(wide.loc[y, c]) for c in ("production", "consumption", "stocks_to_use_pct")}}
+                           for y in wide.index[-25:]]
+    return out

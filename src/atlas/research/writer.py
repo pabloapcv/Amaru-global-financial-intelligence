@@ -198,6 +198,37 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             )
         lines += ["", "*Positioning describes who holds risk; crowded positioning raises reversal risk but is not a timing signal.*", ""]
 
+    # Fundamentals ------------------------------------------------------------------
+    fund = by_tool.get("get_fundamentals", [])
+    if fund:
+        lines += ["## Supply and demand (USDA)", ""]
+        for e in fund:
+            r = e["result"]
+            cur = r["balance"][-1]
+            ch, stu = r["change_vs_prior_year"], r["stocks_to_use"]
+            prior = r["balance"][-2]["market_year"] if len(r["balance"]) > 1 else "the prior year"
+
+            def chg(key: str) -> str:
+                return f" ({ch[key]:+.2f}% vs {prior})" if ch.get(key) is not None else ""
+
+            hist = (f", versus a {stu['history_years']}-year average of {_fmt(stu['mean_pct'])}% (percentile {_fmt(stu['percentile'], 1)})"
+                    if stu.get("mean_pct") is not None else "")
+            lines.append(
+                f"- **{r['commodity']}, {r['geography']}, {cur['market_year']} ({cur['status']}, USDA report of {r['usda_release']}):** "
+                f"production {_fmt(cur['production'], 0)}{chg('production_pct')}, consumption {_fmt(cur['consumption'], 0)}{chg('consumption_pct')}, "
+                f"ending stocks {_fmt(cur['ending_stocks'], 0)}{chg('ending_stocks_pct')} ({r['unit']}). "
+                f"Stocks-to-use {_fmt(stu['latest_pct'])}%{hist} [{e['label']}]."
+            )
+            if r.get("top_producers"):
+                lines.append(f"- {r['commodity']} production is concentrated in "
+                             + ", ".join(f"{t['country']} ({_fmt(t['share_pct'], 1)}%)" for t in r["top_producers"][:4])
+                             + (f"; top exporters: " + ", ".join(f"{t['country']} ({_fmt(t['share_pct'], 1)}%)" for t in r["top_exporters"][:3]) if r.get("top_exporters") else "")
+                             + f" [{e['label']}].")
+            for v in r.get("revisions_vs_previous_report", [])[:3]:
+                lines.append(f"- Since the {v['previous_release']} report, USDA revised {v['market_year']} {r['geography'].lower() if r['geography'] == 'World' else r['geography']} "
+                             f"{v['attribute'].replace('_', ' ')} from {_fmt(v['previous'], 0)} to {_fmt(v['current'], 0)} ({_fmt(v['change_pct'])}%) [{e['label']}].")
+        lines += ["", "*Stocks-to-use is ending stocks divided by consumption; a lower ratio means a tighter market. The latest market year is a USDA projection and will be revised.*", ""]
+
     # Relationships ---------------------------------------------------------------
     rel = by_tool.get("calculate_correlation", []) + by_tool.get("run_regression", [])
     if rel:

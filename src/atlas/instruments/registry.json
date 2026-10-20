@@ -1675,5 +1675,99 @@
         "WLD"
       ]
     ]
+  },
+  "fundamentals": {
+    "_comment": "USDA PSD supply-and-demand balance sheets by country and market year (bulk CSV, no key).",
+    "provider_id": "usda_psd",
+    "commodities": [
+      {
+        "key": "SUGAR",
+        "name": "Sugar",
+        "provider_symbol": "psd_sugar",
+        "psd_group": "sugar",
+        "psd_commodity": "Sugar, Centrifugal",
+        "instrument_id": "CMD.SUGAR.ISA",
+        "unit": "1000 metric tons (raw value)",
+        "aliases": [
+          "sugar"
+        ]
+      },
+      {
+        "key": "COFFEE",
+        "name": "Coffee",
+        "provider_symbol": "psd_coffee",
+        "psd_group": "coffee",
+        "psd_commodity": "Coffee, Green",
+        "instrument_id": "CMD.COFFEE.ARABICA",
+        "unit": "1000 60-kg bags",
+        "aliases": [
+          "coffee",
+          "arabica"
+        ]
+      },
+      {
+        "key": "CORN",
+        "name": "Corn",
+        "provider_symbol": "psd_corn",
+        "psd_group": "grains_pulses",
+        "psd_commodity": "Corn",
+        "instrument_id": "CMD.CORN.US",
+        "unit": "1000 metric tons",
+        "aliases": [
+          "corn",
+          "maize"
+        ]
+      },
+      {
+        "key": "WHEAT",
+        "name": "Wheat",
+        "provider_symbol": "psd_wheat",
+        "psd_group": "grains_pulses",
+        "psd_commodity": "Wheat",
+        "instrument_id": "CMD.WHEAT.USHRW",
+        "unit": "1000 metric tons",
+        "aliases": [
+          "wheat"
+        ]
+      },
+      {
+        "key": "SOYBEANS",
+        "name": "Soybeans",
+        "provider_symbol": "psd_soybeans",
+        "psd_group": "oilseeds",
+        "psd_commodity": "Oilseed, Soybean",
+        "instrument_id": "CMD.SOYBEANS.US",
+        "unit": "1000 metric tons",
+        "aliases": [
+          "soybeans",
+          "soybean",
+          "soy"
+        ]
+      },
+      {
+        "key": "COTTON",
+        "name": "Cotton",
+        "provider_symbol": "psd_cotton",
+        "psd_group": "cotton",
+        "psd_commodity": "Cotton",
+        "instrument_id": null,
+        "unit": "1000 480-lb bales",
+        "aliases": [
+          "cotton"
+        ]
+      },
+      {
+        "key": "RICE",
+        "name": "Rice (milled)",
+        "provider_symbol": "psd_rice",
+        "psd_group": "grains_pulses",
+        "psd_commodity": "Rice, Milled",
+        "instrument_id": null,
+        "unit": "1000 metric tons",
+        "aliases": [
+          "rice"
+        ]
+      }
+    ]
   }
 }
