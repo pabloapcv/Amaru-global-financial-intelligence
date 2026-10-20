@@ -97,7 +97,10 @@ def test_tool_report_and_api(seeded):
 
     ctx = tools.ToolContext()
     out = tools.TOOLS["get_fundamentals"]["fn"](ctx, {"commodity": "corn", "geography": "India"})
-    assert out["geography"] == "India" and "top_producers" not in out
+    assert out["geography"] == "India" and "top_producers" not in out and "price_vs_stocks_to_use" not in out
+    world = tools.TOOLS["get_fundamentals"]["fn"](ctx, {"commodity": "CMD.CORN.US"})
+    pv = world["price_vs_stocks_to_use"]
+    assert pv["stocks_basis"] == "world excluding China" and pv["n_years"] >= 12 and "implied_price" in pv
     gap = tools.TOOLS["get_fundamentals"]["fn"](ctx, {"commodity": "copper"})
     assert gap["status"] == "unavailable" and "USDA PSD covers" in gap["reason"]
     with pytest.raises(tools.ToolError):

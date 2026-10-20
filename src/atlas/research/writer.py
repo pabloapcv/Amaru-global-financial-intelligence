@@ -224,6 +224,22 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
                              + ", ".join(f"{t['country']} ({_fmt(t['share_pct'], 1)}%)" for t in r["top_producers"][:4])
                              + (f"; top exporters: " + ", ".join(f"{t['country']} ({_fmt(t['share_pct'], 1)}%)" for t in r["top_exporters"][:3]) if r.get("top_exporters") else "")
                              + f" [{e['label']}].")
+            pv = r.get("price_vs_stocks_to_use") or {}
+            if pv.get("implied_price") is not None:
+                fit = (f"across {pv['n_years']} market years ({pv['first_market_year']}–{pv['last_market_year']}), stocks-to-use "
+                       f"({pv['stocks_basis']}) and the real price have R² {_fmt(pv['r_squared'], 3)} ({pv['significance']})")
+                if pv["has_signal"]:
+                    band = pv.get(f"implied_price_band_{pv['band_pct']}") or [None, None]
+                    lines.append(
+                        f"- *Price versus fundamentals:* {fit}; each 1-point rise in stocks-to-use went with a {_fmt(pv['slope_pct_per_pp'])}% change in price. "
+                        f"At the projected {_fmt(pv['projected_stocks_to_use_pct'])}% for {pv['projection_market_year']}, the fit implies "
+                        f"{_fmt(pv['implied_price'])} {pv['price_unit']} ({pv['band_pct']}% band {_fmt(band[0])}–{_fmt(band[1])}); the latest price, "
+                        f"{_fmt(pv['latest_price'])} on {pv['latest_price_date']}, is {_fmt(pv['latest_vs_implied_pct'])}% from that, "
+                        f"{pv['assessment']}. This is an association, not a forecast [{e['label']}]."
+                    )
+                else:
+                    lines.append(f"- *Price versus fundamentals:* {fit}, too weak to imply a price; fundamentals alone do not explain "
+                                 f"{r['commodity'].lower()} prices in this sample [{e['label']}].")
             for v in r.get("revisions_vs_previous_report", [])[:3]:
                 lines.append(f"- Since the {v['previous_release']} report, USDA revised {v['market_year']} {r['geography'].lower() if r['geography'] == 'World' else r['geography']} "
                              f"{v['attribute'].replace('_', ' ')} from {_fmt(v['previous'], 0)} to {_fmt(v['current'], 0)} ({_fmt(v['change_pct'])}%) [{e['label']}].")

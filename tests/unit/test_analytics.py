@@ -103,3 +103,28 @@ def test_ml_forecast_candidate_is_evaluated_but_must_earn_selection():
     if res["selected_method"] == "gradient_boosting":
         assert res["beats_naive_baseline"]
     assert "gradient_boosting" not in analytics.forecast(s, unit="usd", frequency="monthly")["evaluation"]
+
+
+def test_price_vs_stocks_to_use_recovers_slope_and_flags_weak_fits():
+    rng = np.random.default_rng(11)
+    years = list(range(1992, 2027))
+    stu = {y: float(rng.uniform(10, 35)) for y in years}
+    months = pd.date_range("1992-01-01", "2026-08-01", freq="MS")
+    cpi = pd.Series(np.linspace(100, 200, len(months)), index=months)  # prices quoted in nominal terms
+    # Real price falls 4% per stocks-to-use point; each crop year's price applies July–June.
+    real = pd.Series([300 * np.exp(-0.0408 * stu[d.year if d.month >= 7 else d.year - 1]) * np.exp(rng.normal(0, 0.03))
+                      if (d.year if d.month >= 7 else d.year - 1) in stu else np.nan for d in months], index=months)
+    nominal = real * cpi / cpi.iloc[-1]
+    res = analytics.price_vs_stocks_to_use(nominal, cpi, stu, 2026)
+    assert res["slope_pct_per_pp"] == pytest.approx(-4.0, abs=0.4)
+    assert res["r_squared"] > 0.9 and res["has_signal"]
+    lo, hi = res["implied_price_band_80"]
+    assert lo < res["implied_price"] < hi
+    assert res["implied_price"] == pytest.approx(300 * np.exp(-0.0408 * stu[2026]), rel=0.05)
+    assert res["n_years"] == 34  # 1992/93 … 2025/26; the projection year is not fitted
+
+    noise = pd.Series(rng.uniform(100, 300, len(months)), index=months)
+    weak = analytics.price_vs_stocks_to_use(noise, cpi, stu, 2026)
+    assert not weak["has_signal"] and weak["assessment"].startswith("no signal")
+    with pytest.raises(ValueError):
+        analytics.price_vs_stocks_to_use(nominal, cpi, {2024: 20.0, 2025: 21.0, 2026: 22.0}, 2026)

@@ -1677,7 +1677,7 @@
     ]
   },
   "fundamentals": {
-    "_comment": "USDA PSD supply-and-demand balance sheets by country and market year (bulk CSV, no key).",
+    "_comment": "USDA PSD supply-and-demand balance sheets by country and market year (bulk CSV, no key). price_model_basis follows USDA's convention of excluding China's largely state-held grain, oilseed and cotton stocks.",
     "provider_id": "usda_psd",
     "commodities": [
       {
@@ -1690,7 +1690,8 @@
         "unit": "1000 metric tons (raw value)",
         "aliases": [
           "sugar"
-        ]
+        ],
+        "price_model_basis": "world"
       },
       {
         "key": "COFFEE",
@@ -1703,7 +1704,8 @@
         "aliases": [
           "coffee",
           "arabica"
-        ]
+        ],
+        "price_model_basis": "world"
       },
       {
         "key": "CORN",
@@ -1716,7 +1718,8 @@
         "aliases": [
           "corn",
           "maize"
-        ]
+        ],
+        "price_model_basis": "world_ex_china"
       },
       {
         "key": "WHEAT",
@@ -1728,7 +1731,8 @@
         "unit": "1000 metric tons",
         "aliases": [
           "wheat"
-        ]
+        ],
+        "price_model_basis": "world_ex_china"
       },
       {
         "key": "SOYBEANS",
@@ -1742,7 +1746,8 @@
           "soybeans",
           "soybean",
           "soy"
-        ]
+        ],
+        "price_model_basis": "world_ex_china"
       },
       {
         "key": "COTTON",
@@ -1754,7 +1759,8 @@
         "unit": "1000 480-lb bales",
         "aliases": [
           "cotton"
-        ]
+        ],
+        "price_model_basis": "world_ex_china"
       },
       {
         "key": "RICE",
@@ -1766,7 +1772,8 @@
         "unit": "1000 metric tons",
         "aliases": [
           "rice"
-        ]
+        ],
+        "price_model_basis": "world_ex_china"
       }
     ]
   }
