@@ -120,3 +120,24 @@ def test_tool_report_and_api(seeded):
     assert c.get("/api/v1/fundamentals", params={"id": "CMD.CRUDE.BRENT"}).status_code == 404
     assert c.get("/api/v1/fundamentals", params={"id": "CMD.CORN.US", "country": "Atlantis"}).status_code == 409
     assert date.fromisoformat(r.json()["result"]["balance"][-1]["market_year"][:4] + "-01-01").year == date.today().year
+
+
+def test_usda_revision_agent_fires_once_per_report(seeded):
+    from atlas import agents
+    from atlas.ingestion.psd import COLUMNS
+
+    a = agents.create("Corn USDA watch", ["CMD.CORN.US"], [{"type": "usda_revision", "abs_pct": 1.0}],
+                      {"query": "What changed in USDA's corn balance?", "engine": "deterministic"}, 1, False, "local", "local")
+    df, _ = get_fundamentals("FUND.CORN")
+    latest = int(df["market_year"].max())
+    cur = float(df[(df.market_year == latest) & (df.country_name == "Brazil") & (df.attribute == "production")].value.iloc[0])
+    payload = ",".join(COLUMNS) + f"\n{latest},BR,Brazil,production,{cur - 9000:.1f},{latest}-11\n"
+    pipeline.ingest_dataset(get_dataset("FUND.CORN"), adapter=type(seeded)(overrides={"psd_corn": payload.encode()}))
+
+    r = agents.check_agent(a["agent_id"], background=False)
+    assert r["fired"], r
+    f = r["findings"][0]
+    assert f["trigger"] == "usda_revision" and f["dedupe_key"] == f"FUND.CORN:{latest}-11" and f["value"] < -1
+    assert "world production" in f["message"]
+    # Same report, checked again after the cooldown (forced): no second report.
+    assert agents.check_agent(a["agent_id"], background=False, force=True)["fired"] is False

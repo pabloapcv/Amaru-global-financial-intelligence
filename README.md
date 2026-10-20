@@ -53,7 +53,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | Research engine (§8) | Planner → typed tools → evidence (E1…En) → narrative → number/citation verification → one revision pass. Claude Opus 5.5 via the Anthropic SDK with server-side refusal fallback; deterministic fallback |
 | Reports (§12) | Versioned HTML, native PDF (WeasyPrint; page numbers, charts) and Excel (summary, evidence, sources, chart data) |
 | Monitoring (FR-009) | Alert rules (threshold, % move, anomaly), evaluated after each ingestion |
-| Monitoring agents (FR-017, §21 Layer 3) | Saved agents watch instruments for unusual moves, large % moves, crowded CFTC positioning or high-volatility regimes, or for new Fed/BEA/CFTC press releases matching keywords; checked after each data refresh; when one fires (outside a cooldown) it runs a research template and records the evidence, with optional email; Intelligence › Agents |
+| Monitoring agents (FR-017, §21 Layer 3) | Saved agents watch instruments for unusual moves, large % moves, crowded CFTC positioning, high-volatility regimes or USDA revisions to world production or stocks (once per USDA report), or for new Fed/BEA/CFTC press releases matching keywords; checked after each data refresh; when one fires (outside a cooldown) it runs a research template and records the evidence, with optional email; Intelligence › Agents |
 | Report templates (§12) | Daily Market Brief, Commodity Deep Dive, Global Macro Outlook, Country Intelligence, Cross-Asset Research |
 | Public API (FR-018) | OpenAPI docs at `/docs` with Bearer API-key auth; quickstart on the Account page |
 | Scheduled reports (FR-010) | Saved questions re-run daily / weekly / monthly by the scheduler, after the data refresh |

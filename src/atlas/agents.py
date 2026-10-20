@@ -29,6 +29,8 @@ TRIGGERS: dict[str, dict[str, Any]] = {
                             "help": "CFTC COT index ≥ extreme or ≤ 100 − extreme (3-year range)"},
     "high_vol_regime": {"label": "High-volatility regime", "param": "probability", "default": 0.8,
                         "help": "Markov-switching probability of the high-volatility regime ≥ probability"},
+    "usda_revision": {"label": "USDA revision", "param": "abs_pct", "default": 2.0,
+                      "help": "a new USDA report revises world production or ending stocks of the commodity by ≥ abs_pct %"},
     "official_release": {"label": "Official release", "param": "keywords", "default": "FOMC statement", "kind": "text",
                          "help": "a new Fed, BEA or CFTC press release mentions any of these comma-separated keywords"},
 }
@@ -88,6 +90,25 @@ def _evaluate_trigger(trigger: dict[str, Any], dsid: str) -> dict[str, Any] | No
             return {"dataset_id": dsid, "trigger": t, "value": idx, "threshold": level,
                     "message": f"{ds.name}: speculators {st['positioning_extreme'] or 'at an extreme'} (COT index {idx}, report {st['report_date']})"}
         return None
+    if t == "usda_revision":
+        from atlas.data.access import get_fundamentals
+        from atlas.instruments import fundamentals_for
+
+        fid = fundamentals_for(dsid)
+        if not fid:
+            return None
+        df, _ = get_fundamentals(fid)
+        res = analytics.fundamentals_balance(df, unit=get_dataset(fid).unit)  # type: ignore[union-attr]
+        big = [v for v in res["revisions_vs_previous_report"] if v["attribute"] in ("production", "ending_stocks")
+               and v["change_pct"] is not None and abs(v["change_pct"]) >= level]
+        if not big:
+            return None
+        v = max(big, key=lambda r: abs(r["change_pct"]))
+        return {"dataset_id": dsid, "trigger": t, "value": v["change_pct"], "threshold": level,
+                # One USDA report fires an agent once, however often it is checked afterwards.
+                "dedupe_key": f"{fid}:{res['usda_release']}",
+                "message": f"{ds.name}: USDA's {res['usda_release']} report revised {v['market_year']} world "
+                           f"{v['attribute'].replace('_', ' ')} {v['change_pct']:+.2f}% (from {v['previous']:,.0f} to {v['current']:,.0f})"}
     series, _ = get_series(dsid)
     if t == "anomaly":
         res = analytics.anomalies(series, unit=ds.unit, frequency=ds.frequency, threshold=level)
@@ -153,6 +174,11 @@ def check_agent(agent_id: str, *, force: bool = False, background: bool = True, 
                 continue
             if f:
                 findings.append(f)
+    if any(f.get("dedupe_key") for f in findings):
+        with session_scope() as s:
+            seen = {f.get("dedupe_key") for e in s.execute(select(AgentEvent).where(
+                AgentEvent.agent_id == agent_id, AgentEvent.status == "fired")).scalars() for f in (e.findings or [])}
+        findings = [f for f in findings if not f.get("dedupe_key") or f["dedupe_key"] not in seen]
     if not findings:
         return {"agent_id": agent_id, "fired": False, "findings": [], "errors": errors}
 
