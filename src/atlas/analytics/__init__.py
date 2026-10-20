@@ -943,3 +943,72 @@ def fundamentals_balance(df: pd.DataFrame, *, unit: str, country: str | None = N
     out["_chart_years"] = [{"market_year": int(y), **{c: r(wide.loc[y, c]) for c in ("production", "consumption", "stocks_to_use_pct")}}
                            for y in wide.index[-25:]]
     return out
+
+
+def price_vs_stocks_to_use(price: pd.Series, cpi: pd.Series, stocks_to_use: dict[int, float], projection_year: int,
+                           *, min_years: int = 12, band: float = 0.8) -> dict[str, Any]:
+    """Fit log(real price) on world stocks-to-use across market years and read off the price the
+    latest USDA projection implies.
+
+    Prices are monthly and deflated by CPI into the latest price month's money; each market year y/y+1
+    uses the average real price from July of y to June of y+1 (a neutral crop-year window, at least 10
+    months). Returns the fit, the implied price with a `band` prediction interval, and how the latest
+    observed price compares. Few observations and a structural shift (e.g. biofuel demand) can break
+    the relationship, so a weak or insignificant fit is reported as no signal.
+    """
+    p = price.dropna().resample("MS").mean()
+    c = cpi.dropna().resample("MS").mean().reindex(p.index, method="ffill")
+    if c.isna().all():
+        raise ValueError("no CPI overlap with the price series")
+    base_cpi = float(c.dropna().iloc[-1])
+    real = (p * base_cpi / c).dropna()
+    rows = []
+    for y, stu in sorted(stocks_to_use.items()):
+        if y >= projection_year or stu is None or not np.isfinite(stu):
+            continue
+        win = real[(real.index >= f"{y}-07-01") & (real.index < f"{y + 1}-07-01")]
+        if len(win) >= 10:
+            rows.append((y, float(stu), float(win.mean())))
+    if len(rows) < min_years:
+        raise ValueError(f"only {len(rows)} market years with both prices and stocks-to-use (need {min_years})")
+    years = np.array([r[0] for r in rows])
+    x = np.array([r[1] for r in rows])
+    yv = np.log(np.array([r[2] for r in rows]))
+    fit = stats.linregress(x, yv)
+    n = len(x)
+    resid = yv - (fit.intercept + fit.slope * x)
+    s = math.sqrt(float(np.sum(resid ** 2)) / (n - 2))
+    x0 = float(stocks_to_use[projection_year])
+    se_pred = s * math.sqrt(1 + 1 / n + (x0 - x.mean()) ** 2 / float(np.sum((x - x.mean()) ** 2)))
+    t = stats.t.ppf(0.5 + band / 2, n - 2)
+    center = fit.intercept + fit.slope * x0
+    implied, lo, hi = math.exp(center), math.exp(center - t * se_pred), math.exp(center + t * se_pred)
+    latest_price, latest_date = float(p.iloc[-1]), p.index[-1].date().isoformat()
+    signal = fit.pvalue < 0.05 and fit.rvalue ** 2 >= 0.2
+    if not signal:
+        assessment = "no signal (weak or insignificant relationship)"
+    elif latest_price > hi:
+        assessment = f"above the {int(band * 100)}% band (rich versus fundamentals)"
+    elif latest_price < lo:
+        assessment = f"below the {int(band * 100)}% band (cheap versus fundamentals)"
+    else:
+        assessment = f"within the {int(band * 100)}% band (in line with fundamentals)"
+    extrapolated = not (x.min() <= x0 <= x.max())
+    return {
+        "model": "log(real price) = a + b × world stocks-to-use (%), one point per market year",
+        "n_years": n, "first_market_year": _my(int(years.min())), "last_market_year": _my(int(years.max())),
+        "slope_pct_per_pp": round((math.exp(fit.slope) - 1) * 100, 2),
+        "r_squared": round(float(fit.rvalue) ** 2, 3), "p_value": round(float(fit.pvalue), 4),
+        "significance": "p<0.001" if fit.pvalue < 0.001 else f"p={fit.pvalue:.3f}", "band_pct": int(band * 100),
+        "projection_market_year": _my(projection_year), "projected_stocks_to_use_pct": round(x0, 2),
+        "implied_price": round(implied, 2), f"implied_price_band_{int(band * 100)}": [round(lo, 2), round(hi, 2)],
+        "latest_price": round(latest_price, 2), "latest_price_date": latest_date,
+        "latest_vs_implied_pct": round((latest_price / implied - 1) * 100, 2),
+        "assessment": assessment, "has_signal": bool(signal), "extrapolated": extrapolated,
+        "price_basis": f"real, deflated by U.S. CPI to {c.dropna().index[-1].strftime('%Y-%m')} money; crop year July–June",
+        "points": [{"market_year": _my(int(yy)), "stocks_to_use_pct": round(xx, 2), "real_price": round(float(math.exp(v)), 2)}
+                   for yy, xx, v in zip(years, x, yv)],
+        "caveats": ["Association, not causation: prices also reflect the dollar, energy costs, policy and speculative flows.",
+                    "Few observations (one per market year); the relationship can shift structurally.",
+                    *(["The projected stocks-to-use is outside the historical range, so the implied price is an extrapolation."] if extrapolated else [])],
+    }

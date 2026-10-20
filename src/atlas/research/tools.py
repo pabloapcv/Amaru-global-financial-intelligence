@@ -705,6 +705,26 @@ def t_get_economic_calendar(ctx: ToolContext, args: dict[str, Any]) -> dict[str,
     return {"evidence_id": label, **result}
 
 
+def _price_vs_stocks(ds, df: pd.DataFrame) -> tuple[dict[str, Any], list]:
+    """Price implied by stocks-to-use (see analytics.price_vs_stocks_to_use); errors become a note."""
+    basis = ds.meta.get("price_model_basis", "world")
+    sub = df[df["country_name"] != "China"] if basis == "world_ex_china" else df
+    try:
+        bal = analytics.fundamentals_balance(sub, unit=ds.unit, years=60)
+        stu = {int(r["market_year"][:4]): r["stocks_to_use_pct"] for r in bal["balance"]}
+        series, metas = _load([ds.meta["instrument_id"], "US.CPI.HEADLINE"])
+        res = analytics.price_vs_stocks_to_use(series[ds.meta["instrument_id"]], series["US.CPI.HEADLINE"], stu,
+                                               int(bal["latest_market_year"][:4]))
+    except (ToolError, ValueError) as exc:
+        return {"status": "unavailable", "reason": str(exc)}, []
+    price_ds = _ds(ds.meta["instrument_id"])
+    return {"price_dataset": price_ds.dataset_id, "price_unit": price_ds.unit,
+            "stocks_basis": "world excluding China" if basis == "world_ex_china" else "world",
+            **({"stocks_basis_note": "China's grain, oilseed and cotton stocks are largely state-held and rarely reach the world market "
+                                     "(USDA publishes world-less-China balances for the same reason)."} if basis == "world_ex_china" else {}),
+            **res}, metas
+
+
 def t_get_fundamentals(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     from atlas.data.access import get_fundamentals
     from atlas.instruments import fundamentals_for, load_registry
@@ -725,11 +745,15 @@ def t_get_fundamentals(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
         raise ToolError(f"{exc}. Use a country name as USDA spells it (e.g. Brazil, United States, European Union).") from exc
     years = res.pop("_chart_years")
     result = {"dataset_id": fid, "commodity": ds.meta["name"], **res}
+    metas = [meta]
+    if not args.get("geography") and ds.meta.get("instrument_id"):
+        result["price_vs_stocks_to_use"], extra = _price_vs_stocks(ds, df)
+        metas += extra
     chart = {"type": "line", "title": f"{ds.meta['name']}: {res['geography'].lower() if res['geography'] == 'World' else res['geography']} production and consumption (USDA PSD)",
              "unit": ds.unit, "series": [
                  {"name": name, "points": [{"date": f"{y['market_year']}-01-01", "value": y[key]} for y in years if y[key] is not None]}
                  for name, key in (("Production", "production"), ("Consumption", "consumption"))]}
-    label = ctx.add("get_fundamentals", args, result, _cite([meta]) + f"; USDA report of {res['usda_release']}", [_source(meta)], chart)
+    label = ctx.add("get_fundamentals", args, result, _cite(metas) + f"; USDA report of {res['usda_release']}", [_source(m) for m in metas], chart)
     return {"evidence_id": label, **result}
 
 
@@ -901,7 +925,7 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "get_fundamentals": {
         "fn": t_get_fundamentals,
-        "description": "USDA supply-and-demand balance sheet for an agricultural commodity (sugar, coffee, corn, wheat, soybeans, cotton, rice): production, consumption, trade, ending stocks and stocks-to-use for recent market years (world, or one country via geography), year-on-year changes, stocks-to-use versus 20 years, top producers/exporters and revisions since the previous USDA report. The latest market year is a USDA projection. Other commodities return a recorded data gap.",
+        "description": "USDA supply-and-demand balance sheet for an agricultural commodity (sugar, coffee, corn, wheat, soybeans, cotton, rice): production, consumption, trade, ending stocks and stocks-to-use for recent market years (world, or one country via geography), year-on-year changes, stocks-to-use versus 20 years, top producers/exporters and revisions since the previous USDA report. For world balances with a price series it also fits real price against stocks-to-use across market years and reports the price the USDA projection implies, an 80% band and where the latest price sits (association, not a forecast). The latest market year is a USDA projection. Other commodities return a recorded data gap.",
         "schema": {"type": "object", "properties": {
             "commodity": {"type": "string", "description": "Commodity name or price dataset id, e.g. 'sugar' or CMD.CORN.US."},
             "metric": {"type": "string", "description": "Optional focus (e.g. 'ending stocks'); the full balance is always returned."},
