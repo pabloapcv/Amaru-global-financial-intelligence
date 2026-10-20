@@ -79,6 +79,7 @@ def test_release_agent_fires_once_per_new_release_and_cites_it(monkeypatch):
     from atlas import agents
     from atlas.data.db import ResearchRun, SourceDocument, session_scope
 
+    documents.refresh(_client())  # self-contained: index the fixture feeds
     with pytest.raises(agents.AgentError):
         agents.validate([], [{"type": "official_release", "keywords": " , "}], {"query": "why?"})
     with pytest.raises(agents.AgentError):  # market triggers still need instruments

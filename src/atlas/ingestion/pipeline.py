@@ -350,7 +350,8 @@ def ingest(dataset_ids: Iterable[str] | None = None, *, backfill: bool = False) 
         # Monitoring agents watching market instruments; positioning updates map to their instrument.
         from atlas.agents import evaluate_agents
 
-        watched = set(changed) | {datasets()[c].meta.get("instrument_id") for c in changed if c.startswith("COT.")}
+        # Positioning and USDA fundamentals updates map to their price instrument.
+        watched = set(changed) | {datasets()[c].meta.get("instrument_id") for c in changed if c.startswith(("COT.", "FUND."))}
         evaluate_agents({w for w in watched if w})
     return results
 
