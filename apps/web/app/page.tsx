@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api, fmt, type Instrument, type Quote } from "@/lib/api";
 import { Card, Change, ErrorNote, FreshnessBadge, PageHeader } from "@/components/ui";
 import GetStarted from "@/components/GetStarted";
+import ThisWeek from "@/components/ThisWeek";
 
 const GROUPS: { title: string; ids: string[] }[] = [
   { title: "Commodities", ids: ["CMD.SUGAR.ISA", "CMD.COPPER.LME", "CMD.CRUDE.BRENT", "CMD.CRUDE.WTI", "CMD.NATGAS.HH", "CMD.COFFEE.ARABICA", "CMD.WHEAT.USHRW", "CMD.GOLD"] },
@@ -84,6 +85,7 @@ export default function Overview() {
           <div className="sub">{health ? (health.llm_configured ? "Claude orchestration enabled" : "Set ANTHROPIC_API_KEY to enable Claude") : ""}</div></div>
         </Card>
       </div>
+      <ThisWeek />
       {GROUPS.map((g) => (
         <div key={g.title} style={{ marginBottom: 18 }}>
           <h3 style={{ marginBottom: 10 }}>{g.title}</h3>
