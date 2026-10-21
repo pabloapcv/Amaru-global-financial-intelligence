@@ -69,6 +69,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | Volatility regimes (§11) | Realized-vol percentile buckets plus a 2-state Markov-switching model (`detect_regime`), in research and Quant Lab |
 | Positioning & countries (FR-011, §9) | COT index, z-score and crowding flags per market; cross-country comparisons with stale-value flags; country profiles |
 | API (§14) | FastAPI: instruments, quotes, history, macro (with `as_of`), data/pipeline status, research jobs (202 + polling), quant, reports, alerts |
+| Data export (FR-018) | `GET /api/v1/datasets/{id}/export?format=csv|json` for every dataset kind (prices, macro, CFTC positioning, trade, USDA balances) with `start`/`end` filters and point-in-time `as_of` for macro; CSV opens with provenance comment lines (source, citation, observation and ingestion dates, freshness, licence note; `header=false` drops them); exports are audited. Download links on Markets, the USDA card and Data Explorer |
 | UI (§13) | Next.js: Overview, AI Research, Markets, Global Economy, Quant Lab, Reports, Intelligence, Data Explorer |
 
 ## Honest limitations

@@ -323,6 +323,7 @@ def data_status() -> list[dict[str, Any]]:
             "kind": ds.kind,
             "asset_class": ds.meta.get("asset_class", "macro"),
             "frequency": ds.frequency,
+            "provider_id": ds.provider_id,
             "provider_symbol": ds.provider_symbol,
             "observation_date": m.last_observation,
             "ingested_at": m.last_ingested_at,
