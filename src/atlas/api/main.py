@@ -648,11 +648,73 @@ def download_report(report_id: str, format: Literal["html", "xlsx", "pdf"] = "ht
     path = r["paths"].get(fmt)
     if not path or not Path(path).exists():
         _404(f"{format} export")
-    media = {"html": "text/html", "pdf": "application/pdf",
-             "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}[fmt]
     filename = f"atlas-report-{report_id[:8]}-v{r['version']}.{fmt}"
-    return FileResponse(path, media_type=media, filename=None if inline else filename,
-                        headers={"Content-Disposition": "inline"} if inline else None)
+    return _report_file(path, fmt, filename, inline)
+
+
+# Report HTML embeds model- and source-derived text; render it with no scripts in a sandboxed origin.
+REPORT_HEADERS = {
+    "Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:",
+    "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
+}
+REPORT_MEDIA = {"html": "text/html", "pdf": "application/pdf",
+                "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+
+
+def _report_file(path: str, fmt: str, filename: str, inline: bool, extra: dict[str, str] | None = None) -> FileResponse:
+    headers = {**REPORT_HEADERS, **(extra or {})}
+    if inline:
+        headers["Content-Disposition"] = "inline"
+    return FileResponse(path, media_type=REPORT_MEDIA[fmt], filename=None if inline else filename, headers=headers)
+
+
+class ShareRequest(BaseModel):
+    days: int = Field(7, ge=1, le=90)
+
+
+@api.post("/reports/{report_id}/shares", status_code=201)
+def share_report(report_id: str, req: ShareRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
+    from atlas import sharing
+
+    try:
+        return sharing.create(p, report_id, req.days)
+    except KeyError:
+        _404("report")
+
+
+@api.get("/reports/{report_id}/shares")
+def report_shares(report_id: str, p: Principal = Depends(principal)) -> list[dict[str, Any]]:
+    from atlas import sharing
+
+    return sharing.list_shares(p, report_id)
+
+
+@api.delete("/shares/{share_id}", status_code=204)
+def revoke_share(share_id: str, p: Principal = Depends(principal)) -> None:
+    from atlas import sharing
+
+    if not sharing.revoke(p, share_id):
+        _404("share link")
+
+
+@app.get("/share/{token}", include_in_schema=False)
+def view_shared_report(token: str, request: Request, format: Literal["html", "xlsx", "pdf"] = "html"):
+    """Public, read-only view of one report through an unexpired, unrevoked share link."""
+    from atlas import sharing
+
+    r = sharing.resolve(token)
+    if r is None:
+        try:  # slow down token guessing; the response stays a plain 404 either way
+            auth._throttle(f"share|{request.client.host if request.client else ''}")
+        except auth.AuthError:
+            raise HTTPException(429, "too many requests")
+        raise HTTPException(404, "link not found or expired")
+    fmt = "html" if format == "pdf" and "pdf" not in r["paths"] else format
+    path = r["paths"].get(fmt)
+    if not path or not Path(path).exists():
+        raise HTTPException(404, "format not available")
+    return _report_file(path, fmt, f"atlas-report-{r['report_id'][:8]}-v{r['version']}.{fmt}", inline=fmt == "html",
+                        extra={"Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow"})
 
 
 # ---------------------------------------------------------------- scheduled reports

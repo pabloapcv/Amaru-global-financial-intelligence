@@ -232,3 +232,63 @@ def test_onboarding_checklist_tracks_real_progress(secured):
     secured.post("/api/v1/api-keys", json={"name": "nb"})
     steps = {s["key"]: s["done"] for s in secured.get("/api/v1/onboarding").json()["steps"]}
     assert steps["portfolio"] and steps["api_key"] and not steps["research"]
+
+
+def test_report_share_links_are_scoped_hashed_expiring_and_revocable(secured):
+    from datetime import timedelta
+
+    from sqlalchemy import select, update
+
+    from atlas.data.db import AuditEvent, ReportShare, session_scope, utcnow
+    from atlas.research import engine
+
+    a = _signup(secured, "sharer@example.test", "Sharer")
+    run = engine.create_run("copper outlook", {"engine": "deterministic", "depth": "quick", "formats": ["html", "xlsx"]},
+                            a["user"]["user_id"], a["workspace"]["workspace_id"])
+    report_id = engine.execute_run(run)["report_id"]
+
+    r = secured.post(f"/api/v1/reports/{report_id}/shares", json={"days": 7})
+    assert r.status_code == 201, r.text
+    link = r.json()
+    token, share_id = link["token"], link["share_id"]
+    assert link["path"] == f"/share/{token}" and token.startswith("shr_") and len(token) > 40
+    with session_scope() as s:
+        row = s.get(ReportShare, share_id)
+        assert row.token_hash != token and token not in row.token_hash  # only the hash is stored
+    listed = secured.get(f"/api/v1/reports/{report_id}/shares").json()
+    assert listed[0]["share_id"] == share_id and "token" not in listed[0]
+
+    # Anyone with the link sees the report, sandboxed, without signing in.
+    secured.cookies.clear()
+    v = secured.get(f"/share/{token}")
+    assert v.status_code == 200 and "text/html" in v.headers["content-type"]
+    assert v.headers["content-security-policy"].startswith("sandbox;") and "script-src" not in v.headers["content-security-policy"]
+    assert v.headers["x-robots-tag"].startswith("noindex") and v.headers["cache-control"] == "private, no-store"
+    assert secured.get(f"/share/{token}", params={"format": "xlsx"}).status_code == 200
+    assert secured.get("/share/shr_not-a-real-token").status_code == 404
+    # The link opens the report only: the API still needs credentials.
+    assert secured.get(f"/api/v1/reports/{report_id}").status_code == 401
+    with session_scope() as s:
+        assert s.get(ReportShare, share_id).view_count == 2
+        events = [e.action for e in s.execute(select(AuditEvent).where(AuditEvent.workspace_id == a["workspace"]["workspace_id"])).scalars()]
+        assert "report.shared" in events and "report.share_viewed" in events
+        assert all(token not in str(e.detail) for e in s.execute(select(AuditEvent)).scalars())
+
+    # Another workspace cannot share, list or revoke it.
+    _signup(secured, "outsider@example.test", "Outsider")
+    assert secured.post(f"/api/v1/reports/{report_id}/shares", json={"days": 7}).status_code == 404
+    assert secured.get(f"/api/v1/reports/{report_id}/shares").json() == []
+    assert secured.delete(f"/api/v1/shares/{share_id}").status_code == 404
+    assert secured.post(f"/api/v1/reports/{report_id}/shares", json={"days": 365}).status_code == 422
+
+    # Expiry and revocation close the link.
+    with session_scope() as s:
+        s.execute(update(ReportShare).where(ReportShare.share_id == share_id).values(expires_at=utcnow() - timedelta(seconds=1)))
+    assert secured.get(f"/share/{token}").status_code == 404
+    with session_scope() as s:
+        s.execute(update(ReportShare).where(ReportShare.share_id == share_id).values(expires_at=utcnow() + timedelta(days=1)))
+    secured.cookies.clear()
+    secured.post("/api/v1/auth/login", json={"email": "sharer@example.test", "password": "correct horse battery"})
+    assert secured.delete(f"/api/v1/shares/{share_id}").status_code == 204
+    assert secured.get(f"/share/{token}").status_code == 404
+    assert secured.get(f"/api/v1/reports/{report_id}/shares").json()[0]["status"] == "revoked"

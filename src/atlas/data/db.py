@@ -340,6 +340,24 @@ class Report(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class ReportShare(Base):
+    """A read-only, expiring link to one report. Only the token's hash is stored."""
+
+    __tablename__ = "report_shares"
+
+    share_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    report_id: Mapped[str] = mapped_column(ForeignKey("reports.report_id"), index=True)
+    workspace_id: Mapped[str] = mapped_column(String(32), index=True)
+    created_by: Mapped[str] = mapped_column(String(64))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    prefix: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    view_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_viewed_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
 class ReportSchedule(Base):
     """A saved research question that re-runs on a cadence (spec FR-010)."""
 
