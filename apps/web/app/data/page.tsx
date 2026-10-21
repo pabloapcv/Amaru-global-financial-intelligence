@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type Freshness } from "@/lib/api";
+import { API_URL, api, type Freshness } from "@/lib/api";
 import { Card, ErrorNote, FreshnessBadge, PageHeader } from "@/components/ui";
 
+const PROVIDERS: Record<string, string> = { fred: "FRED", cftc: "CFTC", worldbank: "WB", comtrade: "Comtrade", usda_psd: "USDA" };
+
 type Status = {
-  dataset_id: string; name: string; kind: string; asset_class: string; frequency: string; provider_symbol: string | null;
+  dataset_id: string; name: string; kind: string; asset_class: string; frequency: string; provider_id: string | null; provider_symbol: string | null;
   observation_date: string | null; ingested_at: string | null; checked_at: string | null; n_observations: number;
   freshness: Freshness; freshness_note: string;
 };
@@ -52,7 +54,7 @@ export default function DataExplorer() {
         actions={
           <div className="row">
             <div className="seg">
-              {[["market", "Markets"], ["macro", "U.S. macro"], ["country", "Countries"], ["positioning", "Positioning"], ["all", "All"]].map(([k, l]) => (
+              {[["market", "Markets"], ["macro", "U.S. macro"], ["country", "Countries"], ["positioning", "Positioning"], ["trade", "Trade"], ["fundamentals", "USDA"], ["all", "All"]].map(([k, l]) => (
                 <button key={k} className={k === kind ? "on" : ""} onClick={() => setKind(k)}>{l}</button>
               ))}
             </div>
@@ -61,17 +63,18 @@ export default function DataExplorer() {
         }
       >
         <table>
-          <thead><tr><th>Dataset</th><th>Source</th><th>Freq.</th><th>Observation</th><th>Ingested</th><th className="num">Obs.</th><th>Freshness</th></tr></thead>
+          <thead><tr><th>Dataset</th><th>Source</th><th>Freq.</th><th>Observation</th><th>Ingested</th><th className="num">Obs.</th><th>Freshness</th><th className="num">Export</th></tr></thead>
           <tbody>
             {shown.map((s) => (
               <tr key={s.dataset_id}>
                 <td>{s.name}<div className="muted mono">{s.dataset_id}</div></td>
-                <td className="mono">{s.provider_symbol ? `${s.dataset_id.startsWith("WB.") ? "WB" : s.dataset_id.startsWith("COT.") ? "CFTC" : "FRED"}:${s.provider_symbol}` : "—"}</td>
+                <td className="mono">{s.provider_symbol ? `${PROVIDERS[s.provider_id ?? ""] ?? s.provider_id}:${s.provider_symbol}` : "—"}</td>
                 <td>{s.frequency}</td>
                 <td>{s.observation_date ?? "—"}</td>
                 <td className="muted">{s.ingested_at?.replace("T", " ").slice(0, 16) ?? "—"}</td>
                 <td className="num">{s.n_observations.toLocaleString()}</td>
                 <td title={s.freshness_note}><FreshnessBadge value={s.freshness} /></td>
+                <td className="num">{s.n_observations > 0 ? <a href={`${API_URL}/api/v1/datasets/${s.dataset_id}/export?format=csv`}>CSV</a> : <span className="muted">—</span>}</td>
               </tr>
             ))}
           </tbody>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Chart from "@/components/Chart";
-import { api, fmt, type ChartSpec } from "@/lib/api";
+import { API_URL, api, fmt, type ChartSpec } from "@/lib/api";
 import { Card, ErrorNote } from "@/components/ui";
 
 type Row = { market_year: string; status: string; production: number | null; consumption: number | null; exports: number | null; ending_stocks: number | null; stocks_to_use_pct: number | null };
@@ -43,7 +43,7 @@ function PriceScatter({ m }: { m: PriceModel }) {
 }
 
 type Result = {
-  commodity: string; geography: string; unit: string; usda_release: string; balance: Row[];
+  dataset_id: string; commodity: string; geography: string; unit: string; usda_release: string; balance: Row[];
   change_vs_prior_year: Record<string, number | null>;
   stocks_to_use: { latest_pct: number | null; mean_pct: number | null; percentile: number | null; history_years: number };
   top_producers?: Share[]; top_exporters?: Share[];
@@ -145,7 +145,8 @@ export default function Fundamentals({ id }: { id: string }) {
               Revisions since the previous USDA report: {r.revisions_vs_previous_report.map((v) => `${v.market_year} ${v.attribute.replace("_", " ")} ${signed(v.change_pct)}`).join(" · ")}
             </p>
           )}
-          <p className="muted" style={{ fontSize: 11.5 }}>{r.unit}. The latest market year is a USDA projection. {data.citation}</p>
+          <p className="muted" style={{ fontSize: 11.5 }}>{r.unit}. The latest market year is a USDA projection. {data.citation}{" "}
+            <a href={`${API_URL}/api/v1/datasets/${r.dataset_id}/export?format=csv`}>Download all countries (CSV)</a></p>
         </>
       )}
     </Card>

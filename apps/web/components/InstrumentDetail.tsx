@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Chart from "@/components/Chart";
-import { api, fmt, type History } from "@/lib/api";
+import { API_URL, api, fmt, type History } from "@/lib/api";
 import { Card, Change, ErrorNote, FreshnessBadge } from "@/components/ui";
 
 const RANGES = [1, 3, 5, 10, 25];
@@ -69,6 +69,7 @@ export default function InstrumentDetail({ id, defaultYears = 5 }: { id: string;
             {p?.max_drawdown_5y_pct != null && (<><dt>5Y max DD</dt><dd>{fmt(p.max_drawdown_5y_pct)}%</dd></>)}
             {p?.percentile_in_5y_range != null && (<><dt>5Y percentile</dt><dd>{fmt(p.percentile_in_5y_range, 1)}</dd></>)}
             <dt>Citation</dt><dd className="muted" style={{ fontSize: 12 }}>{m.citation ?? "—"}</dd>
+            <dt>Export</dt><dd><a href={`${API_URL}/api/v1/datasets/${id}/export?format=csv`}>CSV</a> · <a href={`${API_URL}/api/v1/datasets/${id}/export?format=json`}>JSON</a> <span className="muted" style={{ fontSize: 12 }}>full history with provenance</span></dd>
           </dl>
         </Card>
       </div>

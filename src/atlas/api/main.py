@@ -6,7 +6,7 @@ import logging
 import os
 import threading
 from contextlib import asynccontextmanager
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -491,6 +491,26 @@ def search_documents(q: str = "", days: int = Query(30, ge=1, le=730), limit: in
     from atlas import documents
 
     return documents.search(q, days=days, limit=limit)
+
+
+@api.get("/datasets/{dataset_id}/export")
+def export_dataset(dataset_id: str, format: Literal["csv", "json"] = "csv", start: date | None = None, end: date | None = None,
+                   as_of: datetime | None = None, header: bool = True, p: Principal = Depends(principal)):
+    """Download a stored dataset with provenance. `as_of` gives the point-in-time view for macro series."""
+    from atlas import exports
+
+    if get_dataset(dataset_id) is None:
+        _404("dataset")
+    try:
+        body, media = exports.export(dataset_id, format, start=start, end=end, as_of=as_of, header=header)
+    except access.DataUnavailable as exc:
+        _unavailable(exc)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    auth.audit("data.exported", p.user_id, p.workspace_id, dataset_id=dataset_id, format=format)
+    stamp = (as_of.date() if as_of else date.today()).isoformat()
+    return Response(body, media_type=media, headers={
+        "Content-Disposition": f'attachment; filename="{dataset_id.lower()}-{stamp}.{format}"', "X-Content-Type-Options": "nosniff"})
 
 
 @api.get(f"/pipelines/status")
