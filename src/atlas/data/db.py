@@ -522,6 +522,23 @@ class EmailVerification(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class Invitation(Base):
+    """A single-use, expiring invitation to join a workspace. Only the token's hash is stored."""
+
+    __tablename__ = "invitations"
+
+    invitation_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.workspace_id"), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    role: Mapped[str] = mapped_column(String(16), default="member")  # admin | member
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    invited_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
 class AuditEvent(Base):
     """Security-relevant actions (spec §15: audit logs)."""
 

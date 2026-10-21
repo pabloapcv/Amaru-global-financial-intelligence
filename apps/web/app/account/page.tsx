@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { API_URL, api, type Account } from "@/lib/api";
+import Team from "@/components/Team";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
 type Key = { key_id: string; name: string; prefix: string; created_at: string; last_used_at: string | null };
@@ -114,6 +115,7 @@ export default function AccountPage() {
           <div style={{ height: 14 }} />
         </>
       )}
+      {account && account.auth !== "local" && <div style={{ marginBottom: 14 }}><Team /></div>}
       <Card title="API keys">
         <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
           Use a key from scripts and notebooks: <code>Authorization: Bearer atk_…</code>. Keys act on this workspace and are shown only once.

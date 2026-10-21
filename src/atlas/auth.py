@@ -30,6 +30,7 @@ from atlas.data.db import (
     AuditEvent,
     AuthSession,
     EmailVerification,
+    Invitation,
     Membership,
     MonitorAgent,
     PasswordReset,
@@ -50,10 +51,10 @@ MIN_PASSWORD = 10
 
 # Plan limits (spec §18 tiers). None = unlimited.
 PLANS: dict[str, dict[str, int | None]] = {
-    "explorer": {"llm_budget_usd_per_month": 2, "agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1},
-    "investor": {"llm_budget_usd_per_month": 15, "agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2},
-    "research_pro": {"llm_budget_usd_per_month": 60, "agents": 10, "research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5},
-    "pro": {"llm_budget_usd_per_month": 300, "agents": 50, "research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20},
+    "explorer": {"seats": 1, "llm_budget_usd_per_month": 2, "agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1},
+    "investor": {"seats": 2, "llm_budget_usd_per_month": 15, "agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2},
+    "research_pro": {"seats": 5, "llm_budget_usd_per_month": 60, "agents": 10, "research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5},
+    "pro": {"seats": 25, "llm_budget_usd_per_month": 300, "agents": 50, "research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20},
 }
 
 
@@ -146,7 +147,8 @@ def audit(action: str, user_id: str | None = None, workspace_id: str | None = No
 
 
 def create_user(email: str, password: str, name: str = "", workspace_name: str | None = None,
-                workspace_id: str | None = None, plan: str = "explorer", verified: bool = False) -> tuple[str, str]:
+                workspace_id: str | None = None, plan: str = "explorer", verified: bool = False,
+                role: str | None = None) -> tuple[str, str]:
     """Create a user and either a new workspace or a membership in an existing one."""
     email = email.strip().lower()
     if not EMAIL_RE.match(email):
@@ -165,7 +167,9 @@ def create_user(email: str, password: str, name: str = "", workspace_name: str |
         if workspace_id:
             if s.get(Workspace, workspace_id) is None:
                 raise ValidationError(f"workspace {workspace_id} does not exist")
-            role = "owner" if not s.execute(select(Membership).where(Membership.workspace_id == workspace_id)).first() else "member"
+            if not s.execute(select(Membership).where(Membership.workspace_id == workspace_id)).first():
+                role = "owner"
+            role = role or "member"
             ws_id = workspace_id
         else:
             ws = Workspace(name=workspace_name or f"{name or email.split('@')[0]}'s workspace", plan=plan)
@@ -246,6 +250,10 @@ def account(principal: Principal) -> dict[str, Any]:
             "verification_required": verification_required(),
             "limits": PLANS.get(ws.plan if ws else "explorer"),
             "usage": usage(principal.workspace_id),
+            "workspaces": [{"workspace_id": w.workspace_id, "name": w.name, "role": m.role}
+                           for m, w in s.execute(select(Membership, Workspace).join(Workspace, Workspace.workspace_id == Membership.workspace_id)
+                                                 .where(Membership.user_id == principal.user_id).order_by(Workspace.name)).all()]
+            if principal.via != "local" else [],
         }
 
 
@@ -443,6 +451,11 @@ def usage(workspace_id: str) -> dict[str, int]:
                 MonitorAgent.workspace_id == workspace_id, MonitorAgent.status != "deleted")),
             "api_keys": count(select(func.count()).select_from(ApiKey).where(
                 ApiKey.workspace_id == workspace_id, ApiKey.revoked_at.is_(None))),
+            # Seats: members plus invitations still open.
+            "seats": count(select(func.count()).select_from(Membership).where(Membership.workspace_id == workspace_id))
+            + count(select(func.count()).select_from(Invitation).where(
+                Invitation.workspace_id == workspace_id, Invitation.accepted_at.is_(None), Invitation.revoked_at.is_(None),
+                Invitation.expires_at > utcnow())),
         }
 
 

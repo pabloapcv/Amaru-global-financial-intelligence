@@ -14,7 +14,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     cache: "no-store",
   });
   const body = res.status === 204 ? null : await res.json().catch(() => null);
-  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/v1/auth/") && !["/login", "/reset", "/verify"].includes(window.location.pathname)) {
+  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/v1/auth/") && !["/login", "/reset", "/verify", "/join"].includes(window.location.pathname)) {
     window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
   }
   if (!res.ok) throw new ApiError(res.status, body?.detail ?? body ?? res.statusText);
@@ -30,6 +30,7 @@ export interface Account {
   verification_required: boolean;
   limits: Record<string, number | null>;
   usage: Record<string, number>;
+  workspaces?: { workspace_id: string; name: string; role: string }[];
 }
 
 export type Freshness = "current" | "delayed" | "stale" | "no_data" | "no_source" | "failing";

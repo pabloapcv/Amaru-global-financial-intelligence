@@ -17,16 +17,22 @@ const ITEMS = [
   { href: "/data", label: "Data Explorer", hint: "Datasets and pipelines" },
 ];
 
+const HIDDEN = ["/login", "/reset", "/verify", "/join"];
+
 export default function Nav() {
   const path = usePathname();
   const [account, setAccount] = useState<Account | null>(null);
   const [unread, setUnread] = useState(0);
   useEffect(() => {
-    if (["/login", "/reset", "/verify"].includes(path)) return;
+    if (HIDDEN.includes(path)) return;
     api<Account>("/api/v1/account").then(setAccount).catch(() => {});
     api<{ unread: number }>("/api/v1/agents").then((r) => setUnread(path.startsWith("/intelligence") ? 0 : r.unread)).catch(() => {});
   }, [path]);
-  if (["/login", "/reset", "/verify"].includes(path)) return null;
+  if (HIDDEN.includes(path)) return null;
+  const switchTo = async (workspaceId: string) => {
+    await api("/api/v1/auth/switch-workspace", { method: "POST", body: JSON.stringify({ workspace_id: workspaceId }) });
+    window.location.reload();  // every page reloads its data for the new workspace
+  };
   return (
     <nav className="nav">
       <div className="brand">
@@ -51,6 +57,11 @@ export default function Nav() {
           <span>{account.user.name || account.user.email}</span>
           <small>{account.workspace?.name} · {account.workspace?.plan.replace("_", " ")}</small>
         </Link>
+      )}
+      {account?.workspaces && account.workspaces.length > 1 && (
+        <select className="nav-workspace" value={account.workspace?.workspace_id} onChange={(e) => switchTo(e.target.value)} aria-label="Switch workspace">
+          {account.workspaces.map((w) => <option key={w.workspace_id} value={w.workspace_id}>{w.name} ({w.role})</option>)}
+        </select>
       )}
       <p className="nav-foot">Research and decision support only. Not investment advice.</p>
     </nav>
