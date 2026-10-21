@@ -206,3 +206,38 @@ def test_cost_estimate_uses_served_model_prices():
     assert call_cost("claude-sonnet-5-5", u) == (12.0, True)
     cost, known = call_cost("claude-unknown", u)
     assert not known and cost == 24.0
+
+
+def test_follow_up_runs_inherit_subject_and_link_the_thread(seeded):
+    from fastapi.testclient import TestClient
+
+    from atlas.api.main import app
+    from atlas.research import engine
+
+    c = TestClient(app)
+    parent = engine.create_run("Analyze the relationship between the Brazilian real and sugar prices over the last five years.",
+                               {"engine": "deterministic", "formats": [], "cache": False})
+    engine.execute_run(parent)
+    r = c.post("/api/v1/research", json={"query": "What about over ten years?", "engine": "deterministic", "parent_run_id": parent})
+    assert r.status_code == 202
+    child = r.json()["run_id"]
+    import time
+
+    for _ in range(100):
+        run = c.get(f"/api/v1/research/{child}").json()
+        if run["status"] in ("complete", "failed"):
+            break
+        time.sleep(0.1)
+    assert run["status"] == "complete", run.get("error")
+    assert set(run["plan"]["entities"]) >= {"FX.USDBRL", "CMD.SUGAR.ISA"}  # elliptical: continues the subject
+    assert run["plan"]["timeframe"]["lookback_years"] == 10 and "relationship" in run["plan"]["intents"]
+    assert run["parent"]["run_id"] == parent
+    assert child in [f["run_id"] for f in c.get(f"/api/v1/research/{parent}").json()["follow_ups"]]
+    # A follow-up naming a new subject plans on its own.
+    own = engine.create_run("How is the US economy doing?", {"engine": "deterministic", "formats": [], "cache": False, "parent_run_id": parent})
+    engine.execute_run(own)
+    assert "CMD.SUGAR.ISA" not in engine.get_run(own)["plan"]["entities"]
+
+    assert c.post("/api/v1/research", json={"query": "and then?", "parent_run_id": "nope"}).status_code == 404
+    queued = engine.create_run("copper outlook", {"engine": "deterministic", "formats": []})
+    assert c.post("/api/v1/research", json={"query": "and then?", "parent_run_id": queued}).status_code == 409

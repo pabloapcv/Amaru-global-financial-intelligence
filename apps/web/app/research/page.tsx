@@ -115,7 +115,43 @@ function ResearchForm({ onSubmitted }: { onSubmitted: (id: string) => void }) {
   );
 }
 
-function RunView({ runId, onDone }: { runId: string; onDone?: () => void }) {
+function FollowUp({ run, onSubmitted }: { run: ResearchRun; onSubmitted: (id: string) => void }) {
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (q.trim().length < 3) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const cfg = run.config ?? {};
+      const r = await api<{ run_id: string }>("/api/v1/research", {
+        method: "POST",
+        body: JSON.stringify({ query: q.trim(), parent_run_id: run.run_id, depth: cfg.depth ?? "standard", engine: cfg.engine ?? "auto",
+          report: { formats: cfg.formats ?? ["html", "xlsx"] } }),
+      });
+      setQ("");
+      onSubmitted(r.run_id);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card title="Ask a follow-up">
+      <form className="row" style={{ flexWrap: "nowrap" }} onSubmit={submit}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. What about over ten years? How does Brazil's supply compare?" style={{ minWidth: 0, flex: 1 }} aria-label="Follow-up question" />
+        <button type="submit" disabled={busy || q.trim().length < 3}>{busy ? "Starting…" : "Ask"}</button>
+      </form>
+      <p className="muted" style={{ fontSize: 12, margin: "6px 0 0" }}>Keeps this thread&apos;s subject unless you name a new one. Figures are recomputed and verified for the new answer.</p>
+      <ErrorNote error={error} />
+    </Card>
+  );
+}
+
+function RunView({ runId, onDone, onOpen }: { runId: string; onDone?: () => void; onOpen?: (id: string) => void }) {
   const [run, setRun] = useState<ResearchRun | null>(null);
   const [error, setError] = useState<unknown>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -143,8 +179,15 @@ function RunView({ runId, onDone }: { runId: string; onDone?: () => void }) {
   const res = run.result;
   const active = run.status === "queued" || run.status === "running";
 
+  const open = (id: string) => (e: React.MouseEvent) => { e.preventDefault(); onOpen?.(id); };
+
   return (
     <div className="stack">
+      {run.parent && (
+        <div className="muted" style={{ fontSize: 12.5 }}>
+          Follow-up to <a href={`/research?run=${run.parent.run_id}`} onClick={open(run.parent.run_id)}>{run.parent.title ?? run.parent.query}</a>
+        </div>
+      )}
       {(active || !res) && (
         <Card title={`Research ${run.status}`} actions={active && <button className="secondary" onClick={() => api(`/api/v1/research/${runId}/cancel`, { method: "POST" })}>Cancel</button>}>
           <p style={{ marginTop: 0 }}><em>{run.query}</em></p>
@@ -208,6 +251,16 @@ function RunView({ runId, onDone }: { runId: string; onDone?: () => void }) {
               </tbody>
             </table>
           </Card>
+          {run.status === "complete" && <FollowUp run={run} onSubmitted={(id) => onOpen?.(id)} />}
+          {run.follow_ups && run.follow_ups.length > 0 && (
+            <Card title="Follow-ups">
+              <ul className="list-tight">
+                {run.follow_ups.map((f) => (
+                  <li key={f.run_id}><a href={`/research?run=${f.run_id}`} onClick={open(f.run_id)}>{f.query}</a> <span className="muted" style={{ fontSize: 11.5 }}>{f.status}</span></li>
+                ))}
+              </ul>
+            </Card>
+          )}
           {run.plan && (
             <Card title="Research plan">
               <pre>{JSON.stringify({ intent: run.plan.intent, entities: run.plan.entities, timeframe: run.plan.timeframe, steps: run.plan.steps }, null, 2)}</pre>
@@ -246,7 +299,7 @@ function Research() {
             </ul>
           </Card>
         </div>
-        <div>{runId ? <RunView runId={runId} onDone={refresh} /> : <Card><p className="muted" style={{ margin: 0 }}>Results appear here. ATLAS resolves instruments, plans the investigation, runs calculations, verifies every number against evidence, and renders a versioned report.</p></Card>}</div>
+        <div>{runId ? <RunView runId={runId} onDone={refresh} onOpen={(id) => router.push(`/research?run=${id}`)} /> : <Card><p className="muted" style={{ margin: 0 }}>Results appear here. ATLAS resolves instruments, plans the investigation, runs calculations, verifies every number against evidence, and renders a versioned report.</p></Card>}</div>
       </div>
     </>
   );

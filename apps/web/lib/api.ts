@@ -93,6 +93,8 @@ export interface Verification {
   passed: boolean;
 }
 
+export type RunLink = { run_id: string; query: string; status: string; title: string | null };
+
 export interface ResearchRun {
   run_id: string;
   query: string;
@@ -104,6 +106,9 @@ export interface ResearchRun {
   error: string | null;
   created_at: string;
   finished_at: string | null;
+  config?: Record<string, any>;
+  parent?: RunLink | null;
+  follow_ups?: RunLink[];
   result: {
     title: string;
     narrative_markdown: string;

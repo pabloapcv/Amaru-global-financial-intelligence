@@ -96,3 +96,22 @@ def test_monthly_budget_degrades_auto_and_blocks_explicit_llm(seeded, monkeypatc
     assert any("budget reached" in p["message"] for p in engine.get_run(run["run_id"])["progress"])
     explicit = engine.execute_run(engine.create_run("copper outlook", {"engine": "llm", "formats": []}))
     assert "budget reached" in explicit["error"]
+
+
+def test_follow_up_gives_claude_the_thread_without_stale_evidence_ids(seeded, monkeypatch):
+    parent = engine.create_run("Analyze the relationship between the Brazilian real and sugar prices over the last five years.",
+                               {"engine": "deterministic", "formats": [], "cache": False})
+    engine.execute_run(parent)
+
+    messages = ScriptedMessages([_tool_turn, _final_turn])
+    monkeypatch.setattr(llm, "available", lambda: True)
+    monkeypatch.setattr(llm.anthropic, "Anthropic", lambda *a, **k: NS(beta=NS(messages=messages)))
+    child = engine.create_run("What about over ten years?", {"engine": "llm", "formats": [], "cache": False, "parent_run_id": parent})
+    result = engine.execute_run(child)
+
+    prompt = messages.requests[0]["messages"][0]["content"]
+    assert "follow-up in a research thread" in prompt and "relationship between the Brazilian real" in prompt
+    previous = prompt.split("<previous_answer>")[1].split("</previous_answer>")[0]
+    assert "[E" not in previous  # earlier evidence ids are not valid in this run
+    assert result["verification"]["passed"]
+    assert "*Follow-up to: Analyze the relationship" in result["narrative_markdown"]
