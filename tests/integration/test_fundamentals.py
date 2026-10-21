@@ -141,3 +141,17 @@ def test_usda_revision_agent_fires_once_per_report(seeded):
     assert "world production" in f["message"]
     # Same report, checked again after the cooldown (forced): no second report.
     assert agents.check_agent(a["agent_id"], background=False, force=True)["fired"] is False
+
+
+def test_briefing_combines_calendar_releases_and_usda(seeded):
+    from atlas import briefing
+    from atlas.api.main import app
+
+    r = TestClient(app).get("/api/v1/briefing", params={"days": 14})
+    assert r.status_code == 200
+    b = r.json()
+    assert {"events", "series_due", "releases", "usda", "calendar_window"} <= set(b)
+    corn = next(u for u in b["usda"] if u["name"] == "Corn")
+    assert corn["instrument_id"] == "CMD.CORN.US" and corn["stocks_to_use_pct"] is not None
+    # Cached per dataset until it is re-ingested.
+    assert briefing._usda("FUND.CORN") is briefing._usda("FUND.CORN")
