@@ -482,6 +482,7 @@ class ResearchRequest(BaseModel):
     analysis: dict[str, bool] = Field(default_factory=dict)
     report: ResearchReportOptions = Field(default_factory=ResearchReportOptions)
     no_cache: bool = Field(False, description="Always run fresh research, even if an identical recent answer exists.")
+    parent_run_id: str | None = Field(None, description="Ask a follow-up to this completed run in the same workspace.")
 
 
 def _parse_period(text: str | None, unit_months: dict[str, float]) -> float | None:
@@ -519,6 +520,11 @@ def create_research(req: ResearchRequest, p: Principal = Depends(require_verifie
     }
     if req.no_cache:
         config["cache"] = False
+    if req.parent_run_id:
+        parent = engine.get_run(req.parent_run_id, p.workspace_id) or _404("research run")
+        if parent["status"] != "complete":
+            raise HTTPException(409, "a follow-up needs a completed run")
+        config["parent_run_id"] = req.parent_run_id
 
     def quotas() -> None:  # only charged when new research actually runs (cache hits are free)
         _quota(p.workspace_id, "research_per_day")

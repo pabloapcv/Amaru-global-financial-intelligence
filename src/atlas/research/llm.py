@@ -120,12 +120,23 @@ class LLMResearcher:
         ctx: T.ToolContext,
         progress: Callable[[str], None],
         depth: str = "standard",
+        prior: dict[str, Any] | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
         steps = json.dumps(plan["steps"], indent=1)
+        thread = ""
+        if prior:
+            earlier = "\n".join(f"- {q}" for q in prior["questions"])
+            thread = (
+                f"This is a follow-up in a research thread. Earlier questions, oldest first:\n{earlier}\n\n"
+                f"Your previous answer (context only: its evidence ids belong to an earlier run and are not valid here; "
+                f"re-run any tool whose figures you need and cite this investigation's evidence):\n"
+                f"<previous_answer>\n{prior['answer']}\n</previous_answer>\n\n"
+                "Answer the follow-up directly; do not repeat the earlier brief beyond what the follow-up needs.\n\n"
+            )
         messages: list[dict[str, Any]] = [{
             "role": "user",
             "content": (
-                f"Research question: {query}\n\nRequested depth: {depth}. Outlook horizon: "
+                thread + f"Research question: {query}\n\nRequested depth: {depth}. Outlook horizon: "
                 f"{plan['timeframe']['horizon_months']} months. Lookback: {plan['timeframe']['lookback_years']} years.\n\n"
                 f"Resolved entities: {', '.join(plan['entities']) or 'none — use search_instruments'}.\n"
                 f"Suggested plan (tool calls):\n{steps}\n\n"

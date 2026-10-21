@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
 from atlas.data.db import LOCAL_WORKSPACE, ResearchEvidence, ResearchRun, session_scope, utcnow
+from atlas.instruments import extract_entities, get_dataset
 from atlas.research import llm, tools as T, verify, writer
 from atlas.research.planner import build_plan, validate_plan
 
@@ -40,7 +41,8 @@ def create_run(query: str, config: dict[str, Any] | None = None, user_id: str = 
                workspace_id: str = LOCAL_WORKSPACE) -> str:
     with session_scope() as s:
         run = ResearchRun(query=query, config=config or {}, user_id=user_id, workspace_id=workspace_id,
-                          status="queued", progress=[], cache_key=cache_key(query, config or {}))
+                          status="queued", progress=[], cache_key=cache_key(query, config or {}),
+                          parent_run_id=(config or {}).get("parent_run_id"))
         s.add(run)
         s.flush()
         return run.run_id
@@ -66,7 +68,8 @@ def _save_usage(run_id: str, researchers: list) -> None:
 
 # ---------------------------------------------------------------- result cache
 
-CACHE_CONFIG_KEYS = ("depth", "engine", "template", "lookback_years", "horizon_months", "assets", "formats", "documents_query")
+CACHE_CONFIG_KEYS = ("depth", "engine", "template", "lookback_years", "horizon_months", "assets", "formats", "documents_query",
+                     "parent_run_id")
 
 
 def cache_key(query: str, config: dict[str, Any]) -> str:
@@ -139,6 +142,29 @@ def _evidence_dicts(ctx: T.ToolContext) -> list[dict[str, Any]]:
     ]
 
 
+MAX_THREAD = 5
+
+
+def prior_context(parent_run_id: str, workspace_id: str) -> dict[str, Any] | None:
+    """What a follow-up needs from its thread: earlier questions (oldest first), the parent's answer
+    with its evidence labels removed (they belong to the earlier run), and the parent's instruments."""
+    import re
+
+    parent = get_run(parent_run_id, workspace_id)
+    if parent is None or parent["status"] != "complete" or not parent.get("result"):
+        return None
+    questions, cur = [parent["query"]], parent
+    while cur and cur.get("parent_run_id") and len(questions) < MAX_THREAD:
+        cur = get_run(cur["parent_run_id"], workspace_id)
+        if cur:
+            questions.insert(0, cur["query"])
+    answer = re.sub(r"\s*\[E\d+(?:\s*,\s*E\d+)*\]", "", parent["result"].get("narrative_markdown", ""))
+    plan = parent.get("plan") or {}
+    instruments = [e for e in plan.get("entities", []) if (ds := get_dataset(e)) and ds.kind in ("market", "macro")]
+    return {"run_id": parent_run_id, "query": parent["query"], "questions": questions, "answer": answer[:4000],
+            "instruments": instruments[:5], "template": (parent.get("config") or {}).get("template")}
+
+
 def execute_run(run_id: str) -> dict[str, Any]:
     with session_scope() as s:
         run = s.get(ResearchRun, run_id)
@@ -150,10 +176,19 @@ def execute_run(run_id: str) -> dict[str, Any]:
         depth = config.get("depth", "standard")
         engine_pref = config.get("engine", "auto")
         _progress(run_id, "Parsing intent and resolving instruments")
+        prior = prior_context(config["parent_run_id"], workspace_id) if config.get("parent_run_id") else None
+        plan_query = query
+        if prior and not [e for e in extract_entities(query) if (ds := get_dataset(e)) and ds.kind in ("market", "macro")]:
+            # An elliptical follow-up ("What about over ten years?") continues the earlier subject and analysis;
+            # its own text comes first so its settings (here the lookback) win.
+            plan_query = f"{query} {prior['query']}"
         plan = build_plan(
-            query, depth=depth, horizon_months=config.get("horizon_months"),
+            plan_query, depth=depth, horizon_months=config.get("horizon_months"),
             lookback_years=config.get("lookback_years"), scope=config.get("assets"),
         )
+        plan["query"] = query
+        if prior:
+            plan["follow_up_to"] = {"run_id": prior["run_id"], "query": prior["query"]}
         from atlas.research import templates
 
         plan = templates.apply(plan, config.get("template"))
@@ -190,7 +225,7 @@ def execute_run(run_id: str) -> dict[str, Any]:
                 researcher = llm.LLMResearcher()
                 researchers.append(researcher)
                 _progress(run_id, f"Investigating with {researcher.model}")
-                narrative, transcript = researcher.run(query, plan, ctx, lambda m: _progress(run_id, m), depth)
+                narrative, transcript = researcher.run(query, plan, ctx, lambda m: _progress(run_id, m), depth, prior)
                 engine, model = "llm", researcher.model
             except Exception as exc:
                 # An explicit LLM request fails loudly; only "auto" degrades to the deterministic engine.
@@ -207,17 +242,22 @@ def execute_run(run_id: str) -> dict[str, Any]:
 
         evidence = _evidence_dicts(ctx)
         _progress(run_id, "Verifying numerical claims and citations")
-        check = verify.verify(narrative, evidence, query)
+        asked = query + (" " + " ".join(prior["questions"]) if prior else "")
+        check = verify.verify(narrative, evidence, asked)
         if engine == "llm" and not check["passed"] and transcript is not None:
             _progress(run_id, f"{len(check['unverified_numbers'])} untraceable figure(s); requesting revision")
             try:
                 revised = researcher.revise(transcript, check)  # type: ignore[possibly-undefined]
-                recheck = verify.verify(revised, evidence, query)
+                recheck = verify.verify(revised, evidence, asked)
                 if len(recheck["unverified_numbers"]) <= len(check["unverified_numbers"]):
                     narrative, check = revised, recheck
             except Exception as exc:
                 log.warning("revision failed: %s", exc)
 
+        if prior:  # say what this answers, under the title (after verification: it quotes a question, not a claim)
+            lines = narrative.splitlines()
+            at = 1 if lines and lines[0].startswith("# ") else 0
+            narrative = "\n".join(lines[:at] + ["", f"*Follow-up to: {prior['query']}*"] + lines[at:])
         _save_usage(run_id, researchers)
         title = next((ln[2:].strip() for ln in narrative.splitlines() if ln.startswith("# ")), query)
         sources = {}
@@ -262,8 +302,15 @@ def execute_run(run_id: str) -> dict[str, Any]:
         return {"error": str(exc)}
 
 
+def _summary(r: ResearchRun | None) -> dict[str, Any] | None:
+    return None if r is None else {"run_id": r.run_id, "query": r.query, "status": r.status,
+                                   "title": (r.result or {}).get("title")}
+
+
 def get_run(run_id: str, workspace_id: str | None = None) -> dict[str, Any] | None:
     """Fetch a run. With `workspace_id`, runs from other workspaces are invisible (treated as missing)."""
+    from sqlalchemy import select
+
     with session_scope() as s:
         run = s.get(ResearchRun, run_id)
         if run is None or (workspace_id is not None and run.workspace_id != workspace_id):
@@ -272,7 +319,11 @@ def get_run(run_id: str, workspace_id: str | None = None) -> dict[str, Any] | No
             "run_id": run.run_id, "workspace_id": run.workspace_id, "query": run.query, "config": run.config, "status": run.status,
             "cost_usd": run.cost_usd, "cached_from": run.cached_from,
             "engine": run.engine, "model_version": run.model_version, "plan": run.plan, "result": run.result,
-            "progress": run.progress, "error": run.error,
+            "progress": run.progress, "error": run.error, "parent_run_id": run.parent_run_id,
+            "parent": _summary(s.get(ResearchRun, run.parent_run_id)) if run.parent_run_id else None,
+            "follow_ups": [_summary(r) for r in s.execute(select(ResearchRun).where(
+                ResearchRun.parent_run_id == run.run_id, ResearchRun.workspace_id == run.workspace_id)
+                .order_by(ResearchRun.created_at)).scalars()],
             "created_at": run.created_at.isoformat(timespec="seconds") + "Z",
             "finished_at": run.finished_at.isoformat(timespec="seconds") + "Z" if run.finished_at else None,
         }

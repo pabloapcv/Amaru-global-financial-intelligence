@@ -53,7 +53,7 @@ INTENT_PATTERNS = [
     ("market_update", r"\b(today|happening|latest|now|why is|moving|falling|rising|drop|rally)"),
 ]
 
-WORD_NUM = {"one": 1, "two": 2, "three": 3, "six": 6, "twelve": 12, "five": 5, "ten": 10}
+WORD_NUM = {"one": 1, "two": 2, "three": 3, "six": 6, "twelve": 12, "five": 5, "ten": 10, "twenty": 20}
 
 
 def _horizon_months(q: str) -> int:
@@ -66,10 +66,10 @@ def _horizon_months(q: str) -> int:
 
 
 def _lookback_years(q: str) -> float:
-    m = re.search(r"(?:last|past) (\d+|one|two|three|five|ten) years?", q)
+    m = re.search(r"(?:last|past|over(?: the)?(?: last| past)?) (\d+|one|two|three|five|ten|twenty) years?", q)
     if m:
         return float(m.group(1)) if m.group(1).isdigit() else float(WORD_NUM[m.group(1)])
-    m = re.search(r"\b(\d+)\s*-?\s*(?:y|yr|year)\b", q)
+    m = re.search(r"\b(\d+)\s*-?\s*(?:y|yrs?|years?)\b", q)
     return float(m.group(1)) if m else 5.0
 
 

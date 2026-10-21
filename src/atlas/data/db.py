@@ -302,6 +302,7 @@ class ResearchRun(Base):
     cost_usd: Mapped[float | None] = mapped_column(Float)
     cache_key: Mapped[str | None] = mapped_column(String(64), index=True)
     cached_from: Mapped[str | None] = mapped_column(String(32))
+    parent_run_id: Mapped[str | None] = mapped_column(String(32), index=True)  # follow-up to this run
     config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(16), default="queued")
     engine: Mapped[str | None] = mapped_column(String(32))
@@ -557,6 +558,7 @@ _ADDED_COLUMNS = [
     ("research_runs", "cost_usd", "FLOAT", None),
     ("research_runs", "cache_key", "VARCHAR(64)", None),
     ("research_runs", "cached_from", "VARCHAR(32)", None),
+    ("research_runs", "parent_run_id", "VARCHAR(32)", None),
     ("users", "email_verified_at", "TIMESTAMP", None),
     ("source_documents", "source", "VARCHAR(32)", None),
     ("source_documents", "category", "VARCHAR(128)", None),

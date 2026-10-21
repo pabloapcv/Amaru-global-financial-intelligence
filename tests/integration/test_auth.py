@@ -68,6 +68,9 @@ def test_workspaces_cannot_see_each_others_research(secured):
     assert secured.get(f"/api/v1/reports/{report_id}/download").status_code == 404
     assert run_a not in {r["run_id"] for r in secured.get("/api/v1/research").json()}
     assert report_id not in {r["report_id"] for r in secured.get("/api/v1/reports").json()}
+    # A follow-up cannot use another workspace's run as context.
+    assert secured.post("/api/v1/research", json={"query": "and then?", "parent_run_id": run_a}).status_code == 404
+    assert engine.prior_context(run_a, "some-other-workspace") is None
 
 
 def test_alerts_and_schedules_are_workspace_scoped(secured):
