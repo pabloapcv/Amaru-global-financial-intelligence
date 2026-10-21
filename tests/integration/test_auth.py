@@ -292,3 +292,86 @@ def test_report_share_links_are_scoped_hashed_expiring_and_revocable(secured):
     assert secured.delete(f"/api/v1/shares/{share_id}").status_code == 204
     assert secured.get(f"/share/{token}").status_code == 404
     assert secured.get(f"/api/v1/reports/{report_id}/shares").json()[0]["status"] == "revoked"
+
+
+def test_team_invitations_roles_seats_and_removal(secured):
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from atlas.data.db import Invitation, session_scope, utcnow
+
+    owner = _signup(secured, "owner@team.test", "Team A")
+    ws = owner["workspace"]["workspace_id"]
+    # Explorer is a one-seat plan: inviting needs a bigger plan.
+    assert secured.post("/api/v1/team/invitations", json={"email": "new@team.test"}).status_code == 429
+    auth.set_plan(ws, "investor")  # 2 seats
+    r = secured.post("/api/v1/team/invitations", json={"email": "New@Team.test", "role": "member"})
+    assert r.status_code == 201, r.text
+    inv = r.json()
+    token = inv["link"].split("token=")[1]
+    assert inv["email"] == "new@team.test" and token.startswith("inv_")
+    assert secured.get("/api/v1/team").json()["seats"] == {"used": 2, "limit": 2}  # pending invite holds a seat
+    assert secured.post("/api/v1/team/invitations", json={"email": "third@team.test"}).status_code == 429
+
+    # The invitee creates their account through the link and lands in the workspace.
+    secured.cookies.clear()
+    details = secured.get(f"/api/v1/auth/invitations/{token}").json()
+    assert details["workspace_name"] == "Team A" and details["email"] == "new@team.test" and not details["has_account"]
+    joined = secured.post("/api/v1/auth/invitations/accept", json={"token": token, "password": "another good pass", "name": "New"})
+    assert joined.status_code == 200, joined.text
+    assert joined.json()["workspace"]["workspace_id"] == ws and joined.json()["role"] == "member"
+    member_session = secured.cookies.get("atlas_session")
+    member_key = secured.post("/api/v1/api-keys", json={"name": "member key"}).json()["key"]
+    # Single use.
+    secured.cookies.clear()
+    assert secured.post("/api/v1/auth/invitations/accept", json={"token": token, "password": "another good pass"}).status_code == 400
+    assert secured.get(f"/api/v1/auth/invitations/{token}").status_code == 404
+
+    # Members can see the team but not manage it.
+    secured.cookies.set("atlas_session", member_session)
+    assert {m["email"] for m in secured.get("/api/v1/team").json()["members"]} == {"owner@team.test", "new@team.test"}
+    assert secured.post("/api/v1/team/invitations", json={"email": "x@team.test"}).status_code == 403
+    assert secured.delete(f"/api/v1/team/members/{owner['user']['user_id']}").status_code == 403
+
+    # An existing user elsewhere accepts while signed in, and can switch between workspaces.
+    secured.cookies.clear()
+    other = _signup(secured, "analyst@team.test", "Analyst home")
+    analyst_session = secured.cookies.get("atlas_session")
+    secured.cookies.clear()
+    secured.post("/api/v1/auth/login", json={"email": "owner@team.test", "password": "correct horse battery"})
+    auth.set_plan(ws, "research_pro")
+    analyst_token = secured.post("/api/v1/team/invitations", json={"email": "analyst@team.test", "role": "admin"}).json()["link"].split("token=")[1]
+    wrong_token = secured.post("/api/v1/team/invitations", json={"email": "someone.else@team.test"}).json()["link"].split("token=")[1]
+    secured.cookies.clear()
+    secured.cookies.set("atlas_session", analyst_session)
+    assert secured.post("/api/v1/auth/invitations/accept", json={"token": wrong_token}).status_code == 400  # not their invitation
+    acc = secured.post("/api/v1/auth/invitations/accept", json={"token": analyst_token}).json()
+    assert acc["workspace"]["workspace_id"] == ws and acc["role"] == "admin"
+    assert {w["workspace_id"] for w in acc["workspaces"]} == {ws, other["workspace"]["workspace_id"]}
+    back = secured.post("/api/v1/auth/switch-workspace", json={"workspace_id": other["workspace"]["workspace_id"]})
+    assert back.status_code == 200 and back.json()["role"] == "owner"
+    secured.cookies.clear()
+    secured.post("/api/v1/auth/login", json={"email": "new@team.test", "password": "another good pass"})
+    assert secured.post("/api/v1/auth/switch-workspace", json={"workspace_id": other["workspace"]["workspace_id"]}).status_code == 403
+
+    # Only the owner changes roles; nobody removes or demotes the owner.
+    secured.cookies.clear()
+    secured.post("/api/v1/auth/login", json={"email": "owner@team.test", "password": "correct horse battery"})
+    assert secured.patch(f"/api/v1/team/members/{owner['user']['user_id']}", json={"role": "member"}).status_code == 403
+    assert secured.delete(f"/api/v1/team/members/{owner['user']['user_id']}").status_code == 403
+    member_id = next(m["user_id"] for m in secured.get("/api/v1/team").json()["members"] if m["email"] == "new@team.test")
+    # Removing a member ends their sessions and API keys in this workspace at once.
+    assert secured.delete(f"/api/v1/team/members/{member_id}").status_code == 204
+    secured.cookies.clear()
+    secured.cookies.set("atlas_session", member_session)
+    assert secured.get("/api/v1/account").status_code == 401
+    secured.cookies.clear()
+    assert secured.get("/api/v1/account", headers={"Authorization": f"Bearer {member_key}"}).status_code == 401
+
+    # Expired invitations stop working.
+    secured.post("/api/v1/auth/login", json={"email": "owner@team.test", "password": "correct horse battery"})
+    late = secured.post("/api/v1/team/invitations", json={"email": "late@team.test"}).json()
+    with session_scope() as s:
+        s.execute(update(Invitation).where(Invitation.invitation_id == late["invitation_id"]).values(expires_at=utcnow() - timedelta(seconds=1)))
+    assert secured.get(f"/api/v1/auth/invitations/{late['link'].split('token=')[1]}").status_code == 404

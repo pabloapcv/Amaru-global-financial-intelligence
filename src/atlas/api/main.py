@@ -225,6 +225,59 @@ def verify_email(req: VerifyRequest) -> None:
         raise HTTPException(400, str(exc)) from exc
 
 
+class InvitationAccept(BaseModel):
+    token: str = Field(..., max_length=200)
+    password: str | None = Field(None, max_length=500)  # only for a new account
+    name: str = Field("", max_length=200)
+
+
+def _invite_throttle(request: Request) -> None:
+    try:
+        auth._throttle(f"invite|{request.client.host if request.client else ''}")
+    except auth.AuthError as exc:
+        raise HTTPException(429, "too many attempts; try again later") from exc
+
+
+@app.get(f"{V1}/auth/invitations/{{token}}")
+def invitation_details(token: str, request: Request) -> dict[str, Any]:
+    from atlas import teams
+
+    try:
+        return teams.describe(token)
+    except auth.AuthError as exc:
+        _invite_throttle(request)
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.post(f"{V1}/auth/invitations/accept")
+def accept_invitation(req: InvitationAccept, request: Request, response: Response) -> dict[str, Any]:
+    """Join a workspace: signed in as the invited email, or by creating that account."""
+    from atlas import teams
+
+    session = request.cookies.get(SESSION_COOKIE)
+    try:
+        if session:
+            p = auth.authenticate(session)
+            ws_id = teams.accept(req.token, p.user_id)
+            teams.switch_workspace(session, p.user_id, ws_id)
+            return auth.account(auth.authenticate(session))
+        info = teams.describe(req.token)
+        if info["has_account"]:
+            raise HTTPException(401, f"sign in as {info['email']} to accept this invitation")
+        if not req.password:
+            raise HTTPException(422, "choose a password to create your account")
+        uid, _ = teams.signup_with_invitation(req.token, req.password, req.name)
+        auth.send_verification(uid)
+        token, p = auth.login(info["email"], req.password, request.client.host if request.client else "")
+    except auth.AuthError as exc:
+        _invite_throttle(request)
+        raise HTTPException(400, str(exc)) from exc
+    except auth.ValidationError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    _set_session(response, token)
+    return {"token": token, **auth.account(p)}
+
+
 @app.post(f"{V1}/auth/logout", status_code=204)
 def logout(request: Request, response: Response) -> None:
     token = request.cookies.get(SESSION_COOKIE)
@@ -456,6 +509,87 @@ def pipelines_run(req: IngestRequest, p: Principal = Depends(require_admin)) -> 
 
     threading.Thread(target=ingest, args=(req.dataset_ids,), kwargs={"backfill": req.backfill}, daemon=True).start()
     return {"status": "accepted", "dataset_ids": req.dataset_ids or "all"}
+
+
+# ---------------------------------------------------------------- team
+
+
+class InviteRequest(BaseModel):
+    email: str = Field(..., max_length=320)
+    role: Literal["admin", "member"] = "member"
+
+
+class RoleRequest(BaseModel):
+    role: Literal["admin", "member"]
+
+
+class SwitchRequest(BaseModel):
+    workspace_id: str = Field(..., max_length=32)
+
+
+def _team_call(fn, *args):
+    from atlas import teams
+
+    try:
+        return fn(*args)
+    except teams.Forbidden as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except auth.ValidationError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except auth.QuotaExceeded as exc:
+        raise HTTPException(429, str(exc)) from exc
+    except KeyError:
+        _404("member")
+
+
+@api.get("/team")
+def team(p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import teams
+
+    limits = auth.PLANS.get(auth.account(p)["workspace"]["plan"], {}) if p.via != "local" else {}
+    return {"members": teams.members(p), "role": p.role,
+            "invitations": teams.invitations(p) if p.role in teams.MANAGERS else [],
+            "seats": {"used": auth.usage(p.workspace_id)["seats"], "limit": limits.get("seats")}}
+
+
+@api.post("/team/invitations", status_code=201)
+def invite(req: InviteRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
+    from atlas import teams
+
+    return _team_call(teams.invite, p, req.email, req.role)
+
+
+@api.delete("/team/invitations/{invitation_id}", status_code=204)
+def revoke_invitation(invitation_id: str, p: Principal = Depends(principal)) -> None:
+    from atlas import teams
+
+    if not _team_call(teams.revoke_invitation, p, invitation_id):
+        _404("invitation")
+
+
+@api.patch("/team/members/{user_id}", status_code=204)
+def change_role(user_id: str, req: RoleRequest, p: Principal = Depends(principal)) -> None:
+    from atlas import teams
+
+    _team_call(teams.set_role, p, user_id, req.role)
+
+
+@api.delete("/team/members/{user_id}", status_code=204)
+def remove_member(user_id: str, p: Principal = Depends(principal)) -> None:
+    from atlas import teams
+
+    _team_call(teams.remove, p, user_id)
+
+
+@api.post("/auth/switch-workspace")
+def switch_workspace(req: SwitchRequest, request: Request, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import teams
+
+    session = request.cookies.get(SESSION_COOKIE)
+    if p.via != "session" or not session:
+        raise HTTPException(400, "switching workspaces needs a signed-in session")
+    _team_call(teams.switch_workspace, session, p.user_id, req.workspace_id)
+    return auth.account(auth.authenticate(session))
 
 
 # ---------------------------------------------------------------- research
