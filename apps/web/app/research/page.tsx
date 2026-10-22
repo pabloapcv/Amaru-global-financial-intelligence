@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Chart from "@/components/Chart";
-import { API_URL, api, type ResearchRun } from "@/lib/api";
+import { API_URL, api, type Account, type ResearchRun } from "@/lib/api";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
 const EXAMPLES = [
@@ -17,7 +17,7 @@ const EXAMPLES = [
   "Copper outlook: China demand proxies, dollar and equities, next six months.",
 ];
 
-type RunSummary = { run_id: string; query: string; status: string; title: string | null; created_at: string };
+type RunSummary = { run_id: string; query: string; status: string; title: string | null; created_at: string; user_id: string };
 
 function linkCitations(md: string) {
   return md.replace(/\[(E\d+(?:\s*,\s*E\d+)*)\]/g, (_, labels: string) =>
@@ -277,9 +277,20 @@ function Research() {
   const router = useRouter();
   const runId = params.get("run");
   const [runs, setRuns] = useState<RunSummary[]>([]);
+  const [search, setSearch] = useState("");
+  const [me, setMe] = useState<Account | null>(null);
 
-  const refresh = useCallback(() => api<RunSummary[]>("/api/v1/research?limit=20").then(setRuns).catch(() => {}), []);
-  useEffect(() => { refresh(); }, [refresh, runId]);
+  const refresh = useCallback(() => api<RunSummary[]>(`/api/v1/research?limit=50${search.trim() ? `&q=${encodeURIComponent(search.trim())}` : ""}`).then(setRuns).catch(() => {}), [search]);
+  useEffect(() => { const t = setTimeout(refresh, 250); return () => clearTimeout(t); }, [refresh, runId]);
+  useEffect(() => { api<Account>("/api/v1/account").then(setMe).catch(() => {}); }, []);
+  const canDelete = (r: { user_id?: string; status: string }) =>
+    !["queued", "running"].includes(r.status) && !!me && (me.role === "owner" || me.role === "admin" || me.user.user_id === r.user_id);
+  const remove = async (r: RunSummary) => {
+    if (!window.confirm(`Delete "${r.title ?? r.query}"? Its reports and share links are deleted too. This cannot be undone.`)) return;
+    await api(`/api/v1/research/${r.run_id}`, { method: "DELETE" }).catch(() => {});
+    if (r.run_id === runId) router.push("/research");
+    refresh();
+  };
 
   return (
     <>
@@ -287,15 +298,19 @@ function Research() {
       <div className="split">
         <div className="stack">
           <ResearchForm onSubmitted={(id) => router.push(`/research?run=${id}`)} />
-          <Card title="Recent">
+          <Card title="History">
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your questions" aria-label="Search research history" style={{ marginBottom: 8 }} />
             <ul className="list-tight">
               {runs.map((r) => (
-                <li key={r.run_id}>
-                  <a href={`/research?run=${r.run_id}`} onClick={(e) => { e.preventDefault(); router.push(`/research?run=${r.run_id}`); }}>{r.title ?? r.query}</a>
-                  <div className="muted" style={{ fontSize: 11.5 }}>{r.status} · {r.created_at.replace("T", " ").slice(0, 16)}</div>
+                <li key={r.run_id} className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap", alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <a href={`/research?run=${r.run_id}`} onClick={(e) => { e.preventDefault(); router.push(`/research?run=${r.run_id}`); }}>{r.title ?? r.query}</a>
+                    <div className="muted" style={{ fontSize: 11.5 }}>{r.status} · {r.created_at.replace("T", " ").slice(0, 16)}</div>
+                  </div>
+                  {canDelete(r) && <button className="secondary" style={{ padding: "2px 8px", flex: "none" }} onClick={() => remove(r)} aria-label={`Delete ${r.title ?? r.query}`} title="Delete">✕</button>}
                 </li>
               ))}
-              {runs.length === 0 && <li className="muted">No research yet.</li>}
+              {runs.length === 0 && <li className="muted">{search.trim() ? "No research matches." : "No research yet."}</li>}
             </ul>
           </Card>
         </div>

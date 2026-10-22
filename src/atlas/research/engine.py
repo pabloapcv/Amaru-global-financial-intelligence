@@ -313,7 +313,7 @@ def get_run(run_id: str, workspace_id: str | None = None) -> dict[str, Any] | No
 
     with session_scope() as s:
         run = s.get(ResearchRun, run_id)
-        if run is None or (workspace_id is not None and run.workspace_id != workspace_id):
+        if run is None or run.status == "deleted" or (workspace_id is not None and run.workspace_id != workspace_id):
             return None
         return {
             "run_id": run.run_id, "workspace_id": run.workspace_id, "query": run.query, "config": run.config, "status": run.status,
@@ -329,16 +329,58 @@ def get_run(run_id: str, workspace_id: str | None = None) -> dict[str, Any] | No
         }
 
 
-def list_runs(limit: int = 50, workspace_id: str | None = None) -> list[dict[str, Any]]:
+def delete_run(run_id: str, workspace_id: str, user_id: str, role: str) -> bool:
+    """Delete a run's content: evidence, reports (rows and files) and their share links are removed;
+    the run record keeps only what accounting needs (time, engine, Claude cost) so budgets and quotas
+    cannot be reset by deleting. Follow-ups, cached copies, schedules and agent events are unlinked.
+    The run's creator or a workspace owner/admin may delete; returns False if not visible."""
+    import shutil
+    from pathlib import Path
+
+    from sqlalchemy import delete, select, update
+
+    from atlas.config import settings
+    from atlas.data.db import AgentEvent, Report, ReportSchedule, ReportShare
+
+    with session_scope() as s:
+        run = s.get(ResearchRun, run_id)
+        if run is None or run.workspace_id != workspace_id or run.status == "deleted":
+            return False
+        if run.user_id != user_id and role not in ("owner", "admin"):
+            raise PermissionError("only the run's author or a workspace owner/admin can delete it")
+        if run.status in ("queued", "running"):
+            raise ValueError("cancel the run before deleting it")
+        report_ids = list(s.execute(select(Report.report_id).where(Report.run_id == run_id)).scalars())
+        if report_ids:
+            s.execute(delete(ReportShare).where(ReportShare.report_id.in_(report_ids)))
+            s.execute(delete(Report).where(Report.report_id.in_(report_ids)))
+        s.execute(delete(ResearchEvidence).where(ResearchEvidence.run_id == run_id))
+        s.execute(update(ResearchRun).where(ResearchRun.parent_run_id == run_id).values(parent_run_id=None))
+        s.execute(update(ResearchRun).where(ResearchRun.cached_from == run_id).values(cached_from=None))
+        s.execute(update(ReportSchedule).where(ReportSchedule.last_run_id == run_id).values(last_run_id=None))
+        s.execute(update(AgentEvent).where(AgentEvent.run_id == run_id).values(run_id=None))
+        run.status, run.query, run.plan, run.result, run.progress, run.error = "deleted", "[deleted]", None, None, [], None
+        run.config, run.cache_key, run.parent_run_id = {}, None, None
+    for rid in report_ids:
+        shutil.rmtree(Path(settings.object_store) / "reports" / rid, ignore_errors=True)
+    from atlas.auth import audit
+
+    audit("research.deleted", user_id, workspace_id, run_id=run_id, reports=len(report_ids))
+    return True
+
+
+def list_runs(limit: int = 50, workspace_id: str | None = None, q_text: str | None = None) -> list[dict[str, Any]]:
     from sqlalchemy import select
 
     with session_scope() as s:
-        q = select(ResearchRun)
+        q = select(ResearchRun).where(ResearchRun.status != "deleted")
         if workspace_id is not None:
             q = q.where(ResearchRun.workspace_id == workspace_id)
+        if q_text:
+            q = q.where(ResearchRun.query.ilike(f"%{q_text.strip()}%"))
         runs = s.execute(q.order_by(ResearchRun.created_at.desc()).limit(limit)).scalars().all()
         return [
-            {"run_id": r.run_id, "query": r.query, "status": r.status, "engine": r.engine,
+            {"run_id": r.run_id, "query": r.query, "status": r.status, "engine": r.engine, "user_id": r.user_id,
              "title": (r.result or {}).get("title"), "report_id": (r.result or {}).get("report_id"),
              "created_at": r.created_at.isoformat(timespec="seconds") + "Z"}
             for r in runs
