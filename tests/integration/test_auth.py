@@ -479,3 +479,53 @@ def test_alerts_fire_once_per_episode_and_email_their_creator(secured, monkeypat
     secured.cookies.clear()
     _signup(secured, "outsider@al.test", "Outside")
     assert secured.patch(f"/api/v1/alerts/{alert_id}", json={"notify_email": False}).status_code == 404
+
+
+def test_deleting_research_cascades_but_keeps_accounting(secured):
+    from pathlib import Path
+
+    from sqlalchemy import select
+
+    from atlas.config import settings
+    from atlas.data.db import Report, ReportShare, ResearchEvidence, ResearchRun, session_scope
+    from atlas.research import engine
+
+    owner = _signup(secured, "historian@hist.test", "History")
+    ws, uid = owner["workspace"]["workspace_id"], owner["user"]["user_id"]
+    run = engine.create_run("copper outlook", {"engine": "deterministic", "depth": "quick", "formats": ["html", "xlsx"]}, uid, ws)
+    report_id = engine.execute_run(run)["report_id"]
+    child = engine.create_run("what about over ten years?", {"engine": "deterministic", "depth": "quick", "formats": [],
+                                                             "parent_run_id": run}, uid, ws)
+    engine.execute_run(child)
+    token = secured.post(f"/api/v1/reports/{report_id}/shares", json={"days": 7}).json()["token"]
+    with session_scope() as s:
+        s.get(ResearchRun, run).cost_usd = 0.42  # pretend Claude was used
+    report_dir = Path(settings.object_store) / "reports" / report_id
+    assert report_dir.exists()
+
+    assert [r["run_id"] for r in secured.get("/api/v1/research", params={"q": "COPPER"}).json()] == [run]
+    assert secured.delete(f"/api/v1/research/{run}").status_code == 204
+    assert secured.get(f"/api/v1/research/{run}").status_code == 404
+    assert run not in {r["run_id"] for r in secured.get("/api/v1/research").json()}
+    assert secured.get(f"/api/v1/reports/{report_id}").status_code == 404
+    assert secured.get(f"/share/{token}").status_code == 404
+    assert not report_dir.exists()
+    assert secured.get(f"/api/v1/research/{child}").json()["parent"] is None
+    with session_scope() as s:
+        row = s.get(ResearchRun, run)
+        assert row.status == "deleted" and row.query == "[deleted]" and row.result is None and row.cost_usd == 0.42
+        assert not s.execute(select(ResearchEvidence).where(ResearchEvidence.run_id == run)).first()
+        assert not s.execute(select(Report).where(Report.run_id == run)).first()
+        assert not s.execute(select(ReportShare).where(ReportShare.report_id == report_id)).first()
+    assert auth.llm_spend_this_month(ws) >= 0.42  # deleting cannot reset the Claude budget
+    assert secured.delete(f"/api/v1/research/{run}").status_code == 404
+
+    # A plain member cannot delete someone else's run; other workspaces cannot see it at all.
+    auth.set_plan(ws, "investor")
+    tok = secured.post("/api/v1/team/invitations", json={"email": "member@hist.test"}).json()["link"].split("token=")[1]
+    secured.cookies.clear()
+    secured.post("/api/v1/auth/invitations/accept", json={"token": tok, "password": "member password!"})
+    assert secured.delete(f"/api/v1/research/{child}").status_code == 403
+    secured.cookies.clear()
+    _signup(secured, "nosy@hist.test", "Nosy")
+    assert secured.delete(f"/api/v1/research/{child}").status_code == 404

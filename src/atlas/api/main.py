@@ -751,8 +751,20 @@ def create_research(req: ResearchRequest, p: Principal = Depends(require_verifie
 
 
 @api.get(f"/research")
-def list_research(limit: int = 50, p: Principal = Depends(principal)) -> list[dict[str, Any]]:
-    return engine.list_runs(limit, p.workspace_id)
+def list_research(limit: int = Query(50, ge=1, le=500), q: str | None = Query(None, max_length=200),
+                  p: Principal = Depends(principal)) -> list[dict[str, Any]]:
+    return engine.list_runs(limit, p.workspace_id, q)
+
+
+@api.delete("/research/{run_id}", status_code=204)
+def delete_research(run_id: str, p: Principal = Depends(principal)) -> None:
+    try:
+        if not engine.delete_run(run_id, p.workspace_id, p.user_id, p.role):
+            _404("research run")
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 @api.get(f"/research/{{run_id}}")
