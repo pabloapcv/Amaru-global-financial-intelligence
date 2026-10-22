@@ -86,6 +86,7 @@ class Principal:
     role: str
     email: str
     via: str  # session | api_key | local
+    needs_2fa: bool = False  # the workspace requires two-factor authentication and this user has not set it up
 
 
 LOCAL_PRINCIPAL = Principal(user_id="local", workspace_id=LOCAL_WORKSPACE, role="owner", email="local", via="local")
@@ -359,7 +360,23 @@ def _principal(s, user_id: str, workspace_id: str, via: str) -> Principal:
     m = s.get(Membership, (user_id, workspace_id))
     if user is None or m is None:
         raise AuthError("account no longer has access to this workspace")
-    return Principal(user_id, workspace_id, m.role, user.email, via)
+    ws = s.get(Workspace, workspace_id)
+    needs = bool(ws and ws.require_2fa and not user.totp_enabled_at)
+    return Principal(user_id, workspace_id, m.role, user.email, via, needs)
+
+
+def set_require_2fa(principal: Principal, required: bool) -> None:
+    """Owner-only workspace policy. The owner must use two-factor authentication before requiring it."""
+    with session_scope() as s:
+        if principal.role != "owner":
+            raise AuthError("only the workspace owner can change this")
+        user = s.get(User, principal.user_id)
+        if required and not (user and user.totp_enabled_at):
+            raise ValidationError("turn on two-factor authentication for your own account first")
+        ws = s.get(Workspace, principal.workspace_id)
+        assert ws is not None
+        ws.require_2fa = required
+    audit("workspace.require_2fa_changed", principal.user_id, principal.workspace_id, required=required)
 
 
 def authenticate(token: str | None) -> Principal:
@@ -391,6 +408,7 @@ def account(principal: Principal) -> dict[str, Any]:
             "auth": principal.via,
             "email_verified": bool(user.email_verified_at) if user else True,
             "two_factor": bool(user.totp_enabled_at) if user else False,
+            "workspace_requires_2fa": bool(ws.require_2fa) if ws else False,
             "recovery_codes_left": len(user.recovery_codes or []) if user and user.totp_enabled_at else None,
             "verification_required": verification_required(),
             "limits": PLANS.get(ws.plan if ws else "explorer"),

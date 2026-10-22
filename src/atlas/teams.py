@@ -51,7 +51,7 @@ def members(principal: Principal) -> list[dict[str, Any]]:
     with session_scope() as s:
         rows = s.execute(select(User, Membership.role).join(Membership, Membership.user_id == User.user_id)
                          .where(Membership.workspace_id == principal.workspace_id).order_by(User.email)).all()
-        return [{"user_id": u.user_id, "email": u.email, "name": u.name, "role": role,
+        return [{"user_id": u.user_id, "email": u.email, "name": u.name, "role": role, "two_factor": bool(u.totp_enabled_at),
                  "last_login_at": _iso(u.last_login_at), "you": u.user_id == principal.user_id} for u, role in rows]
 
 

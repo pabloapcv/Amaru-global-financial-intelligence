@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Card, ErrorNote } from "@/components/ui";
 
-type Member = { user_id: string; email: string; name: string; role: string; last_login_at: string | null; you: boolean };
+type Member = { user_id: string; email: string; name: string; role: string; two_factor: boolean; last_login_at: string | null; you: boolean };
 type Invite = { invitation_id: string; email: string; role: string; expires_at: string };
-type TeamData = { members: Member[]; invitations: Invite[]; role: string; seats: { used: number; limit: number | null } };
+type TeamData = { members: Member[]; invitations: Invite[]; role: string; require_2fa: boolean; seats: { used: number; limit: number | null } };
 
 export default function Team() {
   const [team, setTeam] = useState<TeamData | null>(null);
@@ -40,7 +40,7 @@ export default function Team() {
         <tbody>
           {team.members.map((m) => (
             <tr key={m.user_id}>
-              <td>{m.name || m.email}{m.you && <span className="muted"> (you)</span>}<div className="muted" style={{ fontSize: 11.5 }}>{m.email}</div></td>
+              <td>{m.name || m.email}{m.you && <span className="muted"> (you)</span>}<div className="muted" style={{ fontSize: 11.5 }}>{m.email} · 2FA {m.two_factor ? "on" : "off"}</div></td>
               <td>
                 {team.role === "owner" && m.role !== "owner"
                   ? <select value={m.role} onChange={(e) => call(api(`/api/v1/team/members/${m.user_id}`, { method: "PATCH", body: JSON.stringify({ role: e.target.value }) }))} aria-label={`Role for ${m.email}`} style={{ width: "auto" }}>
@@ -66,6 +66,14 @@ export default function Team() {
           ))}
         </tbody>
       </table>
+      {team.role === "owner" && (
+        <label className="row" style={{ fontWeight: 400, marginTop: 12 }}>
+          <input type="checkbox" checked={team.require_2fa} style={{ width: "auto" }}
+            onChange={(e) => call(api("/api/v1/team/settings", { method: "PATCH", body: JSON.stringify({ require_2fa: e.target.checked }) }))} />
+          Require two-factor authentication for everyone in this workspace
+          {!team.require_2fa && team.members.some((m) => !m.two_factor && !m.you) && <span className="muted" style={{ fontSize: 12 }}>(members without it will be asked to set it up before continuing)</span>}
+        </label>
+      )}
       {manager && (
         <form className="row" onSubmit={invite} style={{ marginTop: 12, flexWrap: "wrap" }}>
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="colleague@company.com" style={{ flex: "1 1 200px", minWidth: 0 }} aria-label="Email to invite" />
