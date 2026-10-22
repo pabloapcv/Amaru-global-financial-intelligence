@@ -155,3 +155,19 @@ def test_briefing_combines_calendar_releases_and_usda(seeded):
     assert corn["instrument_id"] == "CMD.CORN.US" and corn["stocks_to_use_pct"] is not None
     # Cached per dataset until it is re-ingested.
     assert briefing._usda("FUND.CORN") is briefing._usda("FUND.CORN")
+
+
+def test_quant_lab_price_model_with_basis_override(seeded):
+    from atlas.api.main import app
+
+    c = TestClient(app)
+    conv = c.post("/api/v1/quant/analyze", json={"analysis": "fundamentals", "dataset_ids": ["CMD.CORN.US"]}).json()
+    pv = conv["result"]["price_vs_stocks_to_use"]
+    assert pv["stocks_basis"] == "world excluding China" and pv["stocks_basis_is_convention"] is True
+    world = c.post("/api/v1/quant/analyze", json={"analysis": "fundamentals", "dataset_ids": ["CMD.CORN.US"], "stocks_basis": "world"}).json()
+    assert world["result"]["price_vs_stocks_to_use"]["stocks_basis"] == "world"
+    assert world["result"]["price_vs_stocks_to_use"]["stocks_basis_is_convention"] is False
+    assert c.post("/api/v1/quant/analyze", json={"analysis": "fundamentals", "dataset_ids": ["CMD.CORN.US"],
+                                                 "stocks_basis": "moon"}).status_code == 422
+    gap = c.post("/api/v1/quant/analyze", json={"analysis": "fundamentals", "dataset_ids": ["CMD.COPPER.LME"]}).json()
+    assert gap["result"]["status"] == "unavailable"

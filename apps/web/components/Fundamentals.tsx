@@ -7,7 +7,7 @@ import { Card, ErrorNote } from "@/components/ui";
 
 type Row = { market_year: string; status: string; production: number | null; consumption: number | null; exports: number | null; ending_stocks: number | null; stocks_to_use_pct: number | null };
 type Share = { country: string; value: number; share_pct: number };
-type PriceModel = {
+export type PriceModel = {
   status?: string; reason?: string; price_unit: string; stocks_basis: string; stocks_basis_note?: string; n_years: number;
   first_market_year: string; last_market_year: string; slope_pct_per_pp: number; r_squared: number; significance: string;
   has_signal: boolean; band_pct: number; projection_market_year: string; projected_stocks_to_use_pct: number;
@@ -16,7 +16,7 @@ type PriceModel = {
   [k: string]: unknown;
 };
 
-function PriceScatter({ m }: { m: PriceModel }) {
+export function PriceScatter({ m }: { m: PriceModel }) {
   const W = 520, H = 200, P = { l: 48, r: 12, t: 10, b: 28 };
   const xs = [...m.points.map((p) => p.stocks_to_use_pct), m.projected_stocks_to_use_pct];
   const band = (m[`implied_price_band_${m.band_pct}`] as number[] | undefined) ?? [m.implied_price, m.implied_price];

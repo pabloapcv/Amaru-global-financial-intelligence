@@ -771,7 +771,8 @@ def cancel_research(run_id: str, p: Principal = Depends(principal)) -> dict[str,
 
 
 class QuantRequest(BaseModel):
-    analysis: Literal["correlation", "regression", "anomalies", "forecast", "scenario", "seasonality", "performance", "regime", "event_study"]
+    analysis: Literal["correlation", "regression", "anomalies", "forecast", "scenario", "seasonality", "performance", "regime", "event_study",
+                      "fundamentals"]
     dataset_ids: list[str] = Field(default_factory=list)
     dependent: str | None = None
     explanatory: list[str] = Field(default_factory=list)
@@ -784,6 +785,7 @@ class QuantRequest(BaseModel):
     event_type: Literal["fed_hike", "fed_cut", "fed_change", "custom"] = "fed_change"
     include_ml: bool = False
     dates: list[str] = Field(default_factory=list)
+    stocks_basis: Literal["world", "world_ex_china"] | None = None
 
 
 @api.post(f"/quant/analyze")
@@ -802,6 +804,7 @@ def quant_analyze(req: QuantRequest) -> dict[str, Any]:
         "regime": ("detect_regime", {"dataset_id": (req.dataset_ids or [None])[0]}),
         "event_study": ("run_event_study", {"dataset_id": (req.dataset_ids or [None])[0], "event_type": req.event_type,
                                             **({"dates": req.dates} if req.dates else {})}),
+        "fundamentals": ("get_fundamentals", {"commodity": (req.dataset_ids or [None])[0], "stocks_basis": req.stocks_basis}),
     }
     tool, args = calls[a]
     import json
