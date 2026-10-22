@@ -375,3 +375,41 @@ def test_team_invitations_roles_seats_and_removal(secured):
     with session_scope() as s:
         s.execute(update(Invitation).where(Invitation.invitation_id == late["invitation_id"]).values(expires_at=utcnow() - timedelta(seconds=1)))
     assert secured.get(f"/api/v1/auth/invitations/{late['link'].split('token=')[1]}").status_code == 404
+
+
+def test_activity_log_is_scoped_paginated_and_manager_only(secured):
+    owner = _signup(secured, "auditor@act.test", "Audited")
+    ws = owner["workspace"]["workspace_id"]
+    key_id = secured.post("/api/v1/api-keys", json={"name": "k1"}).json()["key_id"]
+    assert secured.delete(f"/api/v1/api-keys/{key_id}").status_code in (200, 204)
+    page = secured.get("/api/v1/activity").json()
+    actions = [e["action"] for e in page["events"]]
+    assert actions[:2] == ["api_key.revoked", "api_key.created"] and "login.succeeded" in actions
+    assert all(e["actor"] == "auditor@act.test" for e in page["events"] if e["action"].startswith("api_key."))
+    keys = secured.get("/api/v1/activity", params={"category": "keys"}).json()["events"]
+    assert [e["action"] for e in keys] == ["api_key.revoked", "api_key.created"]
+    # Pagination walks every event exactly once, even within the same second.
+    seen, cursor = [], None
+    while True:
+        page = secured.get("/api/v1/activity", params={"limit": 1, **({"cursor": cursor} if cursor else {})}).json()
+        seen += [e["event_id"] for e in page["events"]]
+        cursor = page["next_cursor"]
+        if not cursor:
+            break
+    assert seen == [e["event_id"] for e in secured.get("/api/v1/activity", params={"limit": 500}).json()["events"]]
+    assert len(seen) == len(set(seen)) >= 4
+    assert secured.get("/api/v1/activity", params={"cursor": "not-a-date|x"}).status_code == 422
+    csv_body = secured.get("/api/v1/activity", params={"format": "csv"}).text
+    assert csv_body.splitlines()[0] == "at,action,label,actor,detail" and "api_key.created" in csv_body
+
+    # Another workspace sees none of it; members cannot see activity.
+    secured.cookies.clear()
+    _signup(secured, "stranger@act.test", "Elsewhere")
+    assert all(e["actor"] != "auditor@act.test" for e in secured.get("/api/v1/activity").json()["events"])
+    secured.cookies.clear()
+    secured.post("/api/v1/auth/login", json={"email": "auditor@act.test", "password": "correct horse battery"})
+    auth.set_plan(ws, "investor")
+    token = secured.post("/api/v1/team/invitations", json={"email": "plain.member@act.test"}).json()["link"].split("token=")[1]
+    secured.cookies.clear()
+    secured.post("/api/v1/auth/invitations/accept", json={"token": token, "password": "member password!"})
+    assert secured.get("/api/v1/activity").status_code == 403

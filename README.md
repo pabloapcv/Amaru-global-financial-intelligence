@@ -34,6 +34,7 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 - **Result cache:** an identical question (same settings) asked again within `ATLAS_RESEARCH_CACHE_TTL_HOURS` (default 6) with no data changed since is answered instantly from the earlier verified run, without using quota; pass `"no_cache": true` to force fresh research.
 - **Passwords:** "Forgot password?" sends a single-use reset link valid for 1 hour (SMTP via `ATLAS_SMTP_*`; without SMTP the link is written to the API log for the operator). Reset requests never reveal whether an account exists. Resetting or changing a password signs the user out everywhere. Set `ATLAS_PUBLIC_URL` so links point at your web app.
 - **Email verification:** sign-up sends a 48-hour verification link. With `ATLAS_REQUIRE_EMAIL_VERIFICATION=true`, unverified accounts can browse data but cannot run research or create keys, agents, schedules, portfolios or alerts. Users created with the CLI are pre-verified.
+- **Activity log:** owners and admins see their workspace's audit trail on the Account page (sign-ins, team changes, share links and their views, data exports, API keys, password and email events), filter it by category, page through it and download it as CSV (`GET /api/v1/activity`).
 - **Operators:** `atlas workspaces` lists workspaces, plans, members and this month's Claude spend; `atlas set-plan <workspace_id> <plan>` changes a plan (audited).
 - **Single-user mode:** `ATLAS_AUTH=off` skips sign-in and uses the `local` workspace.
 
