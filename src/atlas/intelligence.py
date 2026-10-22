@@ -36,6 +36,13 @@ def validate_rule(rule: dict[str, Any]) -> None:
 
 def evaluate_rule(rule: dict[str, Any]) -> str | None:
     """Return a trigger message, or None when the rule does not fire."""
+    hit = evaluate_rule_keyed(rule)
+    return hit[0] if hit else None
+
+
+def evaluate_rule_keyed(rule: dict[str, Any]) -> tuple[str, str] | None:
+    """(message, trigger key) when the condition holds. The key identifies what fired: a state rule
+    (threshold, % move) has one key while it holds; an anomaly is keyed by its observation date."""
     ds = get_dataset(rule["dataset_id"])
     assert ds is not None
     series, meta = get_series(rule["dataset_id"])
@@ -43,7 +50,7 @@ def evaluate_rule(rule: dict[str, Any]) -> str | None:
     t = rule["type"]
     if t == "threshold":
         hit = last > rule["value"] if rule["op"] == ">" else last < rule["value"]
-        return f"{ds.name} at {last:g} {ds.unit} on {last_date} is {rule['op']} {rule['value']:g}" if hit else None
+        return (f"{ds.name} at {last:g} {ds.unit} on {last_date} is {rule['op']} {rule['value']:g}", "holds") if hit else None
     if t == "pct_change":
         window = int(rule.get("window_days", 30))
         past = series[series.index <= series.index[-1] - timedelta(days=window)]
@@ -51,14 +58,15 @@ def evaluate_rule(rule: dict[str, Any]) -> str | None:
             return None
         pct = (last / float(past.iloc[-1]) - 1) * 100
         return (
-            f"{ds.name} moved {pct:+.2f}% over {window} days to {last:g} ({last_date})"
+            (f"{ds.name} moved {pct:+.2f}% over {window} days to {last:g} ({last_date})", "holds")
             if abs(pct) >= rule["abs_pct"] else None
         )
     if t == "anomaly":
         res = anomalies(series, unit=ds.unit, frequency=ds.frequency, threshold=float(rule.get("z", 3.5)))
         lt = res["latest"]
         return (
-            f"Unusual move in {ds.name} on {lt['date']}: {lt['change']:+.3f} {lt['change_unit']} (robust z {lt['robust_z']:+.2f})"
+            (f"Unusual move in {ds.name} on {lt['date']}: {lt['change']:+.3f} {lt['change_unit']} (robust z {lt['robust_z']:+.2f})",
+             f"date:{lt['date']}")
             if lt["is_anomalous"] else None
         )
     return None
@@ -77,12 +85,42 @@ def evaluate_alerts(changed_datasets: Iterable[str] | None = None, workspace_id:
                 continue
             a.last_evaluated_at = utcnow()
             try:
-                msg = evaluate_rule(a.rule)
+                hit = evaluate_rule_keyed(a.rule)
             except (DataUnavailable, ValueError) as exc:
                 log.warning("alert %s not evaluable: %s", a.alert_id, exc)
                 continue
-            if msg:
-                a.last_triggered_at = utcnow()
-                s.add(AlertEvent(alert_id=a.alert_id, message=msg, payload={"rule": a.rule}))
-                fired.append({"alert_id": a.alert_id, "name": a.name, "message": msg})
+            if hit is None:
+                a.last_trigger_key = None  # condition no longer holds: re-arm
+                continue
+            msg, key = hit
+            if key == a.last_trigger_key:
+                continue  # already fired for this (still holding / same observation)
+            a.last_trigger_key = key
+            a.last_triggered_at = utcnow()
+            s.add(AlertEvent(alert_id=a.alert_id, message=msg, payload={"rule": a.rule}))
+            fired.append({"alert_id": a.alert_id, "name": a.name, "message": msg,
+                          "notify": bool(a.notify_email), "user_id": a.user_id})
+    for f in fired:
+        if f.pop("notify"):
+            _email(f)
+        f.pop("user_id")
     return fired
+
+
+def _email(f: dict[str, Any]) -> None:
+    import os
+
+    from atlas import mailer
+    from atlas.data.db import User
+
+    with session_scope() as s:
+        user = s.get(User, f["user_id"])
+        to = user.email if user else None
+    if not to:
+        return
+    base = os.getenv("ATLAS_PUBLIC_URL", "http://localhost:3010").rstrip("/")
+    try:
+        mailer.send(to, f"ATLAS alert: {f['name']}", f"{f['message']}\n\nManage alerts: {base}/intelligence\n"
+                    "Reference data published with a lag; not a live quote. Not investment advice.")
+    except Exception:
+        log.exception("alert email for %s failed", f["alert_id"])

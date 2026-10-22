@@ -446,6 +446,9 @@ class Alert(Base):
     last_evaluated_at: Mapped[datetime | None] = mapped_column(DateTime)
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    notify_email: Mapped[bool | None] = mapped_column(default=False)
+    # Set while the condition holds (what fired it); cleared when it stops holding, which re-arms the alert.
+    last_trigger_key: Mapped[str | None] = mapped_column(String(64))
 
 
 class AlertEvent(Base):
@@ -606,6 +609,8 @@ _ADDED_COLUMNS = [
     ("research_runs", "cache_key", "VARCHAR(64)", None),
     ("research_runs", "cached_from", "VARCHAR(32)", None),
     ("research_runs", "parent_run_id", "VARCHAR(32)", None),
+    ("alerts", "notify_email", "BOOLEAN", None),
+    ("alerts", "last_trigger_key", "VARCHAR(64)", None),
     ("users", "email_verified_at", "TIMESTAMP", None),
     ("source_documents", "source", "VARCHAR(32)", None),
     ("source_documents", "category", "VARCHAR(128)", None),
