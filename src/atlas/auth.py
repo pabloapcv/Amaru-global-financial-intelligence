@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from atlas.data.db import (
     LOCAL_WORKSPACE,
@@ -31,6 +31,7 @@ from atlas.data.db import (
     AuthSession,
     EmailVerification,
     Invitation,
+    LoginChallenge,
     Membership,
     MonitorAgent,
     PasswordReset,
@@ -68,6 +69,14 @@ class QuotaExceeded(Exception):
 
 class ValidationError(ValueError):
     """Invalid input (HTTP 422)."""
+
+
+class SecondFactorRequired(Exception):
+    """Password accepted; a TOTP or recovery code is needed to finish signing in."""
+
+    def __init__(self, challenge: str):
+        super().__init__("two-factor code required")
+        self.challenge = challenge
 
 
 @dataclass(frozen=True)
@@ -192,16 +201,150 @@ def login(email: str, password: str, client: str = "") -> tuple[str, Principal]:
         if not user or not ok:
             audit("login.failed", None, None, email=email)
             raise AuthError("invalid email or password")
-        m = s.execute(select(Membership).where(Membership.user_id == user.user_id)).scalars().first()
-        if m is None:
-            raise AuthError("user has no workspace")
-        token = secrets.token_urlsafe(32)
-        s.add(AuthSession(token_hash=_token_hash(token), user_id=user.user_id, workspace_id=m.workspace_id,
-                          expires_at=utcnow() + SESSION_TTL))
-        user.last_login_at = utcnow()
-        principal = Principal(user.user_id, m.workspace_id, m.role, user.email, "session")
+        challenge: str | None = None
+        if user.totp_enabled_at:
+            challenge = secrets.token_urlsafe(32)
+            s.add(LoginChallenge(token_hash=_token_hash(challenge), user_id=user.user_id,
+                                 expires_at=utcnow() + CHALLENGE_TTL))
+            uid = user.user_id
+        else:
+            token, principal = _start_session(s, user)
+    if challenge is not None:
+        audit("login.password_ok_2fa_pending", uid, None)
+        raise SecondFactorRequired(challenge)
     audit("login.succeeded", principal.user_id, principal.workspace_id)
     return token, principal
+
+
+CHALLENGE_TTL = timedelta(minutes=5)
+MAX_CHALLENGE_ATTEMPTS = 5
+RECOVERY_CODES = 10
+
+
+def _start_session(s, user: User) -> tuple[str, Principal]:
+    m = s.execute(select(Membership).where(Membership.user_id == user.user_id)).scalars().first()
+    if m is None:
+        raise AuthError("user has no workspace")
+    token = secrets.token_urlsafe(32)
+    s.add(AuthSession(token_hash=_token_hash(token), user_id=user.user_id, workspace_id=m.workspace_id,
+                      expires_at=utcnow() + SESSION_TTL))
+    user.last_login_at = utcnow()
+    return token, Principal(user.user_id, m.workspace_id, m.role, user.email, "session")
+
+
+def _check_second_factor(user: User, code: str) -> str | None:
+    """'totp' or 'recovery' when `code` is a valid unused code for `user` (consuming it), else None."""
+    from atlas import secretbox, totp
+
+    secret = secretbox.decrypt(user.totp_secret_enc) if user.totp_secret_enc else None
+    if secret:
+        step = totp.verify(secret, code, user.totp_last_step)
+        if step is not None:
+            user.totp_last_step = step
+            return "totp"
+    normalized = code.strip().lower().replace(" ", "").replace("-", "")
+    hashes = list(user.recovery_codes or [])
+    h = _token_hash(normalized)
+    if h in hashes:
+        hashes.remove(h)
+        user.recovery_codes = hashes
+        return "recovery"
+    return None
+
+
+def login_second_factor(challenge: str, code: str, client: str = "") -> tuple[str, Principal]:
+    with session_scope() as s:
+        ch = s.get(LoginChallenge, _token_hash(challenge))
+        if ch is None or ch.used_at or ch.expires_at <= utcnow() or ch.attempts >= MAX_CHALLENGE_ATTEMPTS:
+            raise AuthError("sign-in expired; enter your email and password again")
+        _throttle(f"2fa|{ch.user_id}|{client}")
+        ch.attempts += 1
+        user = s.get(User, ch.user_id)
+        assert user is not None
+        method = _check_second_factor(user, code)
+        if method is None:
+            failed = True
+        else:
+            failed = False
+            ch.used_at = utcnow()
+            token, principal = _start_session(s, user)
+            remaining = len(user.recovery_codes or [])
+    if failed:
+        audit("login.2fa_failed", ch.user_id, None)
+        raise AuthError("invalid code")
+    audit("login.succeeded", principal.user_id, principal.workspace_id, second_factor=method,
+          **({"recovery_codes_left": remaining} if method == "recovery" else {}))
+    return token, principal
+
+
+def _recovery_codes() -> list[str]:
+    import base64
+
+    return [f"{c[:4]}-{c[4:8]}" for c in (base64.b32encode(secrets.token_bytes(5)).decode().lower() for _ in range(RECOVERY_CODES))]
+
+
+def totp_begin(principal: Principal) -> dict[str, Any]:
+    """Start enrollment: a new secret (pending until confirmed with a code)."""
+    from atlas import secretbox, totp
+
+    with session_scope() as s:
+        user = s.get(User, principal.user_id)
+        if user is None:
+            raise AuthError("account required")
+        if user.totp_enabled_at:
+            raise ValidationError("two-factor authentication is already on")
+        secret = totp.new_secret()
+        user.totp_secret_enc, user.totp_last_step = secretbox.encrypt(secret), None
+        email = user.email
+    return {"secret": secret, "otpauth_uri": totp.provisioning_uri(secret, email)}
+
+
+def totp_enable(principal: Principal, code: str, keep_session: str | None = None) -> list[str]:
+    """Confirm enrollment with a current code; returns recovery codes (shown once)."""
+    from atlas import secretbox, totp
+
+    with session_scope() as s:
+        user = s.get(User, principal.user_id)
+        if user is None or user.totp_enabled_at or not user.totp_secret_enc:
+            raise ValidationError("start enrollment first")
+        secret = secretbox.decrypt(user.totp_secret_enc)
+        step = totp.verify(secret, code) if secret else None
+        if step is None:
+            raise ValidationError("that code is not valid; check your device's clock and try again")
+        codes = _recovery_codes()
+        user.totp_enabled_at, user.totp_last_step = utcnow(), step
+        user.recovery_codes = [_token_hash(c.replace("-", "")) for c in codes]
+        # Other sessions were opened with the password alone: end them.
+        others = delete(AuthSession).where(AuthSession.user_id == user.user_id)
+        if keep_session:
+            others = others.where(AuthSession.token_hash != _token_hash(keep_session))
+        s.execute(others)
+    audit("security.2fa_enabled", principal.user_id, principal.workspace_id)
+    return codes
+
+
+def totp_disable(principal: Principal, password: str, code: str) -> None:
+    with session_scope() as s:
+        user = s.get(User, principal.user_id)
+        if user is None or not user.totp_enabled_at:
+            raise ValidationError("two-factor authentication is not on")
+        if not verify_password(password, user.password_hash) or _check_second_factor(user, code) is None:
+            raise AuthError("password or code is incorrect")
+        user.totp_enabled_at = user.totp_secret_enc = user.totp_last_step = user.recovery_codes = None
+    audit("security.2fa_disabled", principal.user_id, principal.workspace_id)
+
+
+def operator_disable_2fa(email: str) -> bool:
+    """For an operator helping a user who lost their device and recovery codes (audited)."""
+    with session_scope() as s:
+        user = s.execute(select(User).where(User.email == email.strip().lower())).scalar_one_or_none()
+        if user is None or not user.totp_enabled_at:
+            return False
+        user.totp_enabled_at = user.totp_secret_enc = user.totp_last_step = user.recovery_codes = None
+        s.execute(delete(AuthSession).where(AuthSession.user_id == user.user_id))
+        uid = user.user_id
+    audit("security.2fa_disabled_by_operator", uid, None)
+    return True
 
 
 def logout(token: str) -> None:
@@ -247,6 +390,8 @@ def account(principal: Principal) -> dict[str, Any]:
             "role": principal.role,
             "auth": principal.via,
             "email_verified": bool(user.email_verified_at) if user else True,
+            "two_factor": bool(user.totp_enabled_at) if user else False,
+            "recovery_codes_left": len(user.recovery_codes or []) if user and user.totp_enabled_at else None,
             "verification_required": verification_required(),
             "limits": PLANS.get(ws.plan if ws else "explorer"),
             "usage": usage(principal.workspace_id),

@@ -22,6 +22,7 @@ def isolated_env(tmp_path_factory):
     os.environ["ATLAS_OBJECT_STORE"] = str(root / "objects")
     os.environ["ATLAS_LLM"] = "off"
     os.environ["ATLAS_AUTH"] = "off"  # auth tests opt in explicitly
+    os.environ["ATLAS_SECRET_KEY"] = "test-only-secret-key"  # never create a key file in the real data/
     import importlib
 
     import atlas.config as config

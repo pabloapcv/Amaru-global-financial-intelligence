@@ -16,6 +16,8 @@ function Login() {
   const [signupAllowed, setSignupAllowed] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   useEffect(() => {
     api<{ signup_allowed: boolean }>("/health").then((h) => setSignupAllowed(h.signup_allowed)).catch(() => {});
@@ -31,8 +33,15 @@ function Login() {
         setNotice(r.message);
         return;
       }
-      if (mode === "login") {
-        await api("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+      if (challenge) {
+        await api("/api/v1/auth/login/2fa", { method: "POST", body: JSON.stringify({ challenge, code }) });
+      } else if (mode === "login") {
+        const r = await api<{ two_factor_required?: boolean; challenge?: string }>("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+        if (r.two_factor_required && r.challenge) {
+          setChallenge(r.challenge);
+          setPassword("");
+          return;
+        }
       } else {
         await api("/api/v1/auth/signup", { method: "POST", body: JSON.stringify({ email, password, name, workspace_name: workspace || undefined }) });
       }
@@ -53,6 +62,16 @@ function Login() {
           <button type="button" className={mode === "login" ? "on" : ""} onClick={() => setMode("login")}>Sign in</button>
           {signupAllowed && <button type="button" className={mode === "signup" ? "on" : ""} onClick={() => setMode("signup")}>Create account</button>}
         </div>
+        {challenge ? (
+          <form onSubmit={submit}>
+            <p style={{ marginTop: 0 }}>Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
+            <div className="field"><label htmlFor="otp">Code</label>
+              <input id="otp" value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" autoFocus required maxLength={20} />
+            </div>
+            <button type="submit" disabled={busy} style={{ marginTop: 14, width: "100%" }}>{busy ? "…" : "Verify"}</button>
+            <p style={{ fontSize: 12.5, marginBottom: 0 }}><a href="#" onClick={(e) => { e.preventDefault(); setChallenge(null); setCode(""); setError(null); }}>Start over</a></p>
+          </form>
+        ) : (
         <form onSubmit={submit}>
           {mode === "signup" && (
             <>
@@ -68,7 +87,8 @@ function Login() {
           </div>}
           <button type="submit" disabled={busy} style={{ marginTop: 14, width: "100%" }}>{busy ? "…" : mode === "login" ? "Sign in" : mode === "signup" ? "Create account" : "Send reset link"}</button>
         </form>
-        {mode === "login" && <p style={{ fontSize: 12.5, marginBottom: 0 }}><a href="#" onClick={(e) => { e.preventDefault(); setMode("forgot"); setNotice(null); }}>Forgot password?</a></p>}
+        )}
+        {mode === "login" && !challenge && <p style={{ fontSize: 12.5, marginBottom: 0 }}><a href="#" onClick={(e) => { e.preventDefault(); setMode("forgot"); setNotice(null); }}>Forgot password?</a></p>}
         {mode === "forgot" && <p style={{ fontSize: 12.5, marginBottom: 0 }}><a href="#" onClick={(e) => { e.preventDefault(); setMode("login"); setNotice(null); }}>Back to sign in</a></p>}
         {notice && <div className="note note-ok" style={{ marginTop: 10 }}>{notice}</div>}
         <div style={{ marginTop: 10 }}><ErrorNote error={error} /></div>

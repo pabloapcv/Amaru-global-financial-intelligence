@@ -33,6 +33,8 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("workspaces", help="list workspaces, plans, members and this month's Claude spend")
     bm = sub.add_parser("benchmark", help="measure the spec's acceptance targets (§16) on this deployment's data")
     bm.add_argument("--json", action="store_true", help="print the full result as JSON")
+    d2 = sub.add_parser("disable-2fa", help="turn off a user's two-factor authentication (lost device and recovery codes)")
+    d2.add_argument("email")
     sp = sub.add_parser("set-plan", help="change a workspace's plan")
     sp.add_argument("workspace_id")
     sp.add_argument("plan")
@@ -45,7 +47,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    if args.cmd in ("init-db", "ingest", "schedule", "research", "create-user", "workspaces", "set-plan", "benchmark"):
+    if args.cmd in ("init-db", "ingest", "schedule", "research", "create-user", "workspaces", "set-plan", "benchmark", "disable-2fa"):
         init_db()
         with session_scope() as s:
             sync_registry(s)
@@ -71,6 +73,11 @@ def main(argv: list[str] | None = None) -> None:
         from atlas.ingestion.scheduler import run_forever, run_once
 
         print(f"refreshed {run_once()} dataset(s)") if args.once else run_forever()
+    elif args.cmd == "disable-2fa":
+        from atlas import auth
+
+        ok = auth.operator_disable_2fa(args.email)
+        print("two-factor authentication turned off; the user's sessions were ended" if ok else "no such user with 2FA on")
     elif args.cmd == "serve":
         import uvicorn
 

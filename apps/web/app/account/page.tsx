@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { API_URL, api, type Account } from "@/lib/api";
 import Activity from "@/components/Activity";
 import Team from "@/components/Team";
+import TwoFactor from "@/components/TwoFactor";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
 type Key = { key_id: string; name: string; prefix: string; created_at: string; last_used_at: string | null };
@@ -116,6 +117,7 @@ export default function AccountPage() {
           <div style={{ height: 14 }} />
         </>
       )}
+      {account && account.auth === "session" && <div style={{ marginBottom: 14 }}><TwoFactor account={account} onChange={load} /></div>}
       {account && account.auth !== "local" && <div style={{ marginBottom: 14 }}><Team /></div>}
       {account && account.auth !== "local" && (account.role === "owner" || account.role === "admin") && <div style={{ marginBottom: 14 }}><Activity /></div>}
       <Card title="API keys">

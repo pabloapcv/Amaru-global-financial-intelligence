@@ -28,6 +28,8 @@ export interface Account {
   auth: string;
   email_verified: boolean;
   verification_required: boolean;
+  two_factor?: boolean;
+  recovery_codes_left?: number | null;
   limits: Record<string, number | null>;
   usage: Record<string, number>;
   workspaces?: { workspace_id: string; name: string; role: string }[];
