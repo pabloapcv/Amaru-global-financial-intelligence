@@ -705,9 +705,11 @@ def t_get_economic_calendar(ctx: ToolContext, args: dict[str, Any]) -> dict[str,
     return {"evidence_id": label, **result}
 
 
-def _price_vs_stocks(ds, df: pd.DataFrame) -> tuple[dict[str, Any], list]:
-    """Price implied by stocks-to-use (see analytics.price_vs_stocks_to_use); errors become a note."""
-    basis = ds.meta.get("price_model_basis", "world")
+def _price_vs_stocks(ds, df: pd.DataFrame, basis: str | None = None) -> tuple[dict[str, Any], list]:
+    """Price implied by stocks-to-use (see analytics.price_vs_stocks_to_use); errors become a note.
+    `basis` overrides the commodity's convention (world, or world excluding China)."""
+    convention = ds.meta.get("price_model_basis", "world")
+    basis = basis or convention
     sub = df[df["country_name"] != "China"] if basis == "world_ex_china" else df
     try:
         bal = analytics.fundamentals_balance(sub, unit=ds.unit, years=60)
@@ -720,6 +722,7 @@ def _price_vs_stocks(ds, df: pd.DataFrame) -> tuple[dict[str, Any], list]:
     price_ds = _ds(ds.meta["instrument_id"])
     return {"price_dataset": price_ds.dataset_id, "price_unit": price_ds.unit,
             "stocks_basis": "world excluding China" if basis == "world_ex_china" else "world",
+            "stocks_basis_is_convention": basis == convention,
             **({"stocks_basis_note": "China's grain, oilseed and cotton stocks are largely state-held and rarely reach the world market "
                                      "(USDA publishes world-less-China balances for the same reason)."} if basis == "world_ex_china" else {}),
             **res}, metas
@@ -747,7 +750,10 @@ def t_get_fundamentals(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
     result = {"dataset_id": fid, "commodity": ds.meta["name"], **res}
     metas = [meta]
     if not args.get("geography") and ds.meta.get("instrument_id"):
-        result["price_vs_stocks_to_use"], extra = _price_vs_stocks(ds, df)
+        basis = args.get("stocks_basis")
+        if basis not in (None, "world", "world_ex_china"):
+            raise ToolError("stocks_basis must be 'world' or 'world_ex_china'")
+        result["price_vs_stocks_to_use"], extra = _price_vs_stocks(ds, df, basis)
         metas += extra
     chart = {"type": "line", "title": f"{ds.meta['name']}: {res['geography'].lower() if res['geography'] == 'World' else res['geography']} production and consumption (USDA PSD)",
              "unit": ds.unit, "series": [
@@ -930,6 +936,8 @@ TOOLS: dict[str, dict[str, Any]] = {
             "commodity": {"type": "string", "description": "Commodity name or price dataset id, e.g. 'sugar' or CMD.CORN.US."},
             "metric": {"type": "string", "description": "Optional focus (e.g. 'ending stocks'); the full balance is always returned."},
             "geography": {"type": "string", "description": "Optional country as USDA names it (e.g. Brazil); default world."},
+            "stocks_basis": {"type": "string", "enum": ["world", "world_ex_china"],
+                             "description": "Override the price model's stocks basis; default is the commodity's convention."},
         }, "required": ["commodity"]},
     },
     "get_futures_curve": {
