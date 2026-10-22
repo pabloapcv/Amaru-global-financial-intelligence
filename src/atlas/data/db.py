@@ -389,6 +389,18 @@ class Portfolio(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class WatchlistItem(Base):
+    """An instrument a workspace follows, in display order."""
+
+    __tablename__ = "watchlist_items"
+
+    workspace_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    dataset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    added_by: Mapped[str] = mapped_column(String(64), default="local")
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class MonitorAgent(Base):
     """A saved research agent: watches datasets and runs research when a trigger fires (FR-017)."""
 
