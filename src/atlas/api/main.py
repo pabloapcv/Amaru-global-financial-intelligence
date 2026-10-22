@@ -479,6 +479,47 @@ def economic_calendar(days: int = Query(60, ge=1, le=400)) -> dict[str, Any]:
     return calendar.upcoming(days)
 
 
+class WatchlistRequest(BaseModel):
+    dataset_ids: list[str] = Field(..., max_length=40)
+
+
+def _watch(fn, *args) -> dict[str, Any]:
+    from atlas import watchlist
+
+    try:
+        return {"dataset_ids": fn(*args)}
+    except watchlist.WatchlistError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@api.get("/watchlist")
+def get_watchlist(p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import watchlist
+
+    return {"dataset_ids": watchlist.items(p.workspace_id)}
+
+
+@api.put("/watchlist")
+def set_watchlist(req: WatchlistRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import watchlist
+
+    return _watch(watchlist.replace, p.workspace_id, req.dataset_ids, p.user_id)
+
+
+@api.post("/watchlist/{dataset_id}")
+def watch(dataset_id: str, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import watchlist
+
+    return _watch(watchlist.add, p.workspace_id, dataset_id, p.user_id)
+
+
+@api.delete("/watchlist/{dataset_id}")
+def unwatch(dataset_id: str, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import watchlist
+
+    return _watch(watchlist.remove, p.workspace_id, dataset_id)
+
+
 @api.get("/briefing")
 def briefing(days: int = Query(14, ge=1, le=90)) -> dict[str, Any]:
     from atlas import briefing as b

@@ -11,6 +11,17 @@ export default function InstrumentDetail({ id, defaultYears = 5 }: { id: string;
   const [years, setYears] = useState(defaultYears);
   const [hist, setHist] = useState<History | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [watched, setWatched] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    api<{ dataset_ids: string[] }>("/api/v1/watchlist").then((w) => setWatched(w.dataset_ids.includes(id))).catch(() => setWatched(null));
+  }, [id]);
+  const toggleWatch = async () => {
+    try {
+      const w = await api<{ dataset_ids: string[] }>(`/api/v1/watchlist/${id}`, { method: watched ? "DELETE" : "POST" });
+      setWatched(w.dataset_ids.includes(id));
+    } catch (e) { setError(e); }
+  };
 
   useEffect(() => {
     setHist(null);
@@ -29,10 +40,17 @@ export default function InstrumentDetail({ id, defaultYears = 5 }: { id: string;
       <Card
         title={m.name}
         actions={
-          <div className="seg">
-            {RANGES.map((r) => (
-              <button key={r} className={r === years ? "on" : ""} onClick={() => setYears(r)}>{r}Y</button>
-            ))}
+          <div className="row" style={{ flexWrap: "nowrap" }}>
+            {watched !== null && (
+              <button className="secondary" onClick={toggleWatch} aria-pressed={watched} title={watched ? "Remove from the workspace watchlist" : "Add to the workspace watchlist (shown on Overview)"}>
+                {watched ? "★ Watching" : "☆ Watch"}
+              </button>
+            )}
+            <div className="seg">
+              {RANGES.map((r) => (
+                <button key={r} className={r === years ? "on" : ""} onClick={() => setYears(r)}>{r}Y</button>
+              ))}
+            </div>
           </div>
         }
       >
