@@ -612,3 +612,55 @@ def select_user(email):
     from atlas.data.db import User
 
     return select(User).where(User.email == email)
+
+
+def test_workspace_can_require_two_factor(secured):
+    from atlas import secretbox, totp
+
+    secretbox._fernet.cache_clear()
+    owner = _signup(secured, "boss@policy.test", "Strict desk")
+    ws = owner["workspace"]["workspace_id"]
+    owner_session = secured.cookies.get("atlas_session")
+    auth.set_plan(ws, "investor")
+    tok = secured.post("/api/v1/team/invitations", json={"email": "analyst@policy.test"}).json()["link"].split("token=")[1]
+
+    # A member joins and creates an API key before any policy exists.
+    secured.cookies.clear()
+    secured.post("/api/v1/auth/invitations/accept", json={"token": tok, "password": "analyst password"})
+    member_session = secured.cookies.get("atlas_session")
+    member_key = secured.post("/api/v1/api-keys", json={"name": "notebook"}).json()["key"]
+    assert secured.get("/api/v1/research", headers={"Authorization": f"Bearer {member_key}"}).status_code == 200
+    assert secured.patch("/api/v1/team/settings", json={"require_2fa": True}).status_code == 403  # members cannot set it
+
+    # The owner cannot require what they do not use themselves.
+    secured.cookies.clear()
+    secured.cookies.set("atlas_session", owner_session)
+    assert secured.patch("/api/v1/team/settings", json={"require_2fa": True}).status_code == 409
+    sec = secured.post("/api/v1/account/2fa/setup").json()["secret"]
+    secured.post("/api/v1/account/2fa/enable", json={"code": totp.code_at(sec, totp.current_step())})
+    owner_session = secured.cookies.get("atlas_session")
+    assert secured.patch("/api/v1/team/settings", json={"require_2fa": True}).status_code == 200
+    assert secured.get("/api/v1/team").json()["require_2fa"] is True
+    assert secured.get("/api/v1/research").status_code == 200  # the owner uses 2FA
+
+    # The member without 2FA can reach only account setup, and their API key is refused.
+    secured.cookies.clear()
+    key_try = secured.get("/api/v1/research", headers={"Authorization": f"Bearer {member_key}"})
+    assert key_try.status_code == 403 and key_try.json()["detail"]["error"] == "two_factor_required"
+    secured.cookies.set("atlas_session", member_session)
+    assert secured.get("/api/v1/research").status_code == 403
+    assert secured.post("/api/v1/api-keys", json={"name": "k2"}).status_code == 403
+    acct = secured.get("/api/v1/account").json()
+    assert acct["workspace_requires_2fa"] is True and acct["two_factor"] is False
+    msec = secured.post("/api/v1/account/2fa/setup").json()["secret"]
+    assert secured.post("/api/v1/account/2fa/enable", json={"code": totp.code_at(msec, totp.current_step())}).status_code == 200
+    assert secured.get("/api/v1/research").status_code == 200  # enrolled: full access again
+    secured.cookies.clear()
+    assert secured.get("/api/v1/research", headers={"Authorization": f"Bearer {member_key}"}).status_code == 200
+    secured.cookies.set("atlas_session", owner_session)
+    assert any(m["email"] == "analyst@policy.test" and m["two_factor"] for m in secured.get("/api/v1/team").json()["members"])
+
+    # Other workspaces are unaffected.
+    secured.cookies.clear()
+    _signup(secured, "elsewhere@policy.test", "Somewhere else")
+    assert secured.get("/api/v1/research").status_code == 200

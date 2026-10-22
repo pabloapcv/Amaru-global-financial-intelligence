@@ -7,7 +7,7 @@ import { Card, ErrorNote } from "@/components/ui";
 type Event = { event_id: string; at: string; action: string; label: string; actor: string | null; detail: Record<string, unknown> };
 type Page = { events: Event[]; next_cursor: string | null };
 
-const CATEGORIES: [string, string][] = [["", "All"], ["signin", "Sign-ins"], ["team", "Team"], ["sharing", "Sharing"], ["data", "Exports"], ["keys", "API keys"], ["security", "Security"]];
+const CATEGORIES: [string, string][] = [["", "All"], ["signin", "Sign-ins"], ["team", "Team"], ["sharing", "Sharing"], ["data", "Data"], ["keys", "API keys"], ["security", "Security"]];
 
 function summary(d: Record<string, unknown>) {
   const parts = Object.entries(d).filter(([k]) => !k.endsWith("_id") || k === "dataset_id").map(([k, v]) => `${k.replace("_", " ")}: ${String(v)}`);

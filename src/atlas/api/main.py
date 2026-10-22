@@ -72,9 +72,17 @@ def principal(request: Request, creds: HTTPAuthorizationCredentials | None = Dep
         return auth.LOCAL_PRINCIPAL
     token = creds.credentials.strip() if creds else request.cookies.get(SESSION_COOKIE)
     try:
-        return auth.authenticate(token)
+        p = auth.authenticate(token)
     except auth.AuthError as exc:
         raise HTTPException(401, str(exc), headers={"WWW-Authenticate": "Bearer"}) from exc
+    if p.needs_2fa and not (p.via == "session" and request.url.path in TWO_FACTOR_SETUP_PATHS):
+        raise HTTPException(403, {"error": "two_factor_required",
+                                  "message": "This workspace requires two-factor authentication. Turn it on from your Account page."})
+    return p
+
+
+# What a member of a 2FA-required workspace can reach before enrolling (browser sessions only).
+TWO_FACTOR_SETUP_PATHS = {f"{V1}/account", f"{V1}/account/2fa/setup", f"{V1}/account/2fa/enable", f"{V1}/auth/switch-workspace"}
 
 
 def require_admin(p: Principal = Depends(principal)) -> Principal:
@@ -670,12 +678,28 @@ def _team_call(fn, *args):
         _404("member")
 
 
+class TeamSettings(BaseModel):
+    require_2fa: bool
+
+
+@api.patch("/team/settings")
+def team_settings(req: TeamSettings, p: Principal = Depends(principal)) -> dict[str, Any]:
+    try:
+        auth.set_require_2fa(p, req.require_2fa)
+    except auth.AuthError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except auth.ValidationError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return {"require_2fa": req.require_2fa}
+
+
 @api.get("/team")
 def team(p: Principal = Depends(principal)) -> dict[str, Any]:
     from atlas import teams
 
-    limits = auth.PLANS.get(auth.account(p)["workspace"]["plan"], {}) if p.via != "local" else {}
-    return {"members": teams.members(p), "role": p.role,
+    acct = auth.account(p) if p.via != "local" else {}
+    limits = auth.PLANS.get(acct["workspace"]["plan"], {}) if acct else {}
+    return {"members": teams.members(p), "role": p.role, "require_2fa": bool(acct.get("workspace_requires_2fa")),
             "invitations": teams.invitations(p) if p.role in teams.MANAGERS else [],
             "seats": {"used": auth.usage(p.workspace_id)["seats"], "limit": limits.get("seats")}}
 

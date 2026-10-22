@@ -2,7 +2,9 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010
 
 export class ApiError extends Error {
   constructor(public status: number, public detail: unknown) {
-    super(typeof detail === "string" ? detail : JSON.stringify(detail));
+    super(typeof detail === "string" ? detail
+      : detail && typeof detail === "object" && "message" in detail ? String((detail as { message: unknown }).message)
+      : JSON.stringify(detail));
   }
 }
 
@@ -17,6 +19,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/v1/auth/") && !["/login", "/reset", "/verify", "/join"].includes(window.location.pathname)) {
     window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
   }
+  if (res.status === 403 && body?.detail?.error === "two_factor_required" && typeof window !== "undefined" && window.location.pathname !== "/account") {
+    window.location.href = "/account";  // the workspace requires 2FA: send the member to set it up
+  }
   if (!res.ok) throw new ApiError(res.status, body?.detail ?? body ?? res.statusText);
   return body as T;
 }
@@ -29,6 +34,7 @@ export interface Account {
   email_verified: boolean;
   verification_required: boolean;
   two_factor?: boolean;
+  workspace_requires_2fa?: boolean;
   recovery_codes_left?: number | null;
   limits: Record<string, number | null>;
   usage: Record<string, number>;

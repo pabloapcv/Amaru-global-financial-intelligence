@@ -16,9 +16,9 @@ CATEGORIES = {
     "signin": ("login.",),
     "team": ("team.", "user.created", "workspace."),
     "sharing": ("report.share",),
-    "data": ("data.",),
+    "data": ("data.", "research."),
     "keys": ("api_key.",),
-    "security": ("password.", "email."),
+    "security": ("password.", "email.", "security.", "workspace.require_2fa"),
 }
 LABELS = {
     "login.succeeded": "Signed in", "team.invited": "Invited a person", "team.invitation_revoked": "Revoked an invitation",
@@ -28,6 +28,9 @@ LABELS = {
     "report.share_revoked": "Revoked a share link", "data.exported": "Exported a dataset", "api_key.created": "Created an API key",
     "api_key.revoked": "Revoked an API key", "password.changed": "Changed password", "password.reset_requested": "Requested a password reset",
     "password.reset_completed": "Reset password", "email.verified": "Verified email", "email.verification_sent": "Verification email sent",
+    "research.deleted": "Deleted research", "security.2fa_enabled": "Turned on two-factor", "security.2fa_disabled": "Turned off two-factor",
+    "security.2fa_disabled_by_operator": "Two-factor reset by an operator", "login.2fa_failed": "Wrong two-factor code",
+    "workspace.require_2fa_changed": "Changed the two-factor requirement",
 }
 MAX_LIMIT = 500
 

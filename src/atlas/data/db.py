@@ -500,6 +500,7 @@ class Workspace(Base):
     name: Mapped[str] = mapped_column(String(200))
     plan: Mapped[str] = mapped_column(String(32), default="explorer")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    require_2fa: Mapped[bool | None] = mapped_column(default=False)  # members must use two-factor authentication
 
 
 class Membership(Base):
@@ -633,6 +634,7 @@ _ADDED_COLUMNS = [
     ("users", "totp_enabled_at", "TIMESTAMP", None),
     ("users", "totp_last_step", "INTEGER", None),
     ("users", "recovery_codes", "JSON", None),
+    ("workspaces", "require_2fa", "BOOLEAN", None),
     ("source_documents", "source", "VARCHAR(32)", None),
     ("source_documents", "category", "VARCHAR(128)", None),
     ("source_documents", "summary", "TEXT", None),
