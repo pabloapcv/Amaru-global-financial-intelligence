@@ -14,6 +14,8 @@ type AlertRow = {
   last_evaluated_at: string | null;
   last_triggered_at: string | null;
   events: { triggered_at: string; message: string }[];
+  notify_email: boolean;
+  mine: boolean;
 };
 
 function describe(rule: Record<string, any>) {
@@ -32,6 +34,7 @@ export default function Intelligence() {
   const [value, setValue] = useState(10);
   const [op, setOp] = useState(">");
   const [fired, setFired] = useState<string[] | null>(null);
+  const [notify, setNotify] = useState(true);
   const [tab, setTab] = useState<"agents" | "alerts" | "releases">("agents");
 
   const load = useCallback(() => api<AlertRow[]>("/api/v1/alerts").then(setAlerts).catch(setError), []);
@@ -48,7 +51,7 @@ export default function Intelligence() {
     if (type === "anomaly") Object.assign(rule, { z: value });
     const name = `${instruments.find((i) => i.dataset_id === dataset)?.name.split(" (")[0]} — ${type.replace("_", " ")}`;
     try {
-      await api("/api/v1/alerts", { method: "POST", body: JSON.stringify({ name, rule }) });
+      await api("/api/v1/alerts", { method: "POST", body: JSON.stringify({ name, rule, notify_email: notify }) });
       load();
     } catch (e) {
       setError(e);
@@ -102,7 +105,11 @@ export default function Intelligence() {
             {type === "threshold" && <select value={op} onChange={(e) => setOp(e.target.value)} style={{ width: 70 }}><option>{">"}</option><option>{"<"}</option></select>}
             <input type="number" value={value} onChange={(e) => setValue(+e.target.value)} style={{ flex: 1 }} />
           </div>
+          <label className="row" style={{ fontWeight: 400, marginTop: 12 }}>
+            <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} style={{ width: "auto" }} /> Email me when it fires
+          </label>
           <button style={{ marginTop: 14 }} onClick={create}>Create alert</button>
+          <p className="muted" style={{ fontSize: 12 }}>An alert fires once when its condition starts to hold and re-arms after it stops; unusual-move alerts fire once per observation.</p>
         </Card>
         <Card title="Active alerts">
           <ul className="list-tight">
@@ -114,6 +121,13 @@ export default function Intelligence() {
                 </div>
                 <div className="muted mono">{describe(a.rule)}</div>
                 <div className="muted" style={{ fontSize: 12 }}>Last evaluated {a.last_evaluated_at ?? "never"} · last triggered {a.last_triggered_at ?? "never"}</div>
+                {(a.mine || a.notify_email) && (
+                  <label className="row" style={{ fontWeight: 400, fontSize: 12.5, margin: "4px 0" }}>
+                    <input type="checkbox" checked={a.notify_email} style={{ width: "auto" }}
+                      onChange={(e) => api(`/api/v1/alerts/${a.alert_id}`, { method: "PATCH", body: JSON.stringify({ notify_email: e.target.checked }) }).then(load).catch(setError)} />
+                    {a.mine ? "Email me when it fires" : "Emails its creator (you can turn this off)"}
+                  </label>
+                )}
                 {a.events.slice(0, 3).map((e, i) => <div key={i} style={{ fontSize: 12.5 }}>⚑ {e.message}</div>)}
               </li>
             ))}

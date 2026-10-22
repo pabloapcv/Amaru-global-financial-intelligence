@@ -1198,6 +1198,11 @@ class AlertRequest(BaseModel):
     name: str
     rule: dict[str, Any]
     schedule: str = "on_ingest"
+    notify_email: bool = False
+
+
+class AlertUpdate(BaseModel):
+    notify_email: bool
 
 
 @api.post(f"/alerts", status_code=201)
@@ -1210,17 +1215,32 @@ def create_alert(req: AlertRequest, p: Principal = Depends(require_verified)) ->
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     with session_scope() as s:
-        a = Alert(name=req.name, rule=req.rule, schedule=req.schedule, workspace_id=p.workspace_id, user_id=p.user_id)
+        a = Alert(name=req.name, rule=req.rule, schedule=req.schedule, workspace_id=p.workspace_id, user_id=p.user_id,
+                  notify_email=req.notify_email)
         s.add(a)
         s.flush()
-        return {"alert_id": a.alert_id, "name": a.name, "rule": a.rule, "status": a.status}
+        return {"alert_id": a.alert_id, "name": a.name, "rule": a.rule, "status": a.status, "notify_email": bool(a.notify_email)}
+
+
+@api.patch("/alerts/{alert_id}")
+def update_alert(alert_id: str, req: AlertUpdate, p: Principal = Depends(principal)) -> dict[str, Any]:
+    with session_scope() as s:
+        a = s.get(Alert, alert_id)
+        if a is None or a.workspace_id != p.workspace_id or a.status == "deleted":
+            _404("alert")
+        if req.notify_email and a.user_id != p.user_id:
+            raise HTTPException(403, "only the alert's creator can turn on email for it (emails go to the creator)")
+        a.notify_email = req.notify_email
+        return {"alert_id": a.alert_id, "notify_email": bool(a.notify_email)}
 
 
 @api.get(f"/alerts")
 def list_alerts(p: Principal = Depends(principal)) -> list[dict[str, Any]]:
     with session_scope() as s:
         alerts = s.execute(select(Alert).where(Alert.workspace_id == p.workspace_id).order_by(Alert.created_at.desc())).scalars().all()
-        events = s.execute(select(AlertEvent).order_by(AlertEvent.triggered_at.desc()).limit(200)).scalars().all()
+        ids = [a.alert_id for a in alerts]
+        events = s.execute(select(AlertEvent).where(AlertEvent.alert_id.in_(ids))
+                           .order_by(AlertEvent.triggered_at.desc()).limit(500)).scalars().all() if ids else []
         by_alert: dict[str, list[dict[str, Any]]] = {}
         for e in events:
             by_alert.setdefault(e.alert_id, []).append({"triggered_at": e.triggered_at.isoformat(timespec="seconds") + "Z", "message": e.message})
@@ -1229,6 +1249,7 @@ def list_alerts(p: Principal = Depends(principal)) -> list[dict[str, Any]]:
             "last_evaluated_at": a.last_evaluated_at.isoformat(timespec="seconds") + "Z" if a.last_evaluated_at else None,
             "last_triggered_at": a.last_triggered_at.isoformat(timespec="seconds") + "Z" if a.last_triggered_at else None,
             "events": by_alert.get(a.alert_id, [])[:10],
+            "notify_email": bool(a.notify_email), "mine": a.user_id == p.user_id,
         } for a in alerts]
 
 

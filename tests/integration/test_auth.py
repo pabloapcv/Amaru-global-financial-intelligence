@@ -436,3 +436,46 @@ def test_watchlist_is_per_workspace_validated_and_capped(secured, monkeypatch):
     secured.cookies.clear()
     secured.post("/api/v1/auth/login", json={"email": "watcher@wl.test", "password": "correct horse battery"})
     assert secured.delete("/api/v1/watchlist/CMD.SUGAR.ISA").json()["dataset_ids"] == ["US.CPI.HEADLINE"]
+
+
+def test_alerts_fire_once_per_episode_and_email_their_creator(secured, monkeypatch):
+    from atlas import intelligence, mailer
+    from atlas.data.access import get_series
+
+    sent = []
+    monkeypatch.setattr(mailer, "send", lambda to, subject, body: (subject.startswith("ATLAS alert") and sent.append((to, subject))) or True)
+    owner = _signup(secured, "alerter@al.test", "Alerting")
+    ws = owner["workspace"]["workspace_id"]
+    last = float(get_series("CMD.SUGAR.ISA")[0].iloc[-1])
+    r = secured.post("/api/v1/alerts", json={"name": "Sugar above", "notify_email": True,
+                                             "rule": {"type": "threshold", "dataset_id": "CMD.SUGAR.ISA", "op": ">", "value": last - 1}})
+    assert r.status_code == 201 and r.json()["notify_email"] is True
+    alert_id = r.json()["alert_id"]
+
+    first = intelligence.evaluate_alerts({"CMD.SUGAR.ISA"}, workspace_id=ws)
+    assert [f["alert_id"] for f in first] == [alert_id] and sent == [("alerter@al.test", "ATLAS alert: Sugar above")]
+    assert intelligence.evaluate_alerts({"CMD.SUGAR.ISA"}, workspace_id=ws) == []  # still holding: no repeat
+    assert len(sent) == 1
+
+    # Condition stops holding (threshold moved above the price), which re-arms; when it holds again it fires again.
+    from atlas.data.db import Alert, session_scope
+
+    with session_scope() as s:
+        s.get(Alert, alert_id).rule = {"type": "threshold", "dataset_id": "CMD.SUGAR.ISA", "op": ">", "value": last + 1}
+    assert intelligence.evaluate_alerts({"CMD.SUGAR.ISA"}, workspace_id=ws) == []
+    with session_scope() as s:
+        s.get(Alert, alert_id).rule = {"type": "threshold", "dataset_id": "CMD.SUGAR.ISA", "op": ">", "value": last - 1}
+    assert len(intelligence.evaluate_alerts({"CMD.SUGAR.ISA"}, workspace_id=ws)) == 1 and len(sent) == 2
+    listed = next(a for a in secured.get("/api/v1/alerts").json() if a["alert_id"] == alert_id)
+    assert listed["notify_email"] and listed["mine"] and len(listed["events"]) == 2
+
+    # Email can be switched off by anyone in the workspace, but only the creator can switch it on.
+    assert secured.patch(f"/api/v1/alerts/{alert_id}", json={"notify_email": False}).json()["notify_email"] is False
+    auth.set_plan(ws, "investor")
+    token = secured.post("/api/v1/team/invitations", json={"email": "colleague@al.test"}).json()["link"].split("token=")[1]
+    secured.cookies.clear()
+    secured.post("/api/v1/auth/invitations/accept", json={"token": token, "password": "colleague password"})
+    assert secured.patch(f"/api/v1/alerts/{alert_id}", json={"notify_email": True}).status_code == 403
+    secured.cookies.clear()
+    _signup(secured, "outsider@al.test", "Outside")
+    assert secured.patch(f"/api/v1/alerts/{alert_id}", json={"notify_email": False}).status_code == 404
