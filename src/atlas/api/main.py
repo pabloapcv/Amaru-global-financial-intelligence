@@ -612,6 +612,25 @@ def switch_workspace(req: SwitchRequest, request: Request, p: Principal = Depend
     return auth.account(auth.authenticate(session))
 
 
+@api.get("/activity")
+def activity(category: Literal["signin", "team", "sharing", "data", "keys", "security"] | None = None,
+             cursor: str | None = Query(None, max_length=80), limit: int = Query(100, ge=1, le=500), format: Literal["json", "csv"] = "json",
+             p: Principal = Depends(principal)):
+    """This workspace's audit log, newest first. Owners and admins only."""
+    from atlas import activity as act
+
+    if p.role not in ("owner", "admin"):
+        raise HTTPException(403, "only workspace owners and admins can view activity")
+    try:
+        page = act.events(p.workspace_id, category=category, cursor=cursor, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(422, "invalid cursor") from exc
+    if format == "csv":
+        return Response(act.to_csv(page["events"]), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="atlas-activity-{date.today().isoformat()}.csv"'})
+    return page
+
+
 # ---------------------------------------------------------------- research
 
 
