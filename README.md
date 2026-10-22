@@ -76,6 +76,10 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 | Data export (FR-018) | `GET /api/v1/datasets/{id}/export?format=csv|json` for every dataset kind (prices, macro, CFTC positioning, trade, USDA balances) with `start`/`end` filters and point-in-time `as_of` for macro; CSV opens with provenance comment lines (source, citation, observation and ingestion dates, freshness, licence note; `header=false` drops them); exports are audited. Download links on Markets, the USDA card and Data Explorer |
 | UI (§13) | Next.js: Overview, AI Research, Markets, Global Economy, Quant Lab, Reports, Intelligence, Data Explorer |
 
+## Selling it
+
+See [docs/monetization.md](docs/monetization.md) for an honest assessment of what it would take to sell ATLAS: data licensing, regulation, target niches, pricing and next steps.
+
 ## Honest limitations
 
 - **Data is public and delayed.**
