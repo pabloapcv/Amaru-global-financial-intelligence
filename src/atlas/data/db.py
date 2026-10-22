@@ -474,6 +474,23 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime)
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Two-factor authentication (TOTP). The seed is encrypted at rest (atlas.secretbox); recovery codes are hashed.
+    totp_secret_enc: Mapped[str | None] = mapped_column(Text)
+    totp_enabled_at: Mapped[datetime | None] = mapped_column(DateTime)
+    totp_last_step: Mapped[int | None] = mapped_column(Integer)
+    recovery_codes: Mapped[list[str] | None] = mapped_column(JSON)
+
+
+class LoginChallenge(Base):
+    """Second sign-in step for accounts with two-factor authentication: short-lived, single use."""
+
+    __tablename__ = "login_challenges"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class Workspace(Base):
@@ -612,6 +629,10 @@ _ADDED_COLUMNS = [
     ("alerts", "notify_email", "BOOLEAN", None),
     ("alerts", "last_trigger_key", "VARCHAR(64)", None),
     ("users", "email_verified_at", "TIMESTAMP", None),
+    ("users", "totp_secret_enc", "TEXT", None),
+    ("users", "totp_enabled_at", "TIMESTAMP", None),
+    ("users", "totp_last_step", "INTEGER", None),
+    ("users", "recovery_codes", "JSON", None),
     ("source_documents", "source", "VARCHAR(32)", None),
     ("source_documents", "category", "VARCHAR(128)", None),
     ("source_documents", "summary", "TEXT", None),

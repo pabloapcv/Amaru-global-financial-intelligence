@@ -176,8 +176,27 @@ def signup(req: SignupRequest, request: Request, response: Response) -> dict[str
 
 @app.post(f"{V1}/auth/login")
 def login(req: LoginRequest, request: Request, response: Response) -> dict[str, Any]:
+    """Password sign-in. With two-factor authentication on, returns `two_factor_required` and a short-lived
+    `challenge` instead of a session; finish at /auth/login/2fa."""
     try:
         token, p = auth.login(req.email, req.password, request.client.host if request.client else "")
+    except auth.SecondFactorRequired as need:
+        return {"two_factor_required": True, "challenge": need.challenge}
+    except auth.AuthError as exc:
+        raise HTTPException(401, str(exc)) from exc
+    _set_session(response, token)
+    return {"token": token, **auth.account(p)}
+
+
+class SecondFactorRequest(BaseModel):
+    challenge: str = Field(..., max_length=200)
+    code: str = Field(..., max_length=20)
+
+
+@app.post(f"{V1}/auth/login/2fa")
+def login_2fa(req: SecondFactorRequest, request: Request, response: Response) -> dict[str, Any]:
+    try:
+        token, p = auth.login_second_factor(req.challenge, req.code, request.client.host if request.client else "")
     except auth.AuthError as exc:
         raise HTTPException(401, str(exc)) from exc
     _set_session(response, token)
@@ -570,6 +589,54 @@ def pipelines_run(req: IngestRequest, p: Principal = Depends(require_admin)) -> 
 
     threading.Thread(target=ingest, args=(req.dataset_ids,), kwargs={"backfill": req.backfill}, daemon=True).start()
     return {"status": "accepted", "dataset_ids": req.dataset_ids or "all"}
+
+
+# ---------------------------------------------------------------- two-factor authentication
+
+
+class CodeRequest(BaseModel):
+    code: str = Field(..., max_length=20)
+
+
+class DisableTwoFactorRequest(BaseModel):
+    password: str = Field(..., max_length=500)
+    code: str = Field(..., max_length=20)
+
+
+def _session_only(p: Principal) -> None:
+    if p.via != "session":
+        raise HTTPException(400, "manage two-factor authentication from a signed-in browser session")
+
+
+@api.post("/account/2fa/setup")
+def two_factor_setup(p: Principal = Depends(principal)) -> dict[str, Any]:
+    _session_only(p)
+    try:
+        return auth.totp_begin(p)
+    except auth.ValidationError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@api.post("/account/2fa/enable")
+def two_factor_enable(req: CodeRequest, request: Request, p: Principal = Depends(principal)) -> dict[str, Any]:
+    _session_only(p)
+    try:
+        codes = auth.totp_enable(p, req.code, keep_session=request.cookies.get(SESSION_COOKIE))
+    except auth.ValidationError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"enabled": True, "recovery_codes": codes}
+
+
+@api.post("/account/2fa/disable", status_code=204)
+def two_factor_disable(req: DisableTwoFactorRequest, request: Request, p: Principal = Depends(principal)) -> None:
+    _session_only(p)
+    try:
+        auth._throttle(f"2fa-off|{p.user_id}|{request.client.host if request.client else ''}")
+        auth.totp_disable(p, req.password, req.code)
+    except auth.ValidationError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except auth.AuthError as exc:
+        raise HTTPException(403, str(exc)) from exc
 
 
 # ---------------------------------------------------------------- team

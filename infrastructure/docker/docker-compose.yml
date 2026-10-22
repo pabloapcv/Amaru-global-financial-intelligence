@@ -19,6 +19,9 @@ x-atlas-env: &atlas-env
   ATLAS_SMTP_FROM: ${ATLAS_SMTP_FROM:-}
   ATLAS_METRICS_TOKEN: ${ATLAS_METRICS_TOKEN:-}
   ATLAS_USER_AGENT: ${ATLAS_USER_AGENT:-}
+  # Encrypts two-factor secrets at rest. Set it in production; without it a key is generated once on the data volume.
+  ATLAS_SECRET_KEY: ${ATLAS_SECRET_KEY:-}
+  ATLAS_SECRET_KEY_FILE: /data/secret.key
 
 services:
   db:

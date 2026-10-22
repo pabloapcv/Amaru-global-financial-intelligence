@@ -529,3 +529,86 @@ def test_deleting_research_cascades_but_keeps_accounting(secured):
     secured.cookies.clear()
     _signup(secured, "nosy@hist.test", "Nosy")
     assert secured.delete(f"/api/v1/research/{child}").status_code == 404
+
+
+def test_two_factor_authentication(secured, monkeypatch):
+    from atlas import secretbox, totp
+    from atlas.data.db import LoginChallenge, User, session_scope
+
+    secretbox._fernet.cache_clear()
+    acct = _signup(secured, "careful@twofa.test", "Careful")
+    other_device = TestClient(secured.app)
+    other_device.post("/api/v1/auth/login", json={"email": "careful@twofa.test", "password": "correct horse battery"})
+    api_key = secured.post("/api/v1/api-keys", json={"name": "script"}).json()["key"]
+
+    setup = secured.post("/api/v1/account/2fa/setup").json()
+    secret = setup["secret"]
+    assert setup["otpauth_uri"].startswith("otpauth://totp/ATLAS:careful%40twofa.test?secret=")
+    with session_scope() as s:
+        stored = s.get(User, acct["user"]["user_id"]).totp_secret_enc
+    assert secret not in stored and secretbox.decrypt(stored) == secret  # encrypted at rest
+    assert secured.post("/api/v1/account/2fa/enable", json={"code": "000000"}).status_code == 422
+    step = totp.current_step()
+    on = secured.post("/api/v1/account/2fa/enable", json={"code": totp.code_at(secret, step)}).json()
+    codes = on["recovery_codes"]
+    assert on["enabled"] and len(codes) == 10 and len(set(codes)) == 10
+    assert secured.get("/api/v1/account").json()["two_factor"] is True  # this session stays
+    assert other_device.get("/api/v1/account").status_code == 401  # password-only sessions end
+    assert secured.get("/api/v1/account", headers={"Authorization": f"Bearer {api_key}"}).status_code == 200  # keys unaffected
+
+    # Password alone no longer signs in.
+    secured.cookies.clear()
+    r = secured.post("/api/v1/auth/login", json={"email": "careful@twofa.test", "password": "correct horse battery"}).json()
+    assert r == {"two_factor_required": True, "challenge": r["challenge"]} and "atlas_session" not in secured.cookies
+    assert secured.post("/api/v1/auth/login/2fa", json={"challenge": r["challenge"], "code": "123456"}).status_code == 401
+    # The code used to enable cannot be replayed; the next step's code works.
+    assert secured.post("/api/v1/auth/login/2fa", json={"challenge": r["challenge"], "code": totp.code_at(secret, step)}).status_code == 401
+    ok = secured.post("/api/v1/auth/login/2fa", json={"challenge": r["challenge"], "code": totp.code_at(secret, step + 1)})
+    assert ok.status_code == 200 and secured.get("/api/v1/account").status_code == 200
+    assert secured.post("/api/v1/auth/login/2fa", json={"challenge": r["challenge"], "code": totp.code_at(secret, step + 1)}).status_code == 401  # single use
+
+    # A recovery code works once.
+    secured.cookies.clear()
+    ch = secured.post("/api/v1/auth/login", json={"email": "careful@twofa.test", "password": "correct horse battery"}).json()["challenge"]
+    assert secured.post("/api/v1/auth/login/2fa", json={"challenge": ch, "code": codes[0].upper()}).status_code == 200
+    assert secured.get("/api/v1/account").json()["recovery_codes_left"] == 9
+    secured.cookies.clear()
+    ch = secured.post("/api/v1/auth/login", json={"email": "careful@twofa.test", "password": "correct horse battery"}).json()["challenge"]
+    assert secured.post("/api/v1/auth/login/2fa", json={"challenge": ch, "code": codes[0]}).status_code == 401
+    # Challenges allow a few attempts and expire.
+    for _ in range(4):
+        secured.post("/api/v1/auth/login/2fa", json={"challenge": ch, "code": "000000"})
+    assert secured.post("/api/v1/auth/login/2fa", json={"challenge": ch, "code": codes[1]}).status_code == 401  # 6th attempt
+    ch2 = secured.post("/api/v1/auth/login", json={"email": "careful@twofa.test", "password": "correct horse battery"}).json()["challenge"]
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from atlas.data.db import utcnow
+
+    with session_scope() as s:
+        s.execute(update(LoginChallenge).values(expires_at=utcnow() - timedelta(seconds=1)))
+    assert secured.post("/api/v1/auth/login/2fa", json={"challenge": ch2, "code": codes[1]}).status_code == 401
+
+    # Turning it off needs the password and a code.
+    ch3 = secured.post("/api/v1/auth/login", json={"email": "careful@twofa.test", "password": "correct horse battery"}).json()["challenge"]
+    secured.post("/api/v1/auth/login/2fa", json={"challenge": ch3, "code": codes[1]})
+    assert secured.post("/api/v1/account/2fa/disable", json={"password": "wrong password!!", "code": codes[2]}).status_code == 403
+    assert secured.post("/api/v1/account/2fa/disable", json={"password": "correct horse battery", "code": codes[3]}).status_code == 204
+    secured.cookies.clear()
+    assert "token" in secured.post("/api/v1/auth/login", json={"email": "careful@twofa.test", "password": "correct horse battery"}).json()
+
+    # Operators can turn it off for a user who lost everything.
+    secured.post("/api/v1/account/2fa/setup")
+    with session_scope() as s:
+        sec = secretbox.decrypt(s.execute(select_user("careful@twofa.test")).scalar_one().totp_secret_enc)
+    secured.post("/api/v1/account/2fa/enable", json={"code": totp.code_at(sec, totp.current_step())})
+    assert auth.operator_disable_2fa("careful@twofa.test") and not auth.operator_disable_2fa("careful@twofa.test")
+
+
+def select_user(email):
+    from sqlalchemy import select
+
+    from atlas.data.db import User
+
+    return select(User).where(User.email == email)
