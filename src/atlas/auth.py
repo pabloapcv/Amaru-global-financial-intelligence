@@ -52,10 +52,10 @@ MIN_PASSWORD = 10
 
 # Plan limits (spec §18 tiers). None = unlimited.
 PLANS: dict[str, dict[str, int | None]] = {
-    "explorer": {"seats": 1, "llm_budget_usd_per_month": 2, "agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1},
-    "investor": {"seats": 2, "llm_budget_usd_per_month": 15, "agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2},
-    "research_pro": {"seats": 5, "llm_budget_usd_per_month": 60, "agents": 10, "research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5},
-    "pro": {"seats": 25, "llm_budget_usd_per_month": 300, "agents": 50, "research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20},
+    "explorer": {"requests_per_minute": 60, "seats": 1, "llm_budget_usd_per_month": 2, "agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1},
+    "investor": {"requests_per_minute": 120, "seats": 2, "llm_budget_usd_per_month": 15, "agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2},
+    "research_pro": {"requests_per_minute": 300, "seats": 5, "llm_budget_usd_per_month": 60, "agents": 10, "research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5},
+    "pro": {"requests_per_minute": 600, "seats": 25, "llm_budget_usd_per_month": 300, "agents": 50, "research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20},
 }
 
 
@@ -87,6 +87,7 @@ class Principal:
     email: str
     via: str  # session | api_key | local
     needs_2fa: bool = False  # the workspace requires two-factor authentication and this user has not set it up
+    plan: str = "explorer"
 
 
 LOCAL_PRINCIPAL = Principal(user_id="local", workspace_id=LOCAL_WORKSPACE, role="owner", email="local", via="local")
@@ -362,7 +363,7 @@ def _principal(s, user_id: str, workspace_id: str, via: str) -> Principal:
         raise AuthError("account no longer has access to this workspace")
     ws = s.get(Workspace, workspace_id)
     needs = bool(ws and ws.require_2fa and not user.totp_enabled_at)
-    return Principal(user_id, workspace_id, m.role, user.email, via, needs)
+    return Principal(user_id, workspace_id, m.role, user.email, via, needs, ws.plan if ws else "explorer")
 
 
 def set_require_2fa(principal: Principal, required: bool) -> None:

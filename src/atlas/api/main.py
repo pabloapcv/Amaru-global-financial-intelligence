@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from atlas import __version__, analytics, auth
+from atlas import __version__, analytics, auth, ratelimit
 from atlas.auth import Principal
 from atlas.config import settings
 from atlas.data import access
@@ -66,7 +66,7 @@ _bearer = HTTPBearer(auto_error=False, scheme_name="ApiKey",
                      description="An API key (`atk_…`) from the Account page, or a session token from /auth/login.")
 
 
-def principal(request: Request, creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> Principal:
+def principal(request: Request, response: Response, creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> Principal:
     """Authenticate via session cookie or `Authorization: Bearer <session token | API key>`."""
     if not auth.auth_required():
         return auth.LOCAL_PRINCIPAL
@@ -78,6 +78,16 @@ def principal(request: Request, creds: HTTPAuthorizationCredentials | None = Dep
     if p.needs_2fa and not (p.via == "session" and request.url.path in TWO_FACTOR_SETUP_PATHS):
         raise HTTPException(403, {"error": "two_factor_required",
                                   "message": "This workspace requires two-factor authentication. Turn it on from your Account page."})
+    limit = int(auth.PLANS.get(p.plan, auth.PLANS["explorer"]).get("requests_per_minute") or 0)
+    if limit and p.via == "session":
+        limit = max(300, 5 * limit)  # the web app makes several calls per page and polls running research
+    if limit:
+        allowed, remaining, retry = ratelimit.take(f"{p.workspace_id}|{p.user_id}|{p.via}", limit)
+        headers = {"X-RateLimit-Limit": str(limit), "X-RateLimit-Remaining": str(remaining)}
+        if not allowed:
+            raise HTTPException(429, f"rate limit of {limit} requests per minute reached for the {p.plan.replace('_', ' ')} plan; "
+                                     f"retry in {retry}s", headers={**headers, "Retry-After": str(retry)})
+        response.headers.update(headers)
     return p
 
 
