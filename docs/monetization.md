@@ -59,7 +59,7 @@ ATLAS was built in roughly a week and has 136 automated tests and passing CI, bu
 
 Don't compete with Bloomberg, Koyfin or TradingView. Pick a niche where public data is enough and the value is turning it into a finished, verified analysis.
 
-1. **Agricultural trade intelligence for Latin American exporters**, importers, cooperatives, trade associations and the banks that finance them: sugar, coffee, soybeans and corn, plus flows like Bolivia–US. The data it relies on most is government data that allows commercial use. Plausible price: **$200–1,000 per month per company**.
+1. **Agricultural trade intelligence for Latin American exporters** (research briefs and reports can now be written in Spanish or Portuguese with Claude), importers, cooperatives, trade associations and the banks that finance them: sugar, coffee, soybeans and corn, plus flows like Bolivia–US. The data it relies on most is government data that allows commercial use. Plausible price: **$200–1,000 per month per company**.
 2. **A paid weekly newsletter or report service** produced with ATLAS. It has the lowest regulatory and licensing risk, and it is the fastest way to test whether anyone will pay.
 3. **University licences** for teaching finance and economics with verified analysis.
 4. **An API for fintechs** that want a verified AI research engine inside their own product. This comes later, once the data licensing for redistribution is settled.

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -36,55 +36,55 @@
 <body>
 <main>
   <header class="cover">
-    <div class="brand">ATLAS · RESEARCH</div>
+    <div class="brand">{{ L.brand }}</div>
     <h1>{{ title }}</h1>
     <div class="meta">
-      <span>Question: <em>{{ run.query }}</em></span>
-      <span>Generated {{ run.created_at }}</span>
-      <span>Engine: {{ res.engine }}{% if res.model %} ({{ res.model }}){% endif %}</span>
-      <span>Report v{{ version }} · run {{ run.run_id[:8] }}</span>
+      <span>{{ L.question }}: <em>{{ run.query }}</em></span>
+      <span>{{ L.generated }} {{ run.created_at }}</span>
+      <span>{{ L.engine }}: {{ res.engine }}{% if res.model %} ({{ res.model }}){% endif %}</span>
+      <span>{{ L.report }} v{{ version }} · run {{ run.run_id[:8] }}</span>
     </div>
     {% set v = res.verification %}
     {% if v.passed %}
-      <div class="banner ok">Verification passed: {{ v.numbers_verified }} of {{ v.numbers_checked }} numerical claims traced to stored observations or calculations; all citations resolve.</div>
+      <div class="banner ok">{{ L.verified.format(ok=v.numbers_verified, n=v.numbers_checked) }}</div>
     {% else %}
-      <div class="banner warn">Verification warning: {{ v.unverified_numbers|length }} of {{ v.numbers_checked }} numerical claims could not be traced to evidence{% if v.invalid_citations %}; invalid citations: {{ v.invalid_citations|join(", ") }}{% endif %}. Treat those figures as unverified (listed in the appendix).</div>
+      <div class="banner warn">{{ L.unverified.format(bad=v.unverified_numbers|length, n=v.numbers_checked, cites=(L.invalid_citations.format(ids=v.invalid_citations|join(", ")) if v.invalid_citations else "")) }}</div>
     {% endif %}
-    <div class="small">Research and decision-support only — not investment advice. Prices are public reference/benchmark series published with a lag, not live tradable quotes.</div>
+    <div class="small">{{ L.disclaimer }}</div>
   </header>
 
   {{ body|safe }}
 
   {% if charts %}
-  <h2>Charts</h2>
+  <h2>{{ L.charts }}</h2>
   {% for c in charts %}
   <figure>
-    <figcaption><strong>{{ c.title }}</strong> · {{ c.unit }} · source [{{ c.evidence }}]</figcaption>
+    <figcaption><strong>{{ c.title }}</strong> · {{ c.unit }} · {{ L.source }} [{{ c.evidence }}]</figcaption>
     {{ c.svg|safe }}
   </figure>
   {% endfor %}
   {% endif %}
 
-  <h2>Appendix A — Evidence</h2>
+  <h2>{{ L.appendix_a }}</h2>
   <table class="appendix">
-    <tr><th>ID</th><th>Tool</th><th>Citation</th></tr>
+    <tr><th>ID</th><th>{{ L.tool }}</th><th>{{ L.citation }}</th></tr>
     {% for e in res.evidence %}
     <tr><td>{{ e.label }}</td><td><code>{{ e.tool }}</code></td><td>{{ e.citation }}</td></tr>
     {% endfor %}
   </table>
 
-  <h2>Appendix B — Sources and freshness</h2>
+  <h2>{{ L.appendix_b }}</h2>
   <table>
-    <tr><th>Dataset</th><th>Observations through</th><th>Ingested</th><th>Freshness</th><th>Basis</th></tr>
+    <tr><th>{{ L.dataset }}</th><th>{{ L.obs_through }}</th><th>{{ L.ingested }}</th><th>{{ L.freshness }}</th><th>{{ L.basis }}</th></tr>
     {% for s in res.sources %}
     <tr><td>{% if s.url %}<a href="{{ s.url }}">{{ s.name }}</a>{% else %}{{ s.name }}{% endif %}</td><td>{{ s.observation_through }}</td><td>{{ s.ingested_at }}</td><td>{{ s.freshness }}</td><td>{{ s.price_basis|replace("_", " ") }}</td></tr>
     {% endfor %}
   </table>
 
   {% if not v.passed %}
-  <h2>Appendix C — Unverified figures</h2>
+  <h2>{{ L.appendix_c }}</h2>
   <table>
-    <tr><th>Value</th><th>Context</th></tr>
+    <tr><th>{{ L.value }}</th><th>{{ L.context }}</th></tr>
     {% for u in v.unverified_numbers %}<tr><td>{{ u.value }}</td><td>{{ u.context }}</td></tr>{% endfor %}
   </table>
   {% endif %}

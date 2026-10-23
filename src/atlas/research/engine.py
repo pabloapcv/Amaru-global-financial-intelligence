@@ -69,7 +69,7 @@ def _save_usage(run_id: str, researchers: list) -> None:
 # ---------------------------------------------------------------- result cache
 
 CACHE_CONFIG_KEYS = ("depth", "engine", "template", "lookback_years", "horizon_months", "assets", "formats", "documents_query",
-                     "parent_run_id")
+                     "parent_run_id", "language")
 
 
 def cache_key(query: str, config: dict[str, Any]) -> str:
@@ -225,7 +225,8 @@ def execute_run(run_id: str) -> dict[str, Any]:
                 researcher = llm.LLMResearcher()
                 researchers.append(researcher)
                 _progress(run_id, f"Investigating with {researcher.model}")
-                narrative, transcript = researcher.run(query, plan, ctx, lambda m: _progress(run_id, m), depth, prior)
+                narrative, transcript = researcher.run(query, plan, ctx, lambda m: _progress(run_id, m), depth, prior,
+                                                       config.get("language"))
                 engine, model = "llm", researcher.model
             except Exception as exc:
                 # An explicit LLM request fails loudly; only "auto" degrades to the deterministic engine.
@@ -243,17 +244,25 @@ def execute_run(run_id: str) -> dict[str, Any]:
         evidence = _evidence_dicts(ctx)
         _progress(run_id, "Verifying numerical claims and citations")
         asked = query + (" " + " ".join(prior["questions"]) if prior else "")
-        check = verify.verify(narrative, evidence, asked)
+        from atlas import i18n
+
+        language = i18n.lang(config.get("language"))
+        decimal_comma = engine == "llm" and language in i18n.DECIMAL_COMMA  # the deterministic writer writes English
+        check = verify.verify(narrative, evidence, asked, decimal_comma)
         if engine == "llm" and not check["passed"] and transcript is not None:
             _progress(run_id, f"{len(check['unverified_numbers'])} untraceable figure(s); requesting revision")
             try:
                 revised = researcher.revise(transcript, check)  # type: ignore[possibly-undefined]
-                recheck = verify.verify(revised, evidence, asked)
+                recheck = verify.verify(revised, evidence, asked, decimal_comma)
                 if len(recheck["unverified_numbers"]) <= len(check["unverified_numbers"]):
                     narrative, check = revised, recheck
             except Exception as exc:
                 log.warning("revision failed: %s", exc)
 
+        if engine == "deterministic" and i18n.labels(language)["deterministic_note"]:
+            lines = narrative.splitlines()
+            at = 1 if lines and lines[0].startswith("# ") else 0
+            narrative = "\n".join(lines[:at] + ["", i18n.labels(language)["deterministic_note"]] + lines[at:])
         if prior:  # say what this answers, under the title (after verification: it quotes a question, not a claim)
             lines = narrative.splitlines()
             at = 1 if lines and lines[0].startswith("# ") else 0

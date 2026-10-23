@@ -31,6 +31,14 @@ function ResearchForm({ onSubmitted }: { onSubmitted: (id: string) => void }) {
   const [horizon, setHorizon] = useState("3M");
   const [lookback, setLookback] = useState("5Y");
   const [engine, setEngine] = useState<"auto" | "llm" | "deterministic">("auto");
+  const [language, setLanguage] = useState<"en" | "es" | "pt">("en");
+  useEffect(() => {
+    try { const v = localStorage.getItem("atlas.language"); if (v === "es" || v === "pt") setLanguage(v); } catch { /* storage unavailable */ }
+  }, []);
+  const chooseLanguage = (v: "en" | "es" | "pt") => {
+    setLanguage(v);
+    try { localStorage.setItem("atlas.language", v); } catch { /* storage unavailable */ }
+  };
   const [xlsx, setXlsx] = useState(true);
   const [template, setTemplate] = useState("research_report");
   const [templates, setTemplates] = useState<{ key: string; name: string; description: string; default_query: string | null }[]>([]);
@@ -48,7 +56,7 @@ function ResearchForm({ onSubmitted }: { onSubmitted: (id: string) => void }) {
       const r = await api<{ run_id: string }>("/api/v1/research", {
         method: "POST",
         body: JSON.stringify({
-          query, depth, engine,
+          query, depth, engine, language,
           scope: { lookback, forecast_horizon: horizon },
           report: { formats: xlsx ? ["html", "xlsx"] : ["html"], template },
         }),
@@ -98,6 +106,13 @@ function ResearchForm({ onSubmitted }: { onSubmitted: (id: string) => void }) {
           <option value="deterministic">Deterministic (no LLM)</option>
         </select>
       </div>
+      <div className="field">
+        <label htmlFor="lang">Language of the brief</label>
+        <select id="lang" value={language} onChange={(e) => chooseLanguage(e.target.value as "en" | "es" | "pt")}>
+          <option value="en">English</option><option value="es">Español</option><option value="pt">Português</option>
+        </select>
+        {language !== "en" && engine === "deterministic" && <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>The deterministic engine writes English; Claude writes in {language === "es" ? "Spanish" : "Portuguese"}.</p>}
+      </div>
       <div className="row" style={{ marginTop: 12, justifyContent: "space-between" }}>
         <label className="row" style={{ margin: 0, fontWeight: 400 }}>
           <input type="checkbox" checked={xlsx} onChange={(e) => setXlsx(e.target.checked)} style={{ width: "auto" }} /> Excel export
@@ -129,6 +144,7 @@ function FollowUp({ run, onSubmitted }: { run: ResearchRun; onSubmitted: (id: st
       const r = await api<{ run_id: string }>("/api/v1/research", {
         method: "POST",
         body: JSON.stringify({ query: q.trim(), parent_run_id: run.run_id, depth: cfg.depth ?? "standard", engine: cfg.engine ?? "auto",
+          language: cfg.language ?? "en",
           report: { formats: cfg.formats ?? ["html", "xlsx"] } }),
       });
       setQ("");

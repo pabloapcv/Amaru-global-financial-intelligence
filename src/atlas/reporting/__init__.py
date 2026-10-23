@@ -146,8 +146,11 @@ def render_html(run: dict[str, Any], version: int) -> str:
     if body.startswith("<h1>"):
         body = body[body.index("</h1>") + 5:]
     charts = [{"title": c.get("title", ""), "evidence": c["evidence"], "unit": c.get("unit", ""), "svg": svg_chart(c)} for c in res.get("charts", [])]
+    from atlas import i18n
+
+    language = i18n.lang((run.get("config") or {}).get("language"))
     return _env.get_template("report.html").render(
-        title=res["title"], run=run, res=res, body=body, charts=charts, version=version,
+        title=res["title"], run=run, res=res, body=body, charts=charts, version=version, L=i18n.labels(language), lang=language,
     )
 
 

@@ -115,3 +115,49 @@ def test_follow_up_gives_claude_the_thread_without_stale_evidence_ids(seeded, mo
     assert "[E" not in previous  # earlier evidence ids are not valid in this run
     assert result["verification"]["passed"]
     assert "*Follow-up to: Analyze the relationship" in result["narrative_markdown"]
+
+
+def _spanish_final(req):
+    import json
+
+    quote = json.loads(req["messages"][-1]["content"][0]["content"])
+    value = f"{quote['value']:.2f}".replace(".", ",")
+    return NS(stop_reason="end_turn", model="claude-opus-5-5", usage=USAGE, content=[NS(type="text", text=(
+        f"# Informe sobre el azúcar\n\n## Resumen ejecutivo\n\nEl azúcar cotizó {value} {quote['unit']} "
+        f"el {quote['observation_date']} [{quote['evidence_id']}]. La curva de futuros no está conectada [E2]."
+    ))])
+
+
+def test_spanish_brief_verifies_decimal_commas_and_renders_a_spanish_report(seeded, monkeypatch, tmp_path):
+    from pathlib import Path
+
+    messages = ScriptedMessages([_tool_turn, _spanish_final])
+    monkeypatch.setattr(llm, "available", lambda: True)
+    monkeypatch.setattr(llm.anthropic, "Anthropic", lambda *a, **k: NS(beta=NS(messages=messages)))
+    run_id = engine.create_run("¿Qué pasa con el azúcar?", {"engine": "llm", "formats": ["html"], "language": "es", "cache": False})
+    result = engine.execute_run(run_id)
+
+    prompt = messages.requests[0]["messages"][0]["content"]
+    assert "Spanish (Latin American)" in prompt and "## Resumen ejecutivo" in prompt and "decimal comma" in prompt
+    assert result["verification"]["passed"] and result["verification"]["numbers_verified"] >= 1
+    from atlas.reporting import get_report
+
+    html = Path(get_report(result["report_id"])["paths"]["html"]).read_text()
+    assert '<html lang="es">' in html and "Verificación superada" in html and "Anexo A — Evidencia" in html
+    assert "not investment advice" not in html
+
+
+def test_comma_numbers_that_do_not_match_evidence_are_still_caught():
+    from atlas.research import verify
+
+    ev = [{"label": "E1", "result": {"value": 14.81}}]
+    ok = verify.verify("Cotizó 14,81 [E1].", ev, decimal_comma=True)
+    bad = verify.verify("Cotizó 41,18 [E1].", ev, decimal_comma=True)
+    assert ok["passed"] and not bad["passed"]
+    assert not verify.verify("Cotizó 14,81 [E1].", ev)["passed"]  # English mode does not reinterpret commas
+
+
+def test_deterministic_engine_says_it_writes_english(seeded):
+    run_id = engine.create_run("What's happening with sugar?", {"engine": "deterministic", "formats": [], "language": "pt", "cache": False})
+    md = engine.execute_run(run_id)["narrative_markdown"]
+    assert "motor determinístico, que escreve apenas em inglês" in md.splitlines()[2]

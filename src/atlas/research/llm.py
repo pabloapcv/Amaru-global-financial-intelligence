@@ -121,7 +121,9 @@ class LLMResearcher:
         progress: Callable[[str], None],
         depth: str = "standard",
         prior: dict[str, Any] | None = None,
+        language: str | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
+        from atlas.i18n import writing_instruction
         steps = json.dumps(plan["steps"], indent=1)
         thread = ""
         if prior:
@@ -141,6 +143,7 @@ class LLMResearcher:
                 f"Resolved entities: {', '.join(plan['entities']) or 'none — use search_instruments'}.\n"
                 f"Suggested plan (tool calls):\n{steps}\n\n"
                 + (f"Report type: {plan['template_brief']}\n\n" if plan.get("template_brief") else "")
+                + (writing_instruction(language) + "\n\n" if writing_instruction(language) else "")
                 + "Run the investigation, then write the brief."
             ),
         }]
