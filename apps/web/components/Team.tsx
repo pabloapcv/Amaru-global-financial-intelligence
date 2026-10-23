@@ -49,6 +49,9 @@ export default function Team() {
                   : m.role}
               </td>
               <td className="num">
+                {team.role === "owner" && !m.you && (
+                  <button className="secondary" style={{ marginRight: 6 }} onClick={() => { if (window.confirm(`Make ${m.email} the owner? You become an admin; only the new owner can change billing, roles and security policy.`)) call(api("/api/v1/team/transfer-ownership", { method: "POST", body: JSON.stringify({ user_id: m.user_id }) })).then(() => window.location.reload()); }}>Make owner</button>
+                )}
                 {m.role !== "owner" && (m.you || (manager && (team.role === "owner" || m.role === "member"))) && (
                   <button className="secondary" onClick={() => { if (window.confirm(m.you ? "Leave this workspace?" : `Remove ${m.email}? Their sessions and API keys for this workspace stop working.`)) call(api(`/api/v1/team/members/${m.user_id}`, { method: "DELETE" })).then(() => m.you && (window.location.href = "/")); }}>
                     {m.you ? "Leave" : "Remove"}

@@ -600,6 +600,71 @@ def pipelines_run(req: IngestRequest, p: Principal = Depends(require_admin)) -> 
     return {"status": "accepted", "dataset_ids": req.dataset_ids or "all"}
 
 
+# ---------------------------------------------------------------- personal data
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(..., max_length=500)
+    code: str | None = Field(None, max_length=20)
+    confirm_email: str = Field(..., max_length=320)
+
+
+class TransferRequest(BaseModel):
+    user_id: str = Field(..., max_length=64)
+
+
+@api.get("/account/export")
+def export_my_data(p: Principal = Depends(principal)):
+    from atlas import privacy
+
+    if p.via == "local":
+        raise HTTPException(400, "single-user mode has no personal account")
+    import json
+
+    body = json.dumps(privacy.export_personal_data(p), indent=2, default=str)
+    return Response(body, media_type="application/json", headers={
+        "Content-Disposition": f'attachment; filename="atlas-my-data-{date.today().isoformat()}.json"'})
+
+
+@api.get("/account/deletion-check")
+def deletion_check(p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import privacy
+
+    problems, purge = privacy.deletion_blockers(p.user_id)
+    return {"can_delete": not problems, "blockers": problems, "workspaces_deleted": purge}
+
+
+@api.post("/account/delete")
+def delete_my_account(req: DeleteAccountRequest, request: Request, response: Response, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import privacy
+
+    if p.via != "session":
+        raise HTTPException(400, "delete your account from a signed-in browser session")
+    if req.confirm_email.strip().lower() != p.email:
+        raise HTTPException(422, "type your account email to confirm")
+    try:
+        auth._throttle(f"delete|{p.user_id}|{request.client.host if request.client else ''}")
+        out = privacy.delete_account(p, req.password, req.code)
+    except auth.AuthError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except auth.ValidationError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return out
+
+
+@api.post("/team/transfer-ownership", status_code=204)
+def transfer_ownership(req: TransferRequest, p: Principal = Depends(principal)) -> None:
+    from atlas import privacy
+
+    try:
+        privacy.transfer_ownership(p, req.user_id)
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except KeyError:
+        _404("member")
+
+
 # ---------------------------------------------------------------- billing
 
 

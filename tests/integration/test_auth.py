@@ -664,3 +664,103 @@ def test_workspace_can_require_two_factor(secured):
     secured.cookies.clear()
     _signup(secured, "elsewhere@policy.test", "Somewhere else")
     assert secured.get("/api/v1/research").status_code == 200
+
+
+def test_export_and_delete_a_solo_account_purges_everything(secured):
+    from pathlib import Path
+
+    from sqlalchemy import select
+
+    from atlas.config import settings
+    from atlas.data.db import AuditEvent, Portfolio, ResearchRun, User, Workspace, session_scope
+    from atlas.research import engine
+
+    me = _signup(secured, "leaving@privacy.test", "Solo")
+    ws, uid = me["workspace"]["workspace_id"], me["user"]["user_id"]
+    run = engine.create_run("copper outlook", {"engine": "deterministic", "depth": "quick", "formats": ["html"]}, uid, ws)
+    report_id = engine.execute_run(run)["report_id"]
+    token = secured.post(f"/api/v1/reports/{report_id}/shares", json={"days": 7}).json()["token"]
+    secured.post("/api/v1/watchlist/CMD.SUGAR.ISA")
+    secured.post("/api/v1/api-keys", json={"name": "k"})
+    with session_scope() as s:
+        s.add(Portfolio(workspace_id=ws, user_id=uid, name="Mine", holdings=[{"dataset_id": "CMD.SUGAR.ISA", "weight": 1}]))
+
+    exported = secured.get("/api/v1/account/export")
+    assert exported.status_code == 200 and "attachment" in exported.headers["content-disposition"]
+    data = exported.json()
+    assert data["account"]["email"] == "leaving@privacy.test" and data["research"][0]["question"] == "copper outlook"
+    assert data["portfolios"][0]["name"] == "Mine" and data["api_keys"][0]["prefix"].startswith("atk_")
+    assert "password_hash" not in str(data) and "totp" not in str(data["account"]).replace("two_factor_enabled", "")
+
+    check = secured.get("/api/v1/account/deletion-check").json()
+    assert check["can_delete"] and check["workspaces_deleted"] == ["Solo"]
+    assert secured.post("/api/v1/account/delete", json={"password": "wrong password!!", "confirm_email": "leaving@privacy.test"}).status_code == 403
+    assert secured.post("/api/v1/account/delete", json={"password": "correct horse battery", "confirm_email": "nope@x.test"}).status_code == 422
+    r = secured.post("/api/v1/account/delete", json={"password": "correct horse battery", "confirm_email": "leaving@privacy.test"})
+    assert r.status_code == 200 and r.json()["workspaces_deleted"] == ["Solo"]
+
+    with session_scope() as s:
+        assert s.get(User, uid) is None and s.get(Workspace, ws) is None
+        assert not s.execute(select(ResearchRun).where(ResearchRun.workspace_id == ws)).first()
+        assert not s.execute(select(AuditEvent).where(AuditEvent.workspace_id == ws)).first()
+        assert all("leaving@privacy.test" not in str(e.detail) and e.user_id != uid for e in s.execute(select(AuditEvent)).scalars())
+        assert s.execute(select(AuditEvent).where(AuditEvent.action == "privacy.account_deleted")).first()
+    assert not (Path(settings.object_store) / "reports" / report_id).exists()
+    assert secured.get(f"/share/{token}").status_code == 404
+    secured.cookies.clear()
+    assert "token" not in secured.post("/api/v1/auth/login", json={"email": "leaving@privacy.test", "password": "correct horse battery"}).json()
+
+
+def test_owners_transfer_before_deleting_and_shared_work_stays(secured):
+    from atlas import secretbox, totp
+    from atlas.data.db import Membership, ResearchRun, Workspace, session_scope
+    from atlas.research import engine
+
+    secretbox._fernet.cache_clear()
+    owner = _signup(secured, "founder@privacy.test", "Shared desk")
+    ws, uid = owner["workspace"]["workspace_id"], owner["user"]["user_id"]
+    shared_run = engine.create_run("sugar outlook", {"engine": "deterministic", "depth": "quick", "formats": []}, uid, ws)
+    engine.execute_run(shared_run)
+    auth.set_plan(ws, "investor")
+    tok = secured.post("/api/v1/team/invitations", json={"email": "heir@privacy.test"}).json()["link"].split("token=")[1]
+    owner_session = secured.cookies.get("atlas_session")
+    secured.cookies.clear()
+    heir = secured.post("/api/v1/auth/invitations/accept", json={"token": tok, "password": "heir password!!"}).json()
+    heir_session = secured.cookies.get("atlas_session")
+
+    secured.cookies.clear()
+    secured.cookies.set("atlas_session", owner_session)
+    sec = secured.post("/api/v1/account/2fa/setup").json()["secret"]
+    codes = secured.post("/api/v1/account/2fa/enable", json={"code": totp.code_at(sec, totp.current_step())}).json()["recovery_codes"]
+    body = {"password": "correct horse battery", "confirm_email": "founder@privacy.test"}
+
+    check = secured.get("/api/v1/account/deletion-check").json()
+    assert not check["can_delete"] and "transfer ownership of 'Shared desk'" in check["blockers"][0]
+    assert secured.post("/api/v1/account/delete", json=body).status_code == 403  # 2FA code required
+    assert secured.post("/api/v1/account/delete", json={**body, "code": codes[0]}).status_code == 409  # still the owner
+
+    # Only the owner transfers; afterwards the founder is an admin and can leave by deleting.
+    assert secured.post("/api/v1/team/transfer-ownership", json={"user_id": "not-a-member"}).status_code == 404
+    assert secured.post("/api/v1/team/transfer-ownership", json={"user_id": heir["user"]["user_id"]}).status_code == 204
+    r = secured.post("/api/v1/account/delete", json={**body, "code": codes[1]})
+    assert r.status_code == 200 and r.json()["workspaces_deleted"] == []
+
+    secured.cookies.clear()
+    secured.cookies.set("atlas_session", heir_session)
+    team = secured.get("/api/v1/team").json()
+    assert team["role"] == "owner" and [m["email"] for m in team["members"]] == ["heir@privacy.test"]
+    with session_scope() as s:
+        assert s.get(ResearchRun, shared_run) is not None and s.get(Workspace, ws) is not None  # shared work stays
+
+
+def test_live_subscription_blocks_deleting_its_only_member(secured):
+    from atlas.data.db import Workspace, session_scope
+
+    me = _signup(secured, "subscriber@privacy.test", "Paid solo")
+    with session_scope() as s:
+        w = s.get(Workspace, me["workspace"]["workspace_id"])
+        w.billing_status, w.stripe_subscription_id = "active", "sub_live"
+    check = secured.get("/api/v1/account/deletion-check").json()
+    assert not check["can_delete"] and "cancel the paid subscription" in check["blockers"][0]
+    r = secured.post("/api/v1/account/delete", json={"password": "correct horse battery", "confirm_email": "subscriber@privacy.test"})
+    assert r.status_code == 409

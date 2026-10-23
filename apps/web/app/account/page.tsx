@@ -6,6 +6,7 @@ import Activity from "@/components/Activity";
 import Billing from "@/components/Billing";
 import Team from "@/components/Team";
 import TwoFactor from "@/components/TwoFactor";
+import YourData from "@/components/YourData";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
 type Key = { key_id: string; name: string; prefix: string; created_at: string; last_used_at: string | null };
@@ -127,6 +128,7 @@ export default function AccountPage() {
       {account && account.auth === "session" && <div style={{ marginBottom: 14 }}><TwoFactor account={account} onChange={load} /></div>}
       {account && account.auth !== "local" && <div style={{ marginBottom: 14 }}><Team /></div>}
       {account && account.auth !== "local" && (account.role === "owner" || account.role === "admin") && <div style={{ marginBottom: 14 }}><Activity /></div>}
+      {account && account.auth === "session" && <div style={{ marginBottom: 14 }}><YourData account={account} /></div>}
       <Card title="API keys">
         <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
           Use a key from scripts and notebooks: <code>Authorization: Bearer atk_…</code>. Keys act on this workspace and are shown only once.
