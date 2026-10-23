@@ -16,7 +16,6 @@ import pandas as pd
 
 from atlas.data.access import get_fundamentals, get_positioning, get_series, get_trade, series_meta
 from atlas.instruments import get_dataset
-from atlas.provider_sdk import get_adapter
 
 MAX_ROWS = 500_000
 
@@ -53,14 +52,14 @@ def _frame(dataset_id: str, start: date | None, end: date | None, as_of: datetim
 
 
 def provenance(dataset_id: str, as_of: datetime | None = None) -> dict[str, Any]:
-    ds = get_dataset(dataset_id)
     meta = series_meta(dataset_id)
-    adapter = get_adapter(ds.provider_id) if ds and ds.has_source else None  # type: ignore[arg-type]
+    lic = meta.licence or {}
     return {
         "dataset_id": dataset_id, "name": meta.name, "kind": meta.kind, "unit": meta.unit, "frequency": meta.frequency,
         "source": meta.provider, "source_symbol": meta.provider_symbol, "source_url": meta.source_url, "citation": meta.citation,
         "observations_through": meta.last_observation, "ingested_at": meta.last_ingested_at, "freshness": meta.freshness,
-        "licence": adapter.licence_note if adapter else None, "as_of": as_of.isoformat() if as_of else None,
+        "licence": f"{lic.get('label')}: {lic.get('owner')}. {lic.get('note')}" if lic else None,
+        "as_of": as_of.isoformat() if as_of else None,
         "price_basis": meta.price_basis,
     }
 

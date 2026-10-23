@@ -4,10 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { API_URL, api, type Freshness } from "@/lib/api";
 import { Card, ErrorNote, FreshnessBadge, PageHeader } from "@/components/ui";
 
+const LICENCES: Record<string, [string, string]> = {
+  public_domain: ["Public domain", "current"], cc_by: ["CC BY 4.0", "current"], check_terms: ["Check terms", "delayed"],
+  third_party_restricted: ["Restricted", "stale"],
+};
 const PROVIDERS: Record<string, string> = { fred: "FRED", cftc: "CFTC", worldbank: "WB", comtrade: "Comtrade", usda_psd: "USDA" };
 
 type Status = {
   dataset_id: string; name: string; kind: string; asset_class: string; frequency: string; provider_id: string | null; provider_symbol: string | null;
+  licence: string | null;
   observation_date: string | null; ingested_at: string | null; checked_at: string | null; n_observations: number;
   freshness: Freshness; freshness_note: string;
 };
@@ -62,8 +67,9 @@ export default function DataExplorer() {
           </div>
         }
       >
+        <div style={{ overflowX: "auto" }}>
         <table>
-          <thead><tr><th>Dataset</th><th>Source</th><th>Freq.</th><th>Observation</th><th>Ingested</th><th className="num">Obs.</th><th>Freshness</th><th className="num">Export</th></tr></thead>
+          <thead><tr><th>Dataset</th><th>Source</th><th>Freq.</th><th>Observation</th><th>Ingested</th><th className="num">Obs.</th><th>Freshness</th><th>Licence</th><th className="num">Export</th></tr></thead>
           <tbody>
             {shown.map((s) => (
               <tr key={s.dataset_id}>
@@ -74,11 +80,13 @@ export default function DataExplorer() {
                 <td className="muted">{s.ingested_at?.replace("T", " ").slice(0, 16) ?? "—"}</td>
                 <td className="num">{s.n_observations.toLocaleString()}</td>
                 <td title={s.freshness_note}><FreshnessBadge value={s.freshness} /></td>
+                <td>{s.licence ? <span className={`badge badge-${LICENCES[s.licence]?.[1] ?? "no_data"}`}>{LICENCES[s.licence]?.[0] ?? s.licence}</span> : <span className="muted">—</span>}</td>
                 <td className="num">{s.n_observations > 0 ? <a href={`${API_URL}/api/v1/datasets/${s.dataset_id}/export?format=csv`}>CSV</a> : <span className="muted">—</span>}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </Card>
       <div style={{ height: 14 }} />
       <Card title={`Pipeline runs · 30-day success rate ${pipes?.success_rate_30d != null ? (pipes.success_rate_30d * 100).toFixed(1) + "%" : "—"} (${pipes?.runs_30d ?? 0} runs)`}>

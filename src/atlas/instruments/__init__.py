@@ -45,8 +45,16 @@ def load_registry() -> dict[str, Any]:
 def datasets() -> dict[str, Dataset]:
     reg = load_registry()
     out: dict[str, Dataset] = {}
+    import os
+
+    commercial = os.getenv("ATLAS_COMMERCIAL_MODE", "false").lower() == "true"
     for inst in reg["instruments"]:
         src = inst["sources"][0] if inst["sources"] else {}
+        lic = inst.get("licence") or {}
+        if commercial and lic.get("class") == "third_party_restricted":
+            # Showing these to paying users is redistribution: off until a licence is in place.
+            src = {}
+            inst = {**inst, "coverage_note": f"Not available in this commercial deployment: {lic.get('note')}"}
         out[inst["instrument_id"]] = Dataset(
             dataset_id=inst["instrument_id"],
             kind="market",
@@ -88,6 +96,7 @@ def datasets() -> dict[str, Dataset]:
                     # No keywords: countries are resolved separately so 200+ series don't swamp entity extraction.
                     tags=("country", c["iso3"].lower(), *c["groups"]),
                     meta={"country": c["iso3"], "country_name": c["name"], "indicator": ind["indicator"], "refresh": "weekly_poll",
+                          "licence": cm.get("licence"),
                           "indicator_key": ind["key"], "groups": c["groups"], "asset_class": "macro",
                           "description": f"{ind['name']} for {c['name']}, annual (World Bank WDI, code {ind['code']})."},
                 )
@@ -99,6 +108,7 @@ def datasets() -> dict[str, Dataset]:
             provider_symbol=f"{rep}:{par}", frequency="annual", unit="USD",
             tags=("trade", rep.lower(), par.lower()),
             meta={"reporter": rep, "partner": par, "asset_class": "trade", "refresh": "weekly_poll",
+                  "licence": reg.get("trade_pairs", {}).get("licence"),
                   "description": f"{names[rep]}'s declared goods trade with {names[par]} (UN Comtrade, annual, USD): totals and HS-chapter breakdown."},
         )
     fund = reg.get("fundamentals", {})
@@ -109,7 +119,7 @@ def datasets() -> dict[str, Dataset]:
             provider_id=fund["provider_id"], provider_symbol=c["provider_symbol"], frequency="annual", unit=c["unit"],
             # No keywords: commodity questions resolve to the price instrument; fundamentals attach to it.
             tags=("fundamentals", c["key"].lower()),
-            meta={**c, "asset_class": "fundamentals", "refresh": "weekly_poll",
+            meta={**c, "asset_class": "fundamentals", "refresh": "weekly_poll", "licence": fund.get("licence"),
                   "description": f"{c['name']} production, consumption, trade and stocks by country and market year "
                                  f"(USDA FAS PSD; the latest market year is a USDA projection, revised monthly)."},
         )
@@ -127,6 +137,16 @@ def datasets() -> dict[str, Dataset]:
             meta=s,
         )
     return out
+
+
+LICENCE_LABELS = {"public_domain": "Public domain", "cc_by": "CC BY 4.0", "check_terms": "Check terms",
+                  "third_party_restricted": "Restricted (third party)"}
+
+
+def licence_of(ds: Dataset | None) -> dict[str, Any] | None:
+    """{class, label, owner, note} for a dataset, or None when no source is configured."""
+    lic = (ds.meta.get("licence") if ds else None) or None
+    return {**lic, "label": LICENCE_LABELS.get(lic["class"], lic["class"])} if lic else None
 
 
 def fundamentals_for(text_or_id: str) -> str | None:

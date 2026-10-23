@@ -29,6 +29,8 @@ You can sell it: it is your software, built on permissively licensed open-source
 | UN Comtrade | The free API tier may not allow commercial use; there is a paid tier |
 | Exchange data (CME, ICE): futures, real-time | Not connected. Licences cost thousands per month and would change the pricing completely |
 
+ATLAS now records each dataset's licence class and owner (Data Explorer, provenance, export headers). Setting `ATLAS_COMMERCIAL_MODE=true` switches off the three restricted series so a paid deployment does not redistribute them; "check terms" sources (IMF, UN Comtrade) still need a decision from you. The classification is a best-effort reading of each source's terms as of October 2026, not legal advice.
+
 ### 2. The data is public and delayed
 
 Commodity prices are monthly IMF averages; for example, sugar's latest value was from July in October. Professional traders already pay for Bloomberg or Refinitiv and won't pay for lagged public data. The realistic buyer is someone who doesn't have a terminal.

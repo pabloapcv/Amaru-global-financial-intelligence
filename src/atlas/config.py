@@ -65,6 +65,8 @@ class Settings:
     )
     # Optional free FRED API key: enables official U.S. statistical release dates in the calendar.
     fred_api_key: str = field(default_factory=lambda: os.getenv("FRED_API_KEY", ""))
+    # Commercial deployments: switch off datasets whose owners restrict redistribution (see docs/monetization.md).
+    commercial_mode: bool = field(default_factory=lambda: os.getenv("ATLAS_COMMERCIAL_MODE", "false").lower() == "true")
     cors_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(
             os.getenv("ATLAS_CORS_ORIGINS", "http://localhost:3010,http://127.0.0.1:3010").split(",")
