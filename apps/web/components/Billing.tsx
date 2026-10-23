@@ -10,7 +10,7 @@ type Summary = { configured: boolean; plan: string; status: string | null; has_c
 
 const NAMES: Record<string, string> = { explorer: "Explorer", investor: "Investor", research_pro: "Research Pro", pro: "Pro" };
 const SHOWN: [string, string][] = [["seats", "Seats"], ["research_per_day", "Research runs / day"], ["llm_research_per_day", "Claude runs / day"],
-  ["llm_budget_usd_per_month", "Claude budget / month ($)"], ["agents", "Agents"], ["api_keys", "API keys"]];
+  ["llm_budget_usd_per_month", "Claude budget / month ($)"], ["agents", "Agents"], ["api_keys", "API keys"], ["requests_per_minute", "API requests / minute"]];
 
 export default function Billing() {
   const params = useSearchParams();

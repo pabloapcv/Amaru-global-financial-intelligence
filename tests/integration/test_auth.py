@@ -764,3 +764,39 @@ def test_live_subscription_blocks_deleting_its_only_member(secured):
     assert not check["can_delete"] and "cancel the paid subscription" in check["blockers"][0]
     r = secured.post("/api/v1/account/delete", json={"password": "correct horse battery", "confirm_email": "subscriber@privacy.test"})
     assert r.status_code == 409
+
+
+def test_api_rate_limits_by_plan(secured, monkeypatch):
+    from atlas import ratelimit
+
+    ratelimit.reset()
+    now = [1000.0]
+    monkeypatch.setattr(ratelimit, "clock", lambda: now[0])
+    monkeypatch.setitem(auth.PLANS["explorer"], "requests_per_minute", 3)
+    me = _signup(secured, "busy@rate.test", "Busy")
+    key = secured.post("/api/v1/api-keys", json={"name": "script"}).json()["key"]
+    secured.cookies.clear()
+    h = {"Authorization": f"Bearer {key}"}
+    first = secured.get("/api/v1/watchlist", headers=h)
+    assert first.status_code == 200 and first.headers["x-ratelimit-limit"] == "3" and first.headers["x-ratelimit-remaining"] == "2"
+    assert [secured.get("/api/v1/watchlist", headers=h).status_code for _ in range(2)] == [200, 200]
+    blocked = secured.get("/api/v1/watchlist", headers=h)
+    assert blocked.status_code == 429 and blocked.headers["retry-after"] == "20" and "explorer plan" in blocked.json()["detail"]
+    now[0] += 20  # one token back after 60/3 seconds
+    assert secured.get("/api/v1/watchlist", headers=h).status_code == 200
+    assert secured.get("/api/v1/watchlist", headers=h).status_code == 429
+
+    # Browser sessions get more headroom (5x the plan, at least 300/min); other users have their own buckets.
+    secured.post("/api/v1/auth/login", json={"email": "busy@rate.test", "password": "correct horse battery"})
+    s = secured.get("/api/v1/watchlist")
+    assert s.status_code == 200 and s.headers["x-ratelimit-limit"] == "300"
+    secured.cookies.clear()
+    _signup(secured, "calm@rate.test", "Calm")
+    assert secured.get("/api/v1/watchlist").status_code == 200
+    # A bigger plan raises the key's limit.
+    auth.set_plan(me["workspace"]["workspace_id"], "pro")
+    secured.cookies.clear()
+    now[0] += 1  # 600/min refills 10 tokens a second
+    upgraded = secured.get("/api/v1/watchlist", headers=h)
+    assert upgraded.status_code == 200 and upgraded.headers["x-ratelimit-limit"] == "600"
+    ratelimit.reset()
