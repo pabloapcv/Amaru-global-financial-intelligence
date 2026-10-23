@@ -127,6 +127,15 @@ tests/           unit, integration (pipeline, API, LLM loop), financial_validati
 
 See `.env.example`. Key variables: `ATLAS_DATABASE_URL`, `ATLAS_OBJECT_STORE`, `ATLAS_LLM` (`auto`/`off`), `ATLAS_LLM_MODEL` (default `claude-opus-5-5`), `ATLAS_LLM_EFFORT`, `ATLAS_SCHEDULER=on` (refresh inside the API process), `FRED_API_KEY` (optional; official U.S. data release dates), `NEXT_PUBLIC_API_URL` for the web app.
 
+## Backups
+
+```bash
+atlas backup --out backups            # one .tar.gz: every table, report files, raw payloads (--no-raw to skip)
+atlas restore backups/atlas-backup-20261023T153250Z.tar.gz --database-url postgresql+psycopg://...
+```
+
+Backups are database-neutral (each table as gzipped JSON lines), so a SQLite backup restores into PostgreSQL and back. Restore checks every file's SHA-256 against the manifest, rejects unsafe archive entries, and only writes into an empty database. The key that encrypts two-factor secrets (`ATLAS_SECRET_KEY` or `data/secret.key`) is never included: keep it separately, or users with two-factor sign in with a recovery code and re-enroll. In Docker: `docker compose exec api atlas backup --out /data/backups`.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every push to `main` and on pull requests: the Python tests on 3.12 and 3.13 (SQLite) and again on TimescaleDB/PostgreSQL 16, a web type-check and production build, and a build of both Docker images with an API smoke test. To run the suite against Postgres locally, set `ATLAS_TEST_DATABASE_URL` (the database is wiped).
