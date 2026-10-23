@@ -912,6 +912,7 @@ class ResearchRequest(BaseModel):
     report: ResearchReportOptions = Field(default_factory=ResearchReportOptions)
     no_cache: bool = Field(False, description="Always run fresh research, even if an identical recent answer exists.")
     parent_run_id: str | None = Field(None, description="Ask a follow-up to this completed run in the same workspace.")
+    language: Literal["en", "es", "pt"] = Field("en", description="Language of the brief and report (Claude engine; the deterministic engine writes English).")
 
 
 def _parse_period(text: str | None, unit_months: dict[str, float]) -> float | None:
@@ -946,6 +947,7 @@ def create_research(req: ResearchRequest, p: Principal = Depends(require_verifie
         "depth": req.depth, "engine": req.engine, "assets": req.scope.assets,
         "geographies": req.scope.geographies, "lookback_years": lb, "horizon_months": int(hz) if hz else None,
         "analysis": req.analysis, "formats": req.report.formats, "template": req.report.template,
+        **({"language": req.language} if req.language != "en" else {}),
     }
     if req.no_cache:
         config["cache"] = False

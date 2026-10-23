@@ -67,7 +67,17 @@ def _matches(value: float, decimals: int, pool: list[float]) -> bool:
     return False
 
 
-def verify(narrative: str, evidence: list[dict[str, Any]], question: str = "") -> dict[str, Any]:
+_THOUSANDS_DOT = re.compile(r"(?<![\w.,])(\d{1,3}(?:\.\d{3})+)(?:,(\d+))?(?![\d.,]\d)")
+_DECIMAL_COMMA = re.compile(r"(?<![\w.,])(\d+),(\d+)(?![\d.,]\d)")
+
+
+def normalize_decimal_comma(text: str) -> str:
+    """'1.234,56' -> '1234.56' and '14,81' -> '14.81' (Spanish/Portuguese number format)."""
+    text = _THOUSANDS_DOT.sub(lambda m: m.group(1).replace(".", "") + (f".{m.group(2)}" if m.group(2) else ""), text)
+    return _DECIMAL_COMMA.sub(r"\1.\2", text)
+
+
+def verify(narrative: str, evidence: list[dict[str, Any]], question: str = "", decimal_comma: bool = False) -> dict[str, Any]:
     labels = {e["label"] for e in evidence}
     cited = set()
     invalid = []
@@ -80,6 +90,8 @@ def verify(narrative: str, evidence: list[dict[str, Any]], question: str = "") -
 
     text = CITE_RE.sub(" ", narrative)
     text = DATE_RE.sub(" ", text)
+    if decimal_comma:
+        text = normalize_decimal_comma(text)
     pool = evidence_numbers(evidence)
     question_nums = {float(x) for x in re.findall(r"\d+(?:\.\d+)?", question)}
     checked, unverified = 0, []
