@@ -33,6 +33,13 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("workspaces", help="list workspaces, plans, members and this month's Claude spend")
     bm = sub.add_parser("benchmark", help="measure the spec's acceptance targets (§16) on this deployment's data")
     bm.add_argument("--json", action="store_true", help="print the full result as JSON")
+    bk = sub.add_parser("backup", help="write a portable backup archive (database, reports, raw payloads)")
+    bk.add_argument("--out", default="backups", help="directory for the archive (default ./backups)")
+    bk.add_argument("--no-raw", action="store_true", help="skip raw provider payloads (they can be re-fetched)")
+    rs2 = sub.add_parser("restore", help="restore a backup archive into an empty database")
+    rs2.add_argument("archive")
+    rs2.add_argument("--database-url", help="target database (default ATLAS_DATABASE_URL)")
+    rs2.add_argument("--object-store", help="target folder for report and raw files (default ATLAS_OBJECT_STORE)")
     d2 = sub.add_parser("disable-2fa", help="turn off a user's two-factor authentication (lost device and recovery codes)")
     d2.add_argument("email")
     sp = sub.add_parser("set-plan", help="change a workspace's plan")
@@ -73,6 +80,24 @@ def main(argv: list[str] | None = None) -> None:
         from atlas.ingestion.scheduler import run_forever, run_once
 
         print(f"refreshed {run_once()} dataset(s)") if args.once else run_forever()
+    elif args.cmd == "backup":
+        from atlas import backup
+
+        init_db()
+        path = backup.create(args.out, include_raw=not args.no_raw)
+        m = backup.describe(path)
+        print(f"{path} ({path.stat().st_size / 1e6:.1f} MB, {sum(m['tables'].values()):,} rows, {len(m['files'])} files)")
+        print("Not included: the two-factor encryption key (ATLAS_SECRET_KEY or data/secret.key). Keep it separately.")
+    elif args.cmd == "restore":
+        from atlas import backup
+
+        try:
+            out = backup.restore(args.archive, args.database_url, object_store=args.object_store)
+        except (ValueError, FileNotFoundError) as exc:
+            raise SystemExit(f"restore refused: {exc}")
+        print(f"restored {out['rows']:,} rows in {len(out['tables'])} tables and {out['files']} files "
+              f"(backup from {out['created_at']}, {out['from_dialect']}, ATLAS {out['atlas_version']})")
+        print(out["note"])
     elif args.cmd == "disable-2fa":
         from atlas import auth
 

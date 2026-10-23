@@ -51,7 +51,7 @@ ATLAS was built in roughly a week and has 136 automated tests and passing CI, bu
 - Billing: the Stripe integration is now built (Checkout, Customer Portal, verified webhooks) and only needs your Stripe account, prices and webhook set up
 - Production hosting
 - Terms of service and a privacy policy (the product side of data rights is built: people can download their data and delete their account, which privacy laws such as GDPR, Brazil's LGPD and California's CCPA expect)
-- Backups
+- Backups: `atlas backup` / `atlas restore` are built; scheduling them and storing copies off-site is part of hosting
 - Support
 - A security review
 

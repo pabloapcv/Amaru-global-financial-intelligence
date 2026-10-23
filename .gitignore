@@ -9,3 +9,4 @@ apps/web/.next/
 apps/web/next-env.d.ts
 .claude/settings.local.json
 *.tsbuildinfo
+/backups/
