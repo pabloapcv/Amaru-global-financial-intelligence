@@ -600,6 +600,64 @@ def pipelines_run(req: IngestRequest, p: Principal = Depends(require_admin)) -> 
     return {"status": "accepted", "dataset_ids": req.dataset_ids or "all"}
 
 
+# ---------------------------------------------------------------- billing
+
+
+class CheckoutRequest(BaseModel):
+    plan: Literal["investor", "research_pro", "pro"]
+
+
+@api.get("/billing")
+def billing_summary(p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import billing
+
+    return billing.summary(p)
+
+
+def _billing_call(fn, *args) -> dict[str, Any]:
+    from atlas import billing
+
+    try:
+        return {"url": fn(*args)}
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except billing.NotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except billing.BillingError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@api.post("/billing/checkout")
+def billing_checkout(req: CheckoutRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
+    from atlas import billing
+
+    return _billing_call(billing.checkout, p, req.plan)
+
+
+@api.post("/billing/portal")
+def billing_portal(p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import billing
+
+    return _billing_call(billing.portal, p)
+
+
+@app.post(f"{V1}/billing/webhook", include_in_schema=False)
+async def stripe_webhook(request: Request) -> dict[str, Any]:
+    """Stripe events. Only signed payloads are accepted; each event is applied once."""
+    import json
+
+    from atlas import billing
+
+    payload = await request.body()
+    if not billing.verify_signature(payload, request.headers.get("stripe-signature"), os.getenv("STRIPE_WEBHOOK_SECRET", "")):
+        raise HTTPException(400, "invalid signature")
+    try:
+        event = json.loads(payload)
+    except ValueError as exc:
+        raise HTTPException(400, "invalid payload") from exc
+    return {"received": True, "result": billing.handle_event(event)}
+
+
 # ---------------------------------------------------------------- two-factor authentication
 
 
