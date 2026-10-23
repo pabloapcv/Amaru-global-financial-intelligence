@@ -316,7 +316,8 @@ def logout(request: Request, response: Response) -> None:
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {"status": "ok", "version": __version__, "llm_configured": llm.available(), "llm_model": settings.llm_model,
-            "auth_required": auth.auth_required(), "signup_allowed": auth.signup_allowed()}
+            "auth_required": auth.auth_required(), "signup_allowed": auth.signup_allowed(),
+            "commercial_mode": settings.commercial_mode}
 
 
 # ---------------------------------------------------------------- account
@@ -432,7 +433,7 @@ def list_instruments() -> list[dict[str, Any]]:
             "asset_class": d.meta.get("asset_class", "macro"), "frequency": d.frequency, "unit": d.unit,
             "price_basis": d.meta.get("price_basis", "economic_indicator"), "description": d.meta.get("description", ""),
             "has_source": d.has_source, "observation_date": st["observation_date"], "freshness": st["freshness"],
-            "coverage_note": d.meta.get("coverage_note"),
+            "coverage_note": d.meta.get("coverage_note"), "licence": st.get("licence"),
         })
     return out
 

@@ -87,6 +87,7 @@ export default function InstrumentDetail({ id, defaultYears = 5 }: { id: string;
             {p?.max_drawdown_5y_pct != null && (<><dt>5Y max DD</dt><dd>{fmt(p.max_drawdown_5y_pct)}%</dd></>)}
             {p?.percentile_in_5y_range != null && (<><dt>5Y percentile</dt><dd>{fmt(p.percentile_in_5y_range, 1)}</dd></>)}
             <dt>Citation</dt><dd className="muted" style={{ fontSize: 12 }}>{m.citation ?? "—"}</dd>
+            {m.licence && <><dt>Licence</dt><dd style={{ fontSize: 12 }}>{m.licence.label} · <span className="muted">{m.licence.owner}. {m.licence.note}</span></dd></>}
             <dt>Export</dt><dd><a href={`${API_URL}/api/v1/datasets/${id}/export?format=csv`}>CSV</a> · <a href={`${API_URL}/api/v1/datasets/${id}/export?format=json`}>JSON</a> <span className="muted" style={{ fontSize: 12 }}>full history with provenance</span></dd>
           </dl>
         </Card>

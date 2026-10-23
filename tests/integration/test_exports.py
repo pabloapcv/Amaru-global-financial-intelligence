@@ -60,3 +60,32 @@ def test_exports_need_sign_in_and_are_audited(seeded, monkeypatch):
     with session_scope() as s:
         ev = s.execute(select(AuditEvent).where(AuditEvent.workspace_id == ws, AuditEvent.action == "data.exported")).scalars().all()
     assert ev and ev[-1].detail == {"dataset_id": "FUND.SUGAR", "format": "json"}
+
+
+def test_every_sourced_dataset_has_a_licence_and_commercial_mode_withholds_restricted(seeded, monkeypatch):
+    from atlas import instruments
+    from atlas.data.access import DataUnavailable, get_series, series_meta
+    from atlas.research import tools
+
+    classes = {"public_domain", "cc_by", "check_terms", "third_party_restricted"}
+    for ds in instruments.datasets().values():
+        if ds.has_source:
+            assert (ds.meta.get("licence") or {}).get("class") in classes, ds.dataset_id
+    assert series_meta("EQ.US.SP500").licence["class"] == "third_party_restricted"
+    assert "# licence: Restricted (third party): S&P Dow Jones Indices" in TestClient(app).get("/api/v1/datasets/EQ.US.SP500/export").text
+    assert get_series("EQ.US.SP500")[0].size > 0  # normal mode: available
+
+    monkeypatch.setenv("ATLAS_COMMERCIAL_MODE", "true")
+    instruments.datasets.cache_clear()
+    try:
+        assert not instruments.get_dataset("EQ.US.SP500").has_source
+        assert series_meta("VOL.US.VIX").freshness == "no_source"
+        with pytest.raises(DataUnavailable):
+            get_series("EQ.US.SP500")  # stored rows are not served either
+        out, err = tools.execute(tools.ToolContext(), "get_latest_quote", {"dataset_id": "EQ.US.NASDAQ"})
+        assert err and "commercial deployment" in out
+        assert TestClient(app).get("/api/v1/datasets/EQ.US.SP500/export").status_code == 409
+        assert get_series("CMD.CRUDE.BRENT")[0].size > 0  # public-domain data unaffected
+    finally:
+        monkeypatch.delenv("ATLAS_COMMERCIAL_MODE")
+        instruments.datasets.cache_clear()

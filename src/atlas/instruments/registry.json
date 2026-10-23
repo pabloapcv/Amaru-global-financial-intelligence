@@ -34,7 +34,12 @@
           "provider_symbol": "PSUGAISAUSDM"
         }
       ],
-      "coverage_note": "Futures curve, open interest and contract-level settlements for ICE Sugar No. 11 require a licensed ICE/vendor feed."
+      "coverage_note": "Futures curve, open interest and contract-level settlements for ICE Sugar No. 11 require a licensed ICE/vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "International Monetary Fund (Primary Commodity Prices)",
+        "note": "IMF data terms apply; confirm commercial redistribution rights."
+      }
     },
     {
       "instrument_id": "CMD.COPPER.LME",
@@ -67,7 +72,12 @@
           "provider_symbol": "PCOPPUSDM"
         }
       ],
-      "coverage_note": "COMEX HG futures and LME inventories require licensed feeds."
+      "coverage_note": "COMEX HG futures and LME inventories require licensed feeds.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "International Monetary Fund (Primary Commodity Prices)",
+        "note": "IMF data terms apply; confirm commercial redistribution rights."
+      }
     },
     {
       "instrument_id": "CMD.COFFEE.ARABICA",
@@ -98,7 +108,12 @@
           "provider_id": "fred",
           "provider_symbol": "PCOFFOTMUSDM"
         }
-      ]
+      ],
+      "licence": {
+        "class": "check_terms",
+        "owner": "International Monetary Fund (Primary Commodity Prices)",
+        "note": "IMF data terms apply; confirm commercial redistribution rights."
+      }
     },
     {
       "instrument_id": "CMD.COCOA.ICCO",
@@ -128,7 +143,12 @@
           "provider_id": "fred",
           "provider_symbol": "PCOCOUSDM"
         }
-      ]
+      ],
+      "licence": {
+        "class": "check_terms",
+        "owner": "International Monetary Fund (Primary Commodity Prices)",
+        "note": "IMF data terms apply; confirm commercial redistribution rights."
+      }
     },
     {
       "instrument_id": "CMD.WHEAT.USHRW",
@@ -157,7 +177,12 @@
           "provider_id": "fred",
           "provider_symbol": "PWHEAMTUSDM"
         }
-      ]
+      ],
+      "licence": {
+        "class": "check_terms",
+        "owner": "International Monetary Fund (Primary Commodity Prices)",
+        "note": "IMF data terms apply; confirm commercial redistribution rights."
+      }
     },
     {
       "instrument_id": "CMD.CORN.US",
@@ -187,7 +212,12 @@
           "provider_id": "fred",
           "provider_symbol": "PMAIZMTUSDM"
         }
-      ]
+      ],
+      "licence": {
+        "class": "check_terms",
+        "owner": "International Monetary Fund (Primary Commodity Prices)",
+        "note": "IMF data terms apply; confirm commercial redistribution rights."
+      }
     },
     {
       "instrument_id": "CMD.SOYBEANS.US",
@@ -220,7 +250,12 @@
           "provider_id": "fred",
           "provider_symbol": "PSOYBUSDM"
         }
-      ]
+      ],
+      "licence": {
+        "class": "check_terms",
+        "owner": "International Monetary Fund (Primary Commodity Prices)",
+        "note": "IMF data terms apply; confirm commercial redistribution rights."
+      }
     },
     {
       "instrument_id": "CMD.CRUDE.WTI",
@@ -253,7 +288,12 @@
           "provider_symbol": "DCOILWTICO"
         }
       ],
-      "coverage_note": "NYMEX CL futures curve requires a licensed CME/vendor feed."
+      "coverage_note": "NYMEX CL futures curve requires a licensed CME/vendor feed.",
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "CMD.CRUDE.BRENT",
@@ -280,7 +320,12 @@
           "provider_id": "fred",
           "provider_symbol": "DCOILBRENTEU"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "CMD.NATGAS.HH",
@@ -310,7 +355,12 @@
           "provider_id": "fred",
           "provider_symbol": "DHHNGSP"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "CMD.GOLD",
@@ -394,7 +444,12 @@
           "provider_id": "fred",
           "provider_symbol": "DEXBZUS"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "FX.USDINR",
@@ -426,7 +481,12 @@
           "provider_id": "fred",
           "provider_symbol": "DEXINUS"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "FX.USDMXN",
@@ -458,7 +518,12 @@
           "provider_id": "fred",
           "provider_symbol": "DEXMXUS"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "FX.USDCNY",
@@ -491,7 +556,12 @@
           "provider_id": "fred",
           "provider_symbol": "DEXCHUS"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "FX.EURUSD",
@@ -521,7 +591,12 @@
           "provider_id": "fred",
           "provider_symbol": "DEXUSEU"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "FX.USDJPY",
@@ -551,7 +626,12 @@
           "provider_id": "fred",
           "provider_symbol": "DEXJPUS"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "FX.USD.BROAD",
@@ -583,7 +663,12 @@
           "provider_id": "fred",
           "provider_symbol": "DTWEXBGS"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "RATE.UST.2Y",
@@ -614,7 +699,12 @@
           "provider_id": "fred",
           "provider_symbol": "DGS2"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "RATE.UST.10Y",
@@ -648,7 +738,12 @@
           "provider_id": "fred",
           "provider_symbol": "DGS10"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "RATE.UST.10Y.REAL",
@@ -679,7 +774,12 @@
           "provider_id": "fred",
           "provider_symbol": "DFII10"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "RATE.US.BREAKEVEN10Y",
@@ -707,7 +807,12 @@
           "provider_id": "fred",
           "provider_symbol": "T10YIE"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "RATE.US.FEDFUNDS",
@@ -743,7 +848,12 @@
           "provider_id": "fred",
           "provider_symbol": "DFF"
         }
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "Federal Reserve Board / U.S. Treasury",
+        "note": "U.S. government data."
+      }
     },
     {
       "instrument_id": "EQ.US.SP500",
@@ -776,7 +886,12 @@
           "provider_id": "fred",
           "provider_symbol": "SP500"
         }
-      ]
+      ],
+      "licence": {
+        "class": "third_party_restricted",
+        "owner": "S&P Dow Jones Indices LLC",
+        "note": "Redistribution requires a licence from S&P Dow Jones Indices."
+      }
     },
     {
       "instrument_id": "EQ.US.NASDAQ",
@@ -804,7 +919,12 @@
           "provider_id": "fred",
           "provider_symbol": "NASDAQCOM"
         }
-      ]
+      ],
+      "licence": {
+        "class": "third_party_restricted",
+        "owner": "Nasdaq, Inc.",
+        "note": "Redistribution requires a licence from Nasdaq."
+      }
     },
     {
       "instrument_id": "VOL.US.VIX",
@@ -835,7 +955,12 @@
           "provider_id": "fred",
           "provider_symbol": "VIXCLS"
         }
-      ]
+      ],
+      "licence": {
+        "class": "third_party_restricted",
+        "owner": "Cboe Global Markets",
+        "note": "Redistribution requires a licence from Cboe."
+      }
     }
   ],
   "macro_series": [
@@ -859,7 +984,12 @@
         "cpi",
         "consumer prices",
         "headline inflation"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "BLS / BEA / Federal Reserve",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "US.CPI.CORE",
@@ -879,7 +1009,12 @@
       "keywords": [
         "core inflation",
         "core cpi"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "BLS / BEA / Federal Reserve",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "US.UNRATE",
@@ -901,7 +1036,12 @@
         "jobless",
         "labor market",
         "jobs"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "BLS / BEA / Federal Reserve",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "US.PAYEMS",
@@ -923,7 +1063,12 @@
         "nonfarm",
         "nfp",
         "employment"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "BLS / BEA / Federal Reserve",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "US.GDP.REAL",
@@ -947,7 +1092,12 @@
         "economic growth",
         "global economy",
         "recession"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "BLS / BEA / Federal Reserve",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "US.INDPRO",
@@ -970,7 +1120,12 @@
         "industry",
         "manufacturing",
         "factory"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "BLS / BEA / Federal Reserve",
+        "note": "U.S. government data."
+      }
     }
   ],
   "positioning": [
@@ -991,7 +1146,12 @@
       "keywords": [
         "sugar positioning",
         "sugar cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.COPPER",
@@ -1010,7 +1170,12 @@
       "keywords": [
         "copper positioning",
         "copper cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.GOLD",
@@ -1029,7 +1194,12 @@
       "keywords": [
         "gold positioning",
         "gold cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.SILVER",
@@ -1048,7 +1218,12 @@
       "keywords": [
         "silver positioning",
         "silver cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.WTI",
@@ -1071,7 +1246,12 @@
         "wti cot",
         "crude cot",
         "oil cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.NATGAS",
@@ -1092,7 +1272,12 @@
         "natgas positioning",
         "natural gas cot",
         "natgas cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.COFFEE",
@@ -1111,7 +1296,12 @@
       "keywords": [
         "coffee positioning",
         "coffee cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.COCOA",
@@ -1130,7 +1320,12 @@
       "keywords": [
         "cocoa positioning",
         "cocoa cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.CORN",
@@ -1149,7 +1344,12 @@
       "keywords": [
         "corn positioning",
         "corn cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.WHEAT",
@@ -1168,7 +1368,12 @@
       "keywords": [
         "wheat positioning",
         "wheat cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.SOYBEANS",
@@ -1187,7 +1392,12 @@
       "keywords": [
         "soybeans positioning",
         "soybeans cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.BRL",
@@ -1206,7 +1416,12 @@
       "keywords": [
         "brl positioning",
         "brl cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     },
     {
       "series_id": "COT.MXN",
@@ -1225,7 +1440,12 @@
       "keywords": [
         "mxn positioning",
         "mxn cot"
-      ]
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Commodity Futures Trading Commission",
+        "note": "U.S. government data."
+      }
     }
   ],
   "country_macro": {
@@ -1620,7 +1840,12 @@
           "fiscal"
         ]
       }
-    ]
+    ],
+    "licence": {
+      "class": "cc_by",
+      "owner": "World Bank (World Development Indicators)",
+      "note": "CC BY 4.0: commercial use allowed with attribution."
+    }
   },
   "trade_pairs": {
     "_comment": "Bilateral trade relationships pre-loaded from UN Comtrade (reporter's declared exports/imports). WLD = all partners.",
@@ -1674,7 +1899,12 @@
         "CHN",
         "WLD"
       ]
-    ]
+    ],
+    "licence": {
+      "class": "check_terms",
+      "owner": "United Nations (UN Comtrade)",
+      "note": "The free preview API may not allow commercial use; UN Comtrade sells a commercial tier."
+    }
   },
   "fundamentals": {
     "_comment": "USDA PSD supply-and-demand balance sheets by country and market year (bulk CSV, no key). price_model_basis follows USDA's convention of excluding China's largely state-held grain, oilseed and cotton stocks.",
@@ -1775,6 +2005,11 @@
         ],
         "price_model_basis": "world_ex_china"
       }
-    ]
+    ],
+    "licence": {
+      "class": "public_domain",
+      "owner": "U.S. Department of Agriculture (FAS PSD)",
+      "note": "U.S. government data."
+    }
   }
 }

@@ -26,7 +26,7 @@ from atlas.data.db import (
     session_scope,
     utcnow,
 )
-from atlas.instruments import Dataset, datasets, get_dataset
+from atlas.instruments import Dataset, datasets, get_dataset, licence_of
 from atlas.provider_sdk import ProviderAdapter, get_adapter
 
 
@@ -66,6 +66,7 @@ class SeriesMeta:
     freshness_note: str
     n_observations: int
     as_of: str | None = None
+    licence: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -144,7 +145,15 @@ def series_meta(dataset_id: str) -> SeriesMeta:
             freshness=freshness,
             freshness_note=note,
             n_observations=int(n or 0),
+            licence=licence_of(ds),
         )
+
+
+def _require_source(ds: Dataset, meta: SeriesMeta) -> None:
+    """Datasets without a source in this deployment serve nothing, including rows stored earlier
+    (e.g. licence-restricted series in commercial mode)."""
+    if not ds.has_source:
+        raise DataUnavailable(f"{ds.dataset_id}: {meta.freshness_note}")
 
 
 def get_series(
@@ -162,6 +171,7 @@ def get_series(
     if ds is None:
         raise KeyError(f"unknown dataset '{dataset_id}'")
     meta = series_meta(dataset_id)
+    _require_source(ds, meta)
     with session_scope() as s:
         if ds.kind == "market":
             q = select(MarketObservation.observed_at, MarketObservation.value).where(
@@ -233,6 +243,7 @@ def get_trade(dataset_id: str) -> tuple[pd.DataFrame, SeriesMeta]:
     if ds is None or ds.kind != "trade":
         raise KeyError(f"'{dataset_id}' is not a trade dataset")
     meta = series_meta(dataset_id)
+    _require_source(ds, meta)
     with session_scope() as s:
         rows = s.execute(
             select(TradeFlow.year, TradeFlow.flow, TradeFlow.cmd_code, TradeFlow.value_usd)
@@ -252,6 +263,7 @@ def get_fundamentals(dataset_id: str) -> tuple[pd.DataFrame, SeriesMeta]:
     if ds is None or ds.kind != "fundamentals":
         raise KeyError(f"'{dataset_id}' is not a fundamentals dataset")
     meta = series_meta(dataset_id)
+    _require_source(ds, meta)
     cols = ["market_year", "country_code", "country_name", "attribute", "value", "release", "prev_value", "prev_release"]
     with session_scope() as s:
         rows = s.execute(select(*[getattr(FundamentalObservation, c) for c in cols])
@@ -269,6 +281,7 @@ def get_positioning(dataset_id: str, start: date | None = None) -> tuple[pd.Data
     if ds is None or ds.kind != "positioning":
         raise KeyError(f"'{dataset_id}' is not a positioning dataset")
     meta = series_meta(dataset_id)
+    _require_source(ds, meta)
     cols = ["open_interest", "noncomm_long", "noncomm_short", "noncomm_spread", "comm_long", "comm_short",
             "nonrept_long", "nonrept_short"]
     with session_scope() as s:
@@ -331,6 +344,7 @@ def data_status() -> list[dict[str, Any]]:
             "n_observations": m.n_observations,
             "freshness": m.freshness,
             "freshness_note": m.freshness_note,
+            "licence": (m.licence or {}).get("class"),
         })
     return out
 
