@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { API_URL, api, type Account } from "@/lib/api";
 import Activity from "@/components/Activity";
+import Billing from "@/components/Billing";
 import Team from "@/components/Team";
 import TwoFactor from "@/components/TwoFactor";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
@@ -117,6 +118,7 @@ export default function AccountPage() {
           <div style={{ height: 14 }} />
         </>
       )}
+      {account && account.auth !== "local" && <div style={{ marginBottom: 14 }}><Suspense><Billing /></Suspense></div>}
       {account?.workspace_requires_2fa && !account.two_factor && (
         <div className="note note-warn" style={{ marginBottom: 14 }}>
           {account.workspace?.name} requires two-factor authentication. Turn it on below to use this workspace{account.workspaces && account.workspaces.length > 1 ? ", or switch to another workspace from the navigation" : ""}.

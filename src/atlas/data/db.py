@@ -501,6 +501,20 @@ class Workspace(Base):
     plan: Mapped[str] = mapped_column(String(32), default="explorer")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     require_2fa: Mapped[bool | None] = mapped_column(default=False)  # members must use two-factor authentication
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(64))
+    billing_status: Mapped[str | None] = mapped_column(String(32))  # Stripe subscription status
+
+
+class StripeEvent(Base):
+    """Stripe webhook events already processed (Stripe retries deliveries; each is applied once)."""
+
+    __tablename__ = "stripe_events"
+
+    event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    type: Mapped[str] = mapped_column(String(64))
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    result: Mapped[str | None] = mapped_column(String(200))
 
 
 class Membership(Base):
@@ -635,6 +649,9 @@ _ADDED_COLUMNS = [
     ("users", "totp_last_step", "INTEGER", None),
     ("users", "recovery_codes", "JSON", None),
     ("workspaces", "require_2fa", "BOOLEAN", None),
+    ("workspaces", "stripe_customer_id", "VARCHAR(64)", None),
+    ("workspaces", "stripe_subscription_id", "VARCHAR(64)", None),
+    ("workspaces", "billing_status", "VARCHAR(32)", None),
     ("source_documents", "source", "VARCHAR(32)", None),
     ("source_documents", "category", "VARCHAR(128)", None),
     ("source_documents", "summary", "TEXT", None),

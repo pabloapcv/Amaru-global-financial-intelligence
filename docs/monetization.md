@@ -48,7 +48,7 @@ ATLAS was built in roughly a week and has 136 automated tests and passing CI, bu
 
 ### 5. Missing commercial basics
 
-- Billing (for example Stripe)
+- Billing: the Stripe integration is now built (Checkout, Customer Portal, verified webhooks) and only needs your Stripe account, prices and webhook set up
 - Production hosting
 - Terms of service and a privacy policy
 - Backups
@@ -80,7 +80,7 @@ Selling the codebase itself without customers would probably fetch little. Payin
 
 Still blocked on decisions or accounts from you:
 
-- a payment provider account
+- a Stripe account (then set the `STRIPE_*` settings; the integration is built)
 - a choice of hosting
 - an EIA API key (energy data)
 - a licensed futures data source, if you need one

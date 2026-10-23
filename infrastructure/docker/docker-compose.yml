@@ -22,6 +22,12 @@ x-atlas-env: &atlas-env
   # Encrypts two-factor secrets at rest. Set it in production; without it a key is generated once on the data volume.
   ATLAS_SECRET_KEY: ${ATLAS_SECRET_KEY:-}
   ATLAS_SECRET_KEY_FILE: /data/secret.key
+  ATLAS_COMMERCIAL_MODE: ${ATLAS_COMMERCIAL_MODE:-false}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  STRIPE_PRICE_INVESTOR: ${STRIPE_PRICE_INVESTOR:-}
+  STRIPE_PRICE_RESEARCH_PRO: ${STRIPE_PRICE_RESEARCH_PRO:-}
+  STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
 
 services:
   db:
