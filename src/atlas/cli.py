@@ -79,7 +79,11 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "schedule":
         from atlas.ingestion.scheduler import run_forever, run_once
 
-        print(f"refreshed {run_once()} dataset(s)") if args.once else run_forever()
+        if args.once:
+            n = run_once()
+            print("another scheduler is running (it holds the lease); nothing done" if n < 0 else f"refreshed {n} dataset(s)")
+        else:
+            run_forever()
     elif args.cmd == "backup":
         from atlas import backup
 

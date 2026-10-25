@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
+import uuid
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -17,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from atlas import __version__, analytics, auth, ratelimit
+from atlas import __version__, analytics, auth, observability, ratelimit
 from atlas.auth import Principal
 from atlas.config import settings
 from atlas.data import access
@@ -117,6 +119,34 @@ def _quota(workspace_id: str, resource: str) -> None:
 
 
 api = APIRouter(dependencies=[Depends(principal)])
+
+
+_REQUEST_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
+
+
+@app.middleware("http")
+async def _request_id_middleware(request: Request, call_next):
+    """Every response carries X-Request-ID (the caller's, if well formed); logs and error bodies include it."""
+    incoming = request.headers.get("x-request-id", "")
+    rid = incoming if _REQUEST_ID.match(incoming) else uuid.uuid4().hex
+    request.state.request_id = rid
+    token = observability.request_id.set(rid)
+    try:
+        response = await call_next(request)
+    finally:
+        observability.request_id.reset(token)
+    response.headers["X-Request-ID"] = rid
+    return response
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, exc: Exception):
+    from fastapi.responses import JSONResponse
+
+    rid = getattr(request.state, "request_id", None) or uuid.uuid4().hex
+    log.error("unhandled error on %s %s [request %s]", request.method, request.url.path, rid, exc_info=exc)
+    return JSONResponse({"detail": "internal error; quote this request id if you contact support", "request_id": rid},
+                        status_code=500, headers={"X-Request-ID": rid})
 
 
 @app.middleware("http")
@@ -321,6 +351,30 @@ def logout(request: Request, response: Response) -> None:
     if token:
         auth.logout(token)
     response.delete_cookie(SESSION_COOKIE, path="/")
+
+
+@app.get("/health/ready")
+def readiness() -> Response:
+    """Readiness for load balancers and orchestrators: 200 when the database answers (503 otherwise).
+    Also reports whether a scheduler is active and when it last ran (informational)."""
+    import json
+
+    from sqlalchemy import text
+
+    from atlas.data.db import get_engine
+    from atlas.ingestion import scheduler
+
+    checks: dict[str, Any] = {}
+    try:
+        with get_engine().connect() as conn:
+            conn.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+        checks["scheduler"] = scheduler.status()
+    except Exception as exc:  # noqa: BLE001 - report, do not crash the probe
+        checks["database"] = f"error: {type(exc).__name__}"
+    ready = checks["database"] == "ok"
+    return Response(json.dumps({"ready": ready, "version": __version__, **checks}), status_code=200 if ready else 503,
+                    media_type="application/json")
 
 
 @app.get("/health")

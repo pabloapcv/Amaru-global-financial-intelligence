@@ -145,6 +145,8 @@ Backups are database-neutral (each table as gzipped JSON lines), so a SQLite bac
 
 `GET /metrics` serves Prometheus text format: HTTP request counts and latency histograms per route template, research runs by status and engine, 30-day pipeline runs by status, datasets by freshness, and LLM configuration. Set `ATLAS_METRICS_TOKEN` to require a bearer token. Outbound requests identify as `ATLAS_USER_AGENT` (default `ATLAS-research/0.1 (+contact URL)`); set your own contact URL in production.
 
+Health: `/health` (liveness) and `/health/ready` (readiness: 200 when the database answers, 503 otherwise, plus the scheduler's lease holder and last run). Every response carries `X-Request-ID` (the caller's, if well formed); unexpected errors return 500 with that id in the body, and `%(request_id)s` is available in log formats. Only one scheduler works at a time: each iteration takes a lease row in the database (expires after 30 minutes if its holder dies), so running it in the API process and in its own container, or scaling it, never runs scheduled reports or alerts twice.
+
 ## Acceptance benchmark
 
 `atlas benchmark` measures the spec's acceptance targets (§16) on this deployment's stored data: cached query latency, research latency, numerical traceability and citation validity across representative questions, reproducibility, 30-day pipeline reliability, freshness visibility, and cross-workspace isolation (using two throwaway accounts it removes afterwards). It exits non-zero if any target is missed; `--json` prints the full result.

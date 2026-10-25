@@ -241,3 +241,50 @@ def test_follow_up_runs_inherit_subject_and_link_the_thread(seeded):
     assert c.post("/api/v1/research", json={"query": "and then?", "parent_run_id": "nope"}).status_code == 404
     queued = engine.create_run("copper outlook", {"engine": "deterministic", "formats": []})
     assert c.post("/api/v1/research", json={"query": "and then?", "parent_run_id": queued}).status_code == 409
+
+
+def test_scheduler_lease_allows_one_active_scheduler(seeded, monkeypatch):
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from atlas.data.db import SchedulerLease, session_scope, utcnow
+    from atlas.ingestion import scheduler
+
+    with session_scope() as s:
+        s.query(SchedulerLease).delete()
+    assert scheduler.acquire("worker-a") and scheduler.acquire("worker-a")  # take, then renew
+    assert not scheduler.acquire("worker-b")
+    ran = []
+    monkeypatch.setattr("atlas.schedules.run_due", lambda: ran.append(1) or [])
+    # No network in tests: the iteration's refresh steps are stubbed.
+    monkeypatch.setattr("atlas.calendar.refresh_if_due", lambda: None)
+    monkeypatch.setattr("atlas.documents.refresh_if_due", lambda: None)
+    monkeypatch.setattr(scheduler, "due_datasets", lambda: [])
+    assert scheduler.run_once("worker-b") == -1 and ran == []  # the other process does nothing
+    with session_scope() as s:  # holder died: lease expires
+        s.execute(update(SchedulerLease).values(expires_at=utcnow() - timedelta(seconds=1)))
+    assert scheduler.run_once("worker-b") >= 0 and ran == [1]
+    st = scheduler.status()
+    assert st["active"] and st["holder"] == "worker-b" and st["last_run_at"] and "reports_started" in st["last_result"]
+    scheduler.release("worker-b")
+    assert not scheduler.status()["active"] and scheduler.acquire("worker-a")
+    scheduler.release("worker-a")
+
+
+def test_readiness_request_ids_and_error_bodies(seeded, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from atlas.api.main import app
+    from atlas.data import access
+
+    c = TestClient(app, raise_server_exceptions=False)
+    r = c.get("/health/ready")
+    assert r.status_code == 200 and r.json()["ready"] and r.json()["database"] == "ok" and "scheduler" in r.json()
+    assert len(r.headers["x-request-id"]) == 32
+    assert c.get("/health", headers={"X-Request-ID": "abc-123"}).headers["x-request-id"] == "abc-123"
+    assert c.get("/health", headers={"X-Request-ID": "bad id<script>"}).headers["x-request-id"] != "bad id<script>"
+
+    monkeypatch.setattr(access, "data_status", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    err = c.get("/api/v1/data/status", headers={"X-Request-ID": "trace-42"})
+    assert err.status_code == 500 and err.json()["request_id"] == "trace-42" and "boom" not in err.text

@@ -83,3 +83,22 @@ def render() -> str:
     metric("atlas_llm_configured", "gauge", "1 if Anthropic credentials are configured.", [("", int(llm.available()))])
     metric("atlas_uptime_seconds", "gauge", "Seconds since the API process started.", [("", round(time.time() - _started, 1))])
     return "\n".join(out) + "\n"
+
+
+# The current request's id (set by the API middleware), added to log records as `request_id`.
+import contextvars as _contextvars
+import logging as _logging
+
+request_id: _contextvars.ContextVar[str | None] = _contextvars.ContextVar("request_id", default=None)
+
+
+_base_factory = _logging.getLogRecordFactory()
+
+
+def _record_factory(*args, **kwargs) -> _logging.LogRecord:
+    record = _base_factory(*args, **kwargs)
+    record.request_id = request_id.get() or "-"  # usable in log formats as %(request_id)s
+    return record
+
+
+_logging.setLogRecordFactory(_record_factory)

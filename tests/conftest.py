@@ -15,6 +15,20 @@ import pytest
 
 
 @pytest.fixture(scope="session", autouse=True)
+def no_network():
+    """Tests never reach the internet: real HTTP transports fail loudly (mock transports still work)."""
+    import httpx
+
+    def blocked(self, request):
+        raise RuntimeError(f"network access in tests: {request.method} {request.url}")
+
+    original = httpx.HTTPTransport.handle_request
+    httpx.HTTPTransport.handle_request = blocked
+    yield
+    httpx.HTTPTransport.handle_request = original
+
+
+@pytest.fixture(scope="session", autouse=True)
 def isolated_env(tmp_path_factory):
     root = tmp_path_factory.mktemp("atlas")
     test_db = os.getenv("ATLAS_TEST_DATABASE_URL")
