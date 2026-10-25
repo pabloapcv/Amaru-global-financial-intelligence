@@ -1,0 +1,43 @@
+name: Security
+
+# Known vulnerabilities in dependencies. Also runs weekly, because new advisories appear without any code change.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"  # Mondays 06:17 UTC
+
+jobs:
+  python-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install (all extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[postgres,pdf]" pip-audit
+      - name: Audit
+        # Fails on any published advisory for an installed package (ATLAS itself is skipped).
+        run: pip-audit --progress-spinner off --skip-editable
+
+  npm-dependencies:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Audit
+        # Fails on high or critical advisories in production dependencies.
+        run: npm audit --omit=dev --audit-level=high
