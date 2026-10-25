@@ -506,6 +506,19 @@ class Workspace(Base):
     billing_status: Mapped[str | None] = mapped_column(String(32))  # Stripe subscription status
 
 
+class SchedulerLease(Base):
+    """Only the process holding the lease runs the scheduler; it expires if the holder dies."""
+
+    __tablename__ = "scheduler_leases"
+
+    name: Mapped[str] = mapped_column(String(32), primary_key=True)
+    holder: Mapped[str] = mapped_column(String(128))
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    heartbeat_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_result: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+
 class StripeEvent(Base):
     """Stripe webhook events already processed (Stripe retries deliveries; each is applied once)."""
 
