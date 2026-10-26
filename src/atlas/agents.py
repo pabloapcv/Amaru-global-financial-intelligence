@@ -206,6 +206,10 @@ def check_agent(agent_id: str, *, force: bool = False, background: bool = True, 
         engine.execute_run(run_id)
     if notify:
         _notify(ws, name, findings, run_id)
+    from atlas import webhooks
+
+    webhooks.emit(ws, "agent.fired", {"agent_id": agent_id, "name": name, "findings": [f["message"] for f in findings], "run_id": run_id,
+                                      "research_url": webhooks.public_url(f"/research?run={run_id}")})
     return {"agent_id": agent_id, "fired": True, "run_id": run_id, "findings": findings, "errors": errors}
 
 

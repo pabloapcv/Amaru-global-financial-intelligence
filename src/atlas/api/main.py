@@ -445,6 +445,93 @@ def revoke_api_key(key_id: str, p: Principal = Depends(principal)) -> None:
         _404("API key")
 
 
+# ---------------------------------------------------------------- webhooks
+
+
+class WebhookCreate(BaseModel):
+    url: str = Field(..., max_length=2000)
+    events: list[str] = Field(..., min_length=1, max_length=10)
+    description: str = Field("", max_length=200)
+    format: Literal["atlas", "slack"] = "atlas"
+
+
+class WebhookUpdate(BaseModel):
+    events: list[str] | None = Field(None, min_length=1, max_length=10)
+    description: str | None = Field(None, max_length=200)
+    status: Literal["active", "paused"] | None = None
+
+
+def require_manager(p: Principal = Depends(principal)) -> Principal:
+    if p.role not in ("owner", "admin"):
+        raise HTTPException(403, "only workspace owners and admins can manage webhooks")
+    return p
+
+
+def _webhook_call(fn, *args, **kwargs):
+    from atlas import webhooks
+
+    try:
+        return fn(*args, **kwargs)
+    except KeyError:
+        _404("webhook")
+    except webhooks.WebhookError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@api.get("/webhooks")
+def list_webhooks(p: Principal = Depends(require_manager)) -> dict[str, Any]:
+    from atlas import webhooks
+
+    return {"webhooks": webhooks.list_webhooks(p.workspace_id), "events": webhooks.EVENTS}
+
+
+@api.post("/webhooks", status_code=201)
+def create_webhook(req: WebhookCreate, p: Principal = Depends(require_manager)) -> dict[str, Any]:
+    from atlas import webhooks
+
+    if p.via == "api_key":
+        raise HTTPException(403, "API keys cannot create webhooks; sign in")
+    _quota(p.workspace_id, "webhooks")
+    return _webhook_call(webhooks.create, p, req.url, req.events, req.description, req.format)
+
+
+@api.patch("/webhooks/{webhook_id}")
+def update_webhook(webhook_id: str, req: WebhookUpdate, p: Principal = Depends(require_manager)) -> dict[str, Any]:
+    from atlas import webhooks
+
+    return _webhook_call(webhooks.update_webhook, p, webhook_id, events=req.events, description=req.description, status=req.status)
+
+
+@api.delete("/webhooks/{webhook_id}", status_code=204)
+def delete_webhook(webhook_id: str, p: Principal = Depends(require_manager)) -> None:
+    from atlas import webhooks
+
+    _webhook_call(webhooks.delete_webhook, p, webhook_id)
+
+
+@api.post("/webhooks/{webhook_id}/rotate-secret")
+def rotate_webhook_secret(webhook_id: str, p: Principal = Depends(require_manager)) -> dict[str, Any]:
+    from atlas import webhooks
+
+    if p.via == "api_key":
+        raise HTTPException(403, "API keys cannot rotate webhook secrets; sign in")
+    return _webhook_call(webhooks.rotate_secret, p, webhook_id)
+
+
+@api.post("/webhooks/{webhook_id}/test")
+def test_webhook(webhook_id: str, p: Principal = Depends(require_manager)) -> dict[str, Any]:
+    from atlas import webhooks
+
+    return _webhook_call(webhooks.send_test, p, webhook_id)
+
+
+@api.get("/webhooks/{webhook_id}/deliveries")
+def webhook_deliveries(webhook_id: str, limit: int = Query(50, ge=1, le=200), p: Principal = Depends(require_manager)) -> list[dict[str, Any]]:
+    from atlas import webhooks
+
+    return _webhook_call(webhooks.deliveries, p.workspace_id, webhook_id, limit)
+
+
 # ---------------------------------------------------------------- onboarding
 
 
@@ -1042,7 +1129,7 @@ def switch_workspace(req: SwitchRequest, request: Request, p: Principal = Depend
 
 
 @api.get("/activity")
-def activity(category: Literal["signin", "team", "sharing", "data", "keys", "security"] | None = None,
+def activity(category: Literal["signin", "team", "sharing", "data", "keys", "security", "integrations"] | None = None,
              cursor: str | None = Query(None, max_length=80), limit: int = Query(100, ge=1, le=500), format: Literal["json", "csv"] = "json",
              p: Principal = Depends(principal)):
     """This workspace's audit log, newest first. Owners and admins only."""

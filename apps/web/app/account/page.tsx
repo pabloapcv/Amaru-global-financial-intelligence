@@ -7,6 +7,7 @@ import Billing from "@/components/Billing";
 import Digest from "@/components/Digest";
 import Team from "@/components/Team";
 import TwoFactor from "@/components/TwoFactor";
+import Webhooks from "@/components/Webhooks";
 import YourData from "@/components/YourData";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
@@ -130,6 +131,7 @@ export default function AccountPage() {
       {account && account.auth !== "local" && <div style={{ marginBottom: 14 }}><Digest /></div>}
       {account && account.auth !== "local" && <div style={{ marginBottom: 14 }}><Team /></div>}
       {account && account.auth !== "local" && (account.role === "owner" || account.role === "admin") && <div style={{ marginBottom: 14 }}><Activity /></div>}
+      {account && (account.role === "owner" || account.role === "admin") && <div style={{ marginBottom: 14 }}><Webhooks /></div>}
       {account && account.auth === "session" && <div style={{ marginBottom: 14 }}><YourData account={account} /></div>}
       <Card title="API keys">
         <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>

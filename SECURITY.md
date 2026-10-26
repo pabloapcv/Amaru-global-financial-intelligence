@@ -26,6 +26,10 @@ Please report suspected vulnerabilities privately to the maintainer (pabloapcv o
 - Shared and in-app report HTML is served with a sandboxing Content-Security-Policy and no scripts.
 - Shared links expire, can be revoked, and their views are audited.
 
+**Webhooks**
+- Deliveries are signed (HMAC-SHA256 with a timestamp), and signing secrets are encrypted at rest.
+- Endpoints must be HTTPS on public addresses, checked again at every send; redirects are not followed.
+
 **Payments**
 - Workspace plans change only through signed and timestamped Stripe webhooks, each applied once.
 
