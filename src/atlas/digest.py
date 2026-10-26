@@ -152,9 +152,12 @@ def send_due(now=None) -> int:
     now = now or utcnow()
     if now.weekday() != SEND_WEEKDAY or now.hour < SEND_HOUR_UTC:
         return 0
+    from atlas.data.db import suspended_workspace_ids
+
+    suspended = suspended_workspace_ids()
     with session_scope() as s:
         due = [(m.user_id, m.workspace_id) for m in s.execute(select(Membership).where(Membership.digest_weekly.is_(True))).scalars()
-               if m.digest_sent_at is None or now - m.digest_sent_at >= MIN_INTERVAL]
+               if (m.digest_sent_at is None or now - m.digest_sent_at >= MIN_INTERVAL) and m.workspace_id not in suspended]
     sent = 0
     for uid, ws in due:
         try:

@@ -234,7 +234,10 @@ def evaluate_agents(changed_datasets: Iterable[str] | None = None, workspace_id:
         q = select(MonitorAgent).where(MonitorAgent.status == "active")
         if workspace_id is not None:
             q = q.where(MonitorAgent.workspace_id == workspace_id)
-        agents = [(a.agent_id, list(a.watch)) for a in s.execute(q).scalars()]
+        from atlas.data.db import suspended_workspace_ids
+
+        suspended = suspended_workspace_ids()
+        agents = [(a.agent_id, list(a.watch)) for a in s.execute(q).scalars() if a.workspace_id not in suspended]
     results = []
     for agent_id, watch in agents:
         if changed is not None and not changed.intersection(watch):
@@ -249,8 +252,11 @@ def evaluate_agents(changed_datasets: Iterable[str] | None = None, workspace_id:
 def evaluate_release_agents() -> list[dict[str, Any]]:
     """Check active agents with an official-release trigger (after the document index gains releases)."""
     with session_scope() as s:
+        from atlas.data.db import suspended_workspace_ids
+
+        suspended = suspended_workspace_ids()
         ids = [a.agent_id for a in s.execute(select(MonitorAgent).where(MonitorAgent.status == "active")).scalars()
-               if any(t.get("type") in RELEASE_TRIGGERS for t in a.triggers)]
+               if any(t.get("type") in RELEASE_TRIGGERS for t in a.triggers) and a.workspace_id not in suspended]
     results = []
     for agent_id in ids:
         try:

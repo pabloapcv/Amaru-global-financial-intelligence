@@ -50,6 +50,9 @@ export default function Nav() {
             </li>
           );
         })}
+        {account?.operator && (
+          <li><Link href="/admin" className={path.startsWith("/admin") ? "active" : ""}><span>Operator console</span><small>All workspaces</small></Link></li>
+        )}
         {account && <li className="nav-account-mobile"><Link href="/account" className={path.startsWith("/account") ? "active" : ""}><span>Account</span></Link></li>}
       </ul>
       {account && (
