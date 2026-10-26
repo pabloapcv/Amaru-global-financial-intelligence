@@ -26,6 +26,7 @@ To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login
 The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, reports, alerts and schedules belong to a workspace and are invisible to other workspaces; market and macro data are shared.
 
 - **Web:** create an account on the sign-in page (`ATLAS_ALLOW_SIGNUP=true`), or create one from the CLI.
+- **Landing and pricing page:** `/welcome` (English, Spanish, Portuguese) describes ATLAS and shows each plan's limits straight from the plan table. Prices shown come from `ATLAS_PLAN_PRICES` (e.g. `investor=49,research_pro=199,pro=799`; display only, since Stripe prices decide what customers pay) in `ATLAS_PLAN_CURRENCY` (default USD); plans without a price say "Contact us". With sign-up off, the call to action becomes a mailto link to `ATLAS_SALES_EMAIL`.
 - **Existing local data** lives in the `local` workspace. To own it: `atlas create-user you@example.com --workspace local`.
 - **API keys:** create on the Account page; send `Authorization: Bearer atk_…`. Keys are shown once and stored hashed.
 - **Rate limits:** API keys get the plan's requests per minute (60 / 120 / 300 / 600); browser sessions get five times that (at least 300), since the web app makes several calls per page. Responses carry `X-RateLimit-Limit` and `X-RateLimit-Remaining`; over the limit returns 429 with `Retry-After`. Limits are per API process; with several replicas, add a shared limiter in front.

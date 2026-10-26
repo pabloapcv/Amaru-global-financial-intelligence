@@ -82,6 +82,32 @@ def _require_owner(principal: Principal) -> None:
         raise PermissionError("only the workspace owner can manage billing")
 
 
+def display_prices() -> dict[str, float]:
+    """Monthly prices to show on the public pricing page: ATLAS_PLAN_PRICES="investor=49,research_pro=199,pro=799".
+    Display only; what customers pay is set by the Stripe prices."""
+    out: dict[str, float] = {}
+    for part in os.getenv("ATLAS_PLAN_PRICES", "").split(","):
+        key, _, value = part.partition("=")
+        key = key.strip()
+        try:
+            amount = float(value)
+        except ValueError:
+            continue
+        if key in PLANS and amount >= 0:
+            out[key] = amount
+    return out
+
+
+def public_plans() -> dict[str, Any]:
+    from atlas.auth import signup_allowed
+
+    shown = display_prices()
+    email = os.getenv("ATLAS_SALES_EMAIL", "").strip()
+    return {"plans": [{"key": p, "limits": PLANS[p], "price_per_month": 0.0 if p == FREE_PLAN else shown.get(p)} for p in PLANS],
+            "currency": os.getenv("ATLAS_PLAN_CURRENCY", "USD").upper()[:3], "signup_allowed": signup_allowed(),
+            "self_service_billing": configured(), "sales_email": email if "@" in email else None}
+
+
 def summary(principal: Principal) -> dict[str, Any]:
     with session_scope() as s:
         ws = s.get(Workspace, principal.workspace_id)

@@ -16,7 +16,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     cache: "no-store",
   });
   const body = res.status === 204 ? null : await res.json().catch(() => null);
-  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/v1/auth/") && !["/login", "/reset", "/verify", "/join"].includes(window.location.pathname)) {
+  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/v1/auth/") && !["/login", "/reset", "/verify", "/join", "/welcome"].includes(window.location.pathname)) {
     window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
   }
   if (res.status === 403 && body?.detail?.error === "two_factor_required" && typeof window !== "undefined" && window.location.pathname !== "/account") {

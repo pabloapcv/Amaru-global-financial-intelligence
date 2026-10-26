@@ -17,7 +17,7 @@ const ITEMS = [
   { href: "/data", label: "Data Explorer", hint: "Datasets and pipelines" },
 ];
 
-const HIDDEN = ["/login", "/reset", "/verify", "/join"];
+const HIDDEN = ["/login", "/reset", "/verify", "/join", "/welcome"];
 const hidden = (path: string) => HIDDEN.includes(path) || path.startsWith("/n/");  // public newsletter pages
 
 export default function Nav() {
