@@ -1643,6 +1643,7 @@ class ScheduleRequest(BaseModel):
     depth: Literal["quick", "standard", "deep"] = "standard"
     engine: Literal["auto", "llm", "deterministic"] = "auto"
     formats: list[Literal["html", "pdf", "xlsx"]] = Field(default_factory=lambda: ["html", "xlsx"])
+    newsletter: Literal["off", "draft", "send"] = "off"  # turn each finished run into a newsletter issue
 
 
 @api.post(f"/schedules", status_code=201)
@@ -1650,9 +1651,38 @@ def create_schedule(req: ScheduleRequest, p: Principal = Depends(require_verifie
     from atlas import schedules
 
     _quota(p.workspace_id, "schedules")
+    if req.newsletter != "off":
+        _check_newsletter_mode(p)
     return schedules.create_schedule(req.name, req.query, req.cadence,
-                                     {"depth": req.depth, "engine": req.engine, "formats": req.formats, "template": req.template},
+                                     {"depth": req.depth, "engine": req.engine, "formats": req.formats, "template": req.template,
+                                      "newsletter": req.newsletter},
                                      workspace_id=p.workspace_id, user_id=p.user_id)
+
+
+def _check_newsletter_mode(p: Principal) -> None:
+    from atlas import newsletters
+
+    if p.role not in ("owner", "admin"):
+        raise HTTPException(403, "only workspace owners and admins can feed the newsletter")
+    if newsletters.get_settings(p.workspace_id) is None:
+        raise HTTPException(422, "set up the newsletter first (Newsletter page)")
+
+
+class ScheduleNewsletter(BaseModel):
+    newsletter: Literal["off", "draft", "send"]
+
+
+@api.patch(f"/schedules/{{schedule_id}}")
+def update_schedule(schedule_id: str, req: ScheduleNewsletter, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import schedules
+
+    if req.newsletter != "off":
+        _check_newsletter_mode(p)
+    out = schedules.set_newsletter_mode(schedule_id, p.workspace_id, req.newsletter)
+    if out is None:
+        _404("schedule")
+    auth.audit("schedule.newsletter_mode", p.user_id, p.workspace_id, schedule_id=schedule_id, mode=req.newsletter)
+    return out
 
 
 @api.get(f"/schedules")

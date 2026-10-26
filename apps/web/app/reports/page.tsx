@@ -5,7 +5,10 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { API_URL, api } from "@/lib/api";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
-type Schedule = { schedule_id: string; name: string; query: string; cadence: string; status: string; next_run_at: string; last_run_at: string | null; last_run_id: string | null };
+type Schedule = { schedule_id: string; name: string; query: string; cadence: string; status: string; next_run_at: string; last_run_at: string | null; last_run_id: string | null;
+  config: { newsletter?: "off" | "draft" | "send" } };
+
+const NEWSLETTER_MODES: [string, string][] = [["off", "Not in the newsletter"], ["draft", "Draft a newsletter issue"], ["send", "Send as a newsletter issue"]];
 
 function Schedules() {
   const [rows, setRows] = useState<Schedule[]>([]);
@@ -13,9 +16,13 @@ function Schedules() {
   const [query, setQuery] = useState("What's happening with sugar, and what are the main drivers? Include positioning. Outlook for the next three months.");
   const [cadence, setCadence] = useState("weekly");
   const [template, setTemplate] = useState("research_report");
+  const [newsletter, setNewsletter] = useState("off");
+  const [hasNewsletter, setHasNewsletter] = useState(false);
   const [templates, setTemplates] = useState<{ key: string; name: string; default_query: string | null }[]>([]);
   useEffect(() => {
     api<typeof templates>("/api/v1/report-templates").then(setTemplates).catch(() => {});
+    // Only owners and admins with a newsletter set up can feed it (others get 403 here and see no option).
+    api<{ newsletter: unknown }>("/api/v1/newsletter").then((r) => setHasNewsletter(!!r.newsletter)).catch(() => {});
   }, []);
   const [error, setError] = useState<unknown>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -25,9 +32,13 @@ function Schedules() {
   const create = async () => {
     setError(null);
     try {
-      await api("/api/v1/schedules", { method: "POST", body: JSON.stringify({ name, query, cadence, template }) });
+      await api("/api/v1/schedules", { method: "POST", body: JSON.stringify({ name, query, cadence, template, newsletter }) });
       load();
     } catch (e) { setError(e); }
+  };
+  const setMode = async (id: string, mode: string) => {
+    setError(null);
+    try { await api(`/api/v1/schedules/${id}`, { method: "PATCH", body: JSON.stringify({ newsletter: mode }) }); load(); } catch (e) { setError(e); }
   };
   const runNow = async (id: string) => {
     const r = await api<{ run_id: string }>(`/api/v1/schedules/${id}/run`, { method: "POST" });
@@ -55,8 +66,16 @@ function Schedules() {
             <select value={cadence} onChange={(e) => setCadence(e.target.value)} style={{ width: 140 }}>
               <option value="daily">Daily</option><option value="weekly">Weekly (Mon)</option><option value="monthly">Monthly (1st)</option>
             </select>
+            {hasNewsletter && (
+              <select value={newsletter} onChange={(e) => setNewsletter(e.target.value)} aria-label="Newsletter" style={{ width: "auto" }}>
+                {NEWSLETTER_MODES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            )}
             <button onClick={create}>Create schedule</button>
           </div>
+          {hasNewsletter && newsletter === "send" && (
+            <p className="muted" style={{ fontSize: 12 }}>Sent automatically only when the research passes verification; otherwise it waits as a draft and you get an email.</p>
+          )}
           <p className="muted" style={{ fontSize: 12 }}>Runs at 11:00 UTC after the data refresh, when the scheduler is on (<code>atlas schedule</code> or <code>ATLAS_SCHEDULER=on</code>).</p>
           <ErrorNote error={error} />
           {msg && <div className="note">{msg}</div>}
@@ -73,6 +92,12 @@ function Schedules() {
               </div>
               <div className="muted" style={{ fontSize: 12 }}>{r.cadence} · next {r.next_run_at.replace("T", " ").slice(0, 16)} UTC{r.last_run_id && <> · <Link href={`/research?run=${r.last_run_id}`}>last run</Link></>}</div>
               <div style={{ fontSize: 12.5 }}>{r.query}</div>
+              {hasNewsletter && (
+                <select value={r.config?.newsletter ?? "off"} onChange={(e) => setMode(r.schedule_id, e.target.value)} aria-label={`Newsletter for ${r.name}`}
+                  style={{ width: "auto", marginTop: 4, fontSize: 12 }}>
+                  {NEWSLETTER_MODES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              )}
             </li>
           ))}
           {rows.length === 0 && <li className="muted">No schedules yet.</li>}
