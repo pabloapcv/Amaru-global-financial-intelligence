@@ -18,17 +18,18 @@ const ITEMS = [
 ];
 
 const HIDDEN = ["/login", "/reset", "/verify", "/join"];
+const hidden = (path: string) => HIDDEN.includes(path) || path.startsWith("/n/");  // public newsletter pages
 
 export default function Nav() {
   const path = usePathname();
   const [account, setAccount] = useState<Account | null>(null);
   const [unread, setUnread] = useState(0);
   useEffect(() => {
-    if (HIDDEN.includes(path)) return;
+    if (hidden(path)) return;
     api<Account>("/api/v1/account").then(setAccount).catch(() => {});
     api<{ unread: number }>("/api/v1/agents").then((r) => setUnread(path.startsWith("/intelligence") ? 0 : r.unread)).catch(() => {});
   }, [path]);
-  if (HIDDEN.includes(path)) return null;
+  if (hidden(path)) return null;
   const switchTo = async (workspaceId: string) => {
     await api("/api/v1/auth/switch-workspace", { method: "POST", body: JSON.stringify({ workspace_id: workspaceId }) });
     window.location.reload();  // every page reloads its data for the new workspace
@@ -50,6 +51,9 @@ export default function Nav() {
             </li>
           );
         })}
+        {account && (account.role === "owner" || account.role === "admin") && account.auth !== "local" && (
+          <li><Link href="/newsletter" className={path.startsWith("/newsletter") ? "active" : ""}><span>Newsletter</span><small>Publish research by email</small></Link></li>
+        )}
         {account?.operator && (
           <li><Link href="/admin" className={path.startsWith("/admin") ? "active" : ""}><span>Operator console</span><small>All workspaces</small></Link></li>
         )}

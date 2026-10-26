@@ -34,6 +34,8 @@ from atlas.data.db import (
     LoginChallenge,
     Membership,
     MonitorAgent,
+    Newsletter,
+    NewsletterSubscriber,
     PasswordReset,
     ReportSchedule,
     ResearchRun,
@@ -53,10 +55,10 @@ MIN_PASSWORD = 10
 
 # Plan limits (spec §18 tiers). None = unlimited.
 PLANS: dict[str, dict[str, int | None]] = {
-    "explorer": {"requests_per_minute": 60, "seats": 1, "llm_budget_usd_per_month": 2, "agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1, "webhooks": 1},
-    "investor": {"requests_per_minute": 120, "seats": 2, "llm_budget_usd_per_month": 15, "agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2, "webhooks": 2},
-    "research_pro": {"requests_per_minute": 300, "seats": 5, "llm_budget_usd_per_month": 60, "agents": 10, "research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5, "webhooks": 5},
-    "pro": {"requests_per_minute": 600, "seats": 25, "llm_budget_usd_per_month": 300, "agents": 50, "research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20, "webhooks": 20},
+    "explorer": {"requests_per_minute": 60, "seats": 1, "llm_budget_usd_per_month": 2, "agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1, "webhooks": 1, "newsletter_subscribers": 100},
+    "investor": {"requests_per_minute": 120, "seats": 2, "llm_budget_usd_per_month": 15, "agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2, "webhooks": 2, "newsletter_subscribers": 1000},
+    "research_pro": {"requests_per_minute": 300, "seats": 5, "llm_budget_usd_per_month": 60, "agents": 10, "research_per_day": 200, "llm_research_per_day": 60, "schedules": 10, "alerts": 100, "api_keys": 5, "webhooks": 5, "newsletter_subscribers": 10000},
+    "pro": {"requests_per_minute": 600, "seats": 25, "llm_budget_usd_per_month": 300, "agents": 50, "research_per_day": 1000, "llm_research_per_day": 300, "schedules": 50, "alerts": 500, "api_keys": 20, "webhooks": 20, "newsletter_subscribers": 100000},
 }
 
 
@@ -632,6 +634,9 @@ def usage(workspace_id: str) -> dict[str, int]:
             "api_keys": count(select(func.count()).select_from(ApiKey).where(
                 ApiKey.workspace_id == workspace_id, ApiKey.revoked_at.is_(None))),
             "webhooks": count(select(func.count()).select_from(Webhook).where(Webhook.workspace_id == workspace_id)),
+            "newsletter_subscribers": count(select(func.count()).select_from(NewsletterSubscriber).join(
+                Newsletter, Newsletter.newsletter_id == NewsletterSubscriber.newsletter_id).where(
+                Newsletter.workspace_id == workspace_id, NewsletterSubscriber.status != "unsubscribed")),
             # Seats: members plus invitations still open.
             "seats": count(select(func.count()).select_from(Membership).where(Membership.workspace_id == workspace_id))
             + count(select(func.count()).select_from(Invitation).where(

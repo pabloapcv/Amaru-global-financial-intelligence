@@ -19,9 +19,14 @@ CATEGORIES = {
     "data": ("data.", "research."),
     "keys": ("api_key.",),
     "integrations": ("webhook.",),
+    "newsletter": ("newsletter.",),
     "security": ("password.", "email.", "security.", "workspace.require_2fa"),
 }
 LABELS = {
+    "newsletter.created": "Set up the newsletter", "newsletter.updated": "Changed newsletter settings",
+    "newsletter.invited": "Invited a newsletter subscriber", "newsletter.subscriber_removed": "Removed a newsletter subscriber",
+    "newsletter.issue_created": "Drafted a newsletter issue", "newsletter.issue_sent": "Sent a newsletter issue",
+    "newsletter.limit_reached": "Newsletter subscriber limit reached",
     "webhook.created": "Added a webhook", "webhook.updated": "Changed a webhook", "webhook.deleted": "Deleted a webhook",
     "webhook.secret_rotated": "Rotated a webhook secret", "webhook.disabled": "Webhook disabled after failures",
     "login.succeeded": "Signed in", "team.invited": "Invited a person", "team.invitation_revoked": "Revoked an invitation",

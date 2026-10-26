@@ -109,6 +109,9 @@ def run_once(holder: str = HOLDER) -> int:
     from atlas import webhooks
 
     retried = webhooks.deliver_due()
+    from atlas import newsletters
+
+    newsletters.resume_stalled()
     _record({"datasets_refreshed": len(due), "reports_started": len(started), "digests_sent": digests,
              "webhook_retries": retried}, holder)
     return len(due)
