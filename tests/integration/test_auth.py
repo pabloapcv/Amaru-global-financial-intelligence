@@ -535,7 +535,7 @@ def test_two_factor_authentication(secured, monkeypatch):
     from atlas import secretbox, totp
     from atlas.data.db import LoginChallenge, User, session_scope
 
-    secretbox._fernet.cache_clear()
+    secretbox.reset()
     acct = _signup(secured, "careful@twofa.test", "Careful")
     other_device = TestClient(secured.app)
     other_device.post("/api/v1/auth/login", json={"email": "careful@twofa.test", "password": "correct horse battery"})
@@ -617,7 +617,7 @@ def select_user(email):
 def test_workspace_can_require_two_factor(secured):
     from atlas import secretbox, totp
 
-    secretbox._fernet.cache_clear()
+    secretbox.reset()
     owner = _signup(secured, "boss@policy.test", "Strict desk")
     ws = owner["workspace"]["workspace_id"]
     owner_session = secured.cookies.get("atlas_session")
@@ -716,7 +716,7 @@ def test_owners_transfer_before_deleting_and_shared_work_stays(secured):
     from atlas.data.db import Membership, ResearchRun, Workspace, session_scope
     from atlas.research import engine
 
-    secretbox._fernet.cache_clear()
+    secretbox.reset()
     owner = _signup(secured, "founder@privacy.test", "Shared desk")
     ws, uid = owner["workspace"]["workspace_id"], owner["user"]["user_id"]
     shared_run = engine.create_run("sugar outlook", {"engine": "deterministic", "depth": "quick", "formats": []}, uid, ws)
@@ -800,3 +800,43 @@ def test_api_rate_limits_by_plan(secured, monkeypatch):
     upgraded = secured.get("/api/v1/watchlist", headers=h)
     assert upgraded.status_code == 200 and upgraded.headers["x-ratelimit-limit"] == "600"
     ratelimit.reset()
+
+
+def test_weekly_digest_opt_in_schedule_and_unsubscribe(secured, monkeypatch):
+    import re
+    from datetime import datetime, timedelta
+    from urllib.parse import parse_qs, urlparse
+
+    from atlas import digest, mailer, secretbox
+
+    secretbox.reset()
+    sent = []
+    monkeypatch.setattr(mailer, "send", lambda to, subject, body: (subject.startswith("ATLAS weekly") and sent.append((to, body))) or True)
+    me = _signup(secured, "reader@digest.test", "Digest desk")
+    ws = me["workspace"]["workspace_id"]
+    secured.post("/api/v1/watchlist/CMD.CRUDE.BRENT")
+    assert secured.get("/api/v1/account/digest").json()["weekly"] is False  # opt-in, off by default
+
+    preview = secured.get("/api/v1/account/digest/preview").json()
+    assert preview["subject"] == "ATLAS weekly: Digest desk"
+    for section in ("WATCHLIST", "THIS WEEK", "Unsubscribe from this weekly email"):
+        assert section in preview["body"]
+    assert "Crude oil (Brent, Europe spot): " in preview["body"] and "over the week" in preview["body"]
+
+    monday_6, monday_8 = datetime(2026, 11, 2, 6, 0), datetime(2026, 11, 2, 8, 0)
+    assert digest.send_due(monday_8) == 0  # nobody opted in yet
+    assert secured.put("/api/v1/account/digest", json={"weekly": True}).json()["weekly"] is True
+    assert digest.send_due(datetime(2026, 11, 3, 8, 0)) == 0 and digest.send_due(monday_6) == 0  # only Monday mornings
+    assert digest.send_due(monday_8) == 1 and sent[-1][0] == "reader@digest.test"
+    assert digest.send_due(monday_8 + timedelta(hours=2)) == 0  # once a week
+    assert digest.send_due(monday_8 + timedelta(days=7)) == 1
+
+    link = re.search(r"Unsubscribe from this weekly email: (\S+)", sent[-1][1]).group(1)
+    q = {k: v[0] for k, v in parse_qs(urlparse(link).query).items()}
+    secured.cookies.clear()
+    assert secured.get("/digest/unsubscribe", params={**q, "s": "0" * 32}).status_code == 400  # tampered
+    assert secured.get("/digest/unsubscribe", params={**q, "w": "another-ws"}).status_code == 400  # signature binds the workspace
+    page = secured.get("/digest/unsubscribe", params=q)
+    assert page.status_code == 200 and "no longer receive" in page.text and "<script" not in page.text
+    assert digest.opted_in(me["user"]["user_id"], ws) is False
+    assert digest.send_due(monday_8 + timedelta(days=14)) == 0

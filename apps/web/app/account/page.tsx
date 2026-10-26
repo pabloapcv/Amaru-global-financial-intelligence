@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { API_URL, api, type Account } from "@/lib/api";
 import Activity from "@/components/Activity";
 import Billing from "@/components/Billing";
+import Digest from "@/components/Digest";
 import Team from "@/components/Team";
 import TwoFactor from "@/components/TwoFactor";
 import YourData from "@/components/YourData";
@@ -126,6 +127,7 @@ export default function AccountPage() {
         </div>
       )}
       {account && account.auth === "session" && <div style={{ marginBottom: 14 }}><TwoFactor account={account} onChange={load} /></div>}
+      {account && account.auth !== "local" && <div style={{ marginBottom: 14 }}><Digest /></div>}
       {account && account.auth !== "local" && <div style={{ marginBottom: 14 }}><Team /></div>}
       {account && account.auth !== "local" && (account.role === "owner" || account.role === "admin") && <div style={{ marginBottom: 14 }}><Activity /></div>}
       {account && account.auth === "session" && <div style={{ marginBottom: 14 }}><YourData account={account} /></div>}

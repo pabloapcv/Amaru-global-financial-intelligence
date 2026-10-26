@@ -101,7 +101,12 @@ def run_once(holder: str = HOLDER) -> int:
     started = run_due()
     if started:
         log.info("started %d scheduled report(s)", len(started))
-    _record({"datasets_refreshed": len(due), "reports_started": len(started)}, holder)
+    from atlas import digest
+
+    digests = digest.send_due()
+    if digests:
+        log.info("sent %d weekly digest(s)", digests)
+    _record({"datasets_refreshed": len(due), "reports_started": len(started), "digests_sent": digests}, holder)
     return len(due)
 
 
