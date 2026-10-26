@@ -25,7 +25,7 @@ from typing import Any
 import markdown as md
 from sqlalchemy import delete, func, select
 
-from atlas import secretbox
+from atlas import i18n, secretbox
 from atlas.auth import PLANS, Principal, audit
 from atlas.data.db import (
     Newsletter,
@@ -45,8 +45,7 @@ EMAIL_RE = re.compile(r"^[^@\s<>\"',;]{1,64}@[A-Za-z0-9.-]{1,250}\.[A-Za-z]{2,24
 CONFIRM_TTL = timedelta(days=7)
 RESEND_AFTER = timedelta(minutes=10)
 STALLED = timedelta(minutes=15)
-DISCLAIMER = ("Based on public reference data published with a lag; not a live quote. "
-              "General research, not personalised investment advice.")
+# The disclaimer, footers and confirmation texts come from i18n.NEWSLETTER in the newsletter's language.
 BACKGROUND = True  # tests send synchronously
 
 
@@ -91,7 +90,7 @@ def _settings(n: Newsletter, s) -> dict[str, Any]:
         NewsletterSubscriber.newsletter_id == n.newsletter_id).group_by(NewsletterSubscriber.status)).all())
     return {"newsletter_id": n.newsletter_id, "slug": n.slug, "name": n.name, "description": n.description,
             "from_name": n.from_name, "reply_to": n.reply_to, "postal_address": n.postal_address,
-            "public_archive": n.public_archive, "public_url": web_url(f"/n/{n.slug}"),
+            "public_archive": n.public_archive, "language": n.language or "en", "public_url": web_url(f"/n/{n.slug}"),
             "subscribers": {"active": counts.get("active", 0), "pending": counts.get("pending", 0),
                             "unsubscribed": counts.get("unsubscribed", 0)}}
 
@@ -107,12 +106,14 @@ def get_settings(workspace_id: str) -> dict[str, Any] | None:
 
 
 def save_settings(p: Principal, *, slug: str, name: str, description: str = "", from_name: str = "",
-                  reply_to: str | None = None, postal_address: str = "", public_archive: bool = True) -> dict[str, Any]:
+                  reply_to: str | None = None, postal_address: str = "", public_archive: bool = True, language: str = "en") -> dict[str, Any]:
     slug, name = slug.strip().lower(), name.strip()
     if not SLUG_RE.match(slug):
         raise NewsletterError("the address must be 3-40 lowercase letters, digits or hyphens")
     if not name:
         raise NewsletterError("give the newsletter a name")
+    if language not in i18n.LANGUAGES:
+        raise NewsletterError(f"language must be one of {', '.join(i18n.LANGUAGES)}")
     reply_to = (reply_to or "").strip() or None
     if reply_to and not EMAIL_RE.match(reply_to):
         raise NewsletterError("reply-to must be an email address")
@@ -127,7 +128,7 @@ def save_settings(p: Principal, *, slug: str, name: str, description: str = "", 
             s.add(n)
         n.slug, n.name, n.description = slug, name[:120], description.strip()[:2000]
         n.from_name, n.reply_to = from_name.strip()[:120], reply_to
-        n.postal_address, n.public_archive = postal_address.strip()[:300], public_archive
+        n.postal_address, n.public_archive, n.language = postal_address.strip()[:300], public_archive, language
         s.flush()
         newsletter_id = n.newsletter_id
     audit("newsletter.created" if created else "newsletter.updated", p.user_id, p.workspace_id, newsletter_id=newsletter_id, slug=slug)
@@ -146,14 +147,13 @@ def _mine(s, workspace_id: str) -> Newsletter:
 # ---------------------------------------------------------------- subscribers
 
 
-def _send_confirmation(name: str, email: str, token: str) -> None:
+def _send_confirmation(name: str, email: str, token: str, language: str) -> None:
     from atlas import mailer
 
     link = api_url(f"/newsletter/confirm?token={token}")
     try:
-        mailer.send(email, f"Confirm your subscription to {name}",
-                    f"Someone (hopefully you) asked to receive {name} at this address.\n\nConfirm: {link}\n\n"
-                    "If this wasn't you, ignore this email and you won't hear from us. The link is valid for 7 days.")
+        mailer.send(email, i18n.newsletter_text(language, "confirm_subject", name=name),
+                    i18n.newsletter_text(language, "confirm_body", name=name, link=link))
     except Exception:
         log.exception("could not send newsletter confirmation")
 
@@ -176,7 +176,7 @@ def subscribe(slug: str, email: str, *, source: str = "form") -> None:
             return  # don't let the form be used to flood someone's inbox
         listed = s.execute(select(func.count()).select_from(NewsletterSubscriber).where(
             NewsletterSubscriber.newsletter_id == n.newsletter_id, NewsletterSubscriber.status != "unsubscribed")).scalar() or 0
-        workspace_id, name = n.workspace_id, n.name
+        workspace_id, name, language = n.workspace_id, n.name, n.language
         # A pending address is already counted; a new or returning one needs a free place.
         cap_hit = (sub is None or sub.status == "unsubscribed") and listed >= subscriber_cap(workspace_id)
         if not cap_hit:
@@ -188,7 +188,7 @@ def subscribe(slug: str, email: str, *, source: str = "form") -> None:
     if cap_hit:
         audit("newsletter.limit_reached", None, workspace_id, slug=slug)
         return
-    _send_confirmation(name, email, token)
+    _send_confirmation(name, email, token, language)
 
 
 def invite(p: Principal, email: str) -> None:
@@ -198,22 +198,22 @@ def invite(p: Principal, email: str) -> None:
     audit("newsletter.invited", p.user_id, p.workspace_id, email=email.strip().lower())
 
 
-def confirm(token: str) -> str | None:
-    """Confirm a subscription; returns the newsletter's name, or None for a bad or expired link."""
+def confirm(token: str) -> dict[str, str] | None:
+    """Confirm a subscription; returns the newsletter's name and language, or None for a bad or expired link."""
     with session_scope() as s:
         sub = s.execute(select(NewsletterSubscriber).where(NewsletterSubscriber.confirm_token_hash == _hash(token))).scalar_one_or_none()
         if sub is None or sub.confirm_sent_at is None or utcnow() - sub.confirm_sent_at > CONFIRM_TTL:
             return None
         sub.status, sub.confirmed_at, sub.confirm_token_hash = "active", utcnow(), None
         n = s.get(Newsletter, sub.newsletter_id)
-        return n.name if n else None
+        return {"name": n.name, "language": n.language} if n else None
 
 
 def unsubscribe_link(subscriber_id: str) -> str:
     return api_url(f"/newsletter/unsubscribe?s={subscriber_id}&sig={secretbox.sign('newsletter|' + subscriber_id)}")
 
 
-def unsubscribe(subscriber_id: str, signature: str) -> str | None:
+def unsubscribe(subscriber_id: str, signature: str) -> dict[str, str] | None:
     if not secretbox.verify_signature("newsletter|" + subscriber_id, signature):
         return None
     with session_scope() as s:
@@ -223,7 +223,7 @@ def unsubscribe(subscriber_id: str, signature: str) -> str | None:
         if sub.status != "unsubscribed":
             sub.status, sub.unsubscribed_at, sub.confirm_token_hash = "unsubscribed", utcnow(), None
         n = s.get(Newsletter, sub.newsletter_id)
-        return n.name if n else ""
+        return {"name": n.name if n else "", "language": n.language if n else "en"}
 
 
 def list_subscribers(workspace_id: str) -> list[dict[str, Any]]:
@@ -267,7 +267,8 @@ def _issue_dict(i: NewsletterIssue, with_body: bool = False) -> dict[str, Any]:
     return out
 
 
-def _snapshot(result: dict[str, Any]) -> str:
+def _snapshot(result: dict[str, Any], language: str = "en") -> str:
+    t = i18n.NEWSLETTER[i18n.lang(language)]
     narrative = result.get("narrative_markdown", "").strip()
     lines = narrative.splitlines()
     if lines and lines[0].startswith("# "):  # the subject replaces the report title
@@ -276,10 +277,10 @@ def _snapshot(result: dict[str, Any]) -> str:
     labels = set(re.findall(r"E\d+", " ".join(re.findall(r"\[(E\d+(?:\s*,\s*E\d+)*)\]", narrative))))
     cited = [e for e in evidence if e["label"] in labels]
     if cited:  # resolves the [E1] markers in the text
-        narrative += "\n\n**Evidence:**\n\n" + "\n".join(f"- [{e['label']}] {e['citation']}" for e in cited[:30])
+        narrative += f"\n\n**{t['evidence']}:**\n\n" + "\n".join(f"- [{e['label']}] {e['citation']}" for e in cited[:30])
     sources = result.get("sources") or []
     if sources:
-        narrative += "\n\n**Sources:**\n\n" + "\n".join(
+        narrative += f"\n\n**{t['sources']}:**\n\n" + "\n".join(
             f"- {src.get('name') or src.get('dataset_id')}: {src.get('citation') or src.get('url') or 'ATLAS'}" for src in sources[:12])
     return narrative
 
@@ -300,7 +301,7 @@ def _create_issue(workspace_id: str, user_id: str, run_id: str, subject: str | N
             raise NewsletterError("only completed research can become an issue")
         result = dict(run.result)
         i = NewsletterIssue(newsletter_id=n.newsletter_id, run_id=run_id, subject=(subject or result.get("title") or run.query)[:200].strip(),
-                            intro=intro.strip()[:5000], body_markdown=_snapshot(result), created_by=user_id)
+                            intro=intro.strip()[:5000], body_markdown=_snapshot(result, n.language), created_by=user_id)
         s.add(i)
         s.flush()
         return _issue_dict(i, True)
@@ -345,7 +346,7 @@ def list_issues(workspace_id: str) -> list[dict[str, Any]]:
 
 
 def _content(n: Newsletter, i: NewsletterIssue) -> str:
-    return (f"{i.intro}\n\n---\n\n" if i.intro else "") + i.body_markdown + f"\n\n*{DISCLAIMER}*"
+    return (f"{i.intro}\n\n---\n\n" if i.intro else "") + i.body_markdown + f"\n\n*{i18n.newsletter_text(n.language, 'disclaimer')}*"
 
 
 def get_issue(workspace_id: str, issue_id: str) -> dict[str, Any]:
@@ -355,20 +356,20 @@ def get_issue(workspace_id: str, issue_id: str) -> dict[str, Any]:
 
 
 def render_email(n: Newsletter, i: NewsletterIssue, unsubscribe: str) -> tuple[str, str]:
+    t = i18n.NEWSLETTER[i18n.lang(n.language)]
     content = _content(n, i)
     archive = web_url(f"/n/{n.slug}/{i.issue_id}") if n.public_archive else None
-    footer = (f"You receive {n.name} because you subscribed and confirmed your address."
-              f"\nUnsubscribe: {unsubscribe}\n{n.postal_address}")
-    text = f"{i.subject}\n\n{content}\n\n" + (f"Read online: {archive}\n\n" if archive else "") + "--\n" + footer
+    why = t["why"].format(name=n.name)
+    footer = f"{why}\n{t['unsubscribe']}: {unsubscribe}\n{n.postal_address}"
+    text = f"{i.subject}\n\n{content}\n\n" + (f"{t['read_online']}: {archive}\n\n" if archive else "") + "--\n" + footer
     e = _html.escape
-    html = (f"<!doctype html><html><body style=\"margin:0;padding:24px;background:#f6f7f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1d2330\">"
+    html = (f"<!doctype html><html lang=\"{i18n.lang(n.language)}\"><body style=\"margin:0;padding:24px;background:#f6f7f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1d2330\">"
             f"<div style=\"max-width:640px;margin:0 auto;background:#fff;border-radius:8px;padding:28px;line-height:1.55;font-size:15px\">"
             f"<div style=\"font-size:12px;color:#667;text-transform:uppercase;letter-spacing:.04em\">{e(n.name)}</div>"
             f"<h1 style=\"font-size:22px;margin:6px 0 18px\">{e(i.subject)}</h1>{safe_html(content)}"
-            + (f"<p><a href=\"{e(archive)}\">Read online</a></p>" if archive else "")
+            + (f"<p><a href=\"{e(archive)}\">{e(t['read_online'])}</a></p>" if archive else "")
             + f"</div><p style=\"max-width:640px;margin:16px auto 0;font-size:12px;color:#667;text-align:center\">"
-            f"You receive {e(n.name)} because you subscribed and confirmed your address. "
-            f"<a href=\"{e(unsubscribe)}\" style=\"color:#667\">Unsubscribe</a><br>{e(n.postal_address)}</p></body></html>")
+            f"{e(why)} <a href=\"{e(unsubscribe)}\" style=\"color:#667\">{e(t['unsubscribe'])}</a><br>{e(n.postal_address)}</p></body></html>")
     return text, html
 
 
@@ -476,6 +477,12 @@ def resume_stalled(now=None) -> int:
 SCHEDULE_MODES = ("off", "draft", "send")
 
 
+def language_for(workspace_id: str) -> str | None:
+    with session_scope() as s:
+        n = s.execute(select(Newsletter).where(Newsletter.workspace_id == workspace_id)).scalar_one_or_none()
+        return n.language if n and n.language != "en" else None
+
+
 def from_scheduled_run(run_id: str) -> dict[str, Any] | None:
     """A scheduled report set to feed the newsletter has finished: draft an issue from it, and send it
     when the schedule says so and it is safe to (verified research, creator still a publisher,
@@ -550,7 +557,8 @@ def public_info(slug: str) -> dict[str, Any] | None:
             issues = [{"issue_id": i.issue_id, "subject": i.subject, "sent_at": _iso(i.sent_at)} for i in s.execute(
                 select(NewsletterIssue).where(NewsletterIssue.newsletter_id == n.newsletter_id, NewsletterIssue.status == "sent")
                 .order_by(NewsletterIssue.sent_at.desc()).limit(100)).scalars()]
-        return {"slug": n.slug, "name": n.name, "description": n.description, "issues": issues, "public_archive": n.public_archive}
+        return {"slug": n.slug, "name": n.name, "description": n.description, "issues": issues, "public_archive": n.public_archive,
+                "language": i18n.lang(n.language), "text": i18n.NEWSLETTER[i18n.lang(n.language)]}
 
 
 def public_issue(slug: str, issue_id: str) -> dict[str, Any] | None:
@@ -561,7 +569,8 @@ def public_issue(slug: str, issue_id: str) -> dict[str, Any] | None:
         i = s.get(NewsletterIssue, issue_id)
         if i is None or i.newsletter_id != n.newsletter_id or i.status != "sent":
             return None
-        return {"newsletter": n.name, "slug": n.slug, "subject": i.subject, "sent_at": _iso(i.sent_at), "html": safe_html(_content(n, i))}
+        return {"newsletter": n.name, "slug": n.slug, "subject": i.subject, "sent_at": _iso(i.sent_at), "html": safe_html(_content(n, i)),
+                "language": i18n.lang(n.language), "text": i18n.NEWSLETTER[i18n.lang(n.language)]}
 
 
 def purge_workspace(s, workspace_id: str) -> None:

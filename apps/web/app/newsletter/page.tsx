@@ -5,12 +5,12 @@ import { API_URL, api } from "@/lib/api";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
 type Settings = { slug: string; name: string; description: string; from_name: string; reply_to: string | null; postal_address: string;
-  public_archive: boolean; public_url?: string; subscribers?: { active: number; pending: number; unsubscribed: number }; subscriber_limit?: number };
+  public_archive: boolean; language: "en" | "es" | "pt"; public_url?: string; subscribers?: { active: number; pending: number; unsubscribed: number }; subscriber_limit?: number };
 type Subscriber = { subscriber_id: string; email: string; status: string; source: string; created_at: string };
 type Issue = { issue_id: string; run_id: string | null; subject: string; intro: string; status: string; created_at: string; sent_at: string | null; recipients: number };
 type Run = { run_id: string; query: string; status: string; title: string | null; created_at: string };
 
-const EMPTY: Settings = { slug: "", name: "", description: "", from_name: "", reply_to: "", postal_address: "", public_archive: true };
+const EMPTY: Settings = { slug: "", name: "", description: "", from_name: "", reply_to: "", postal_address: "", public_archive: true, language: "en" };
 
 export default function NewsletterPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -132,6 +132,11 @@ export default function NewsletterPage() {
           <form onSubmit={save}>
             <label>Name<input {...field("name")} required maxLength={120} placeholder="Sugar Weekly" /></label>
             <label>Public address<div className="row" style={{ flexWrap: "nowrap", gap: 4 }}><span className="muted" style={{ whiteSpace: "nowrap" }}>/n/</span><input {...field("slug")} required maxLength={40} placeholder="sugar-weekly" /></div></label>
+            <label>Language (public page, emails and scheduled research)
+              <select value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value as Settings["language"] })}>
+                <option value="en">English</option><option value="es">Español</option><option value="pt">Português</option>
+              </select>
+            </label>
             <label>Description<textarea {...field("description")} rows={3} maxLength={2000} placeholder="What readers get, and how often" /></label>
             <label>Sender name<input {...field("from_name")} maxLength={120} placeholder="Defaults to the newsletter name" /></label>
             <label>Reply-to email<input {...field("reply_to")} type="email" maxLength={320} /></label>

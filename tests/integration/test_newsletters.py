@@ -254,3 +254,43 @@ def test_scheduled_reports_draft_or_send_issues(secured, outbox, monkeypatch):
     member.post("/api/v1/auth/invitations/accept", json={"token": token, "password": "member password!"})
     assert member.patch(f"/api/v1/schedules/{sched['schedule_id']}", json={"newsletter": "send"}).status_code == 403
     assert member.patch(f"/api/v1/schedules/{sched['schedule_id']}", json={"newsletter": "off"}).status_code == 200
+
+
+def test_spanish_newsletter_localizes_emails_pages_and_scheduled_research(secured, outbox):
+    from atlas import schedules
+    from atlas.data.db import NewsletterSubscriber, ResearchRun, session_scope
+
+    pub = _signup(secured, "editora@pub.test", "Editora")
+    assert secured.put("/api/v1/newsletter", json={**SETTINGS, "slug": "azucar", "name": "Azúcar Semanal", "language": "fr"}).status_code == 422
+    r = secured.put("/api/v1/newsletter", json={**SETTINGS, "slug": "azucar", "name": "Azúcar Semanal", "language": "es",
+                                                "postal_address": "Av. Arce 1, La Paz"})
+    assert r.json()["language"] == "es"
+    visitor = TestClient(secured.app)
+    info = visitor.get("/api/v1/public/newsletters/azucar").json()
+    assert info["language"] == "es" and info["text"]["subscribe"] == "Suscribirme"
+
+    visitor.post("/api/v1/public/newsletters/azucar/subscribe", json={"email": "lectora@mail.test"})
+    assert outbox[-1]["subject"] == "Confirma tu suscripción a Azúcar Semanal" and "Confirmar:" in outbox[-1]["body"]
+    page = visitor.get(_link(outbox[-1]["body"], "/newsletter/confirm"))
+    assert "Te suscribiste a Azúcar Semanal" in page.text and "lang=es" in page.text
+    bad = visitor.get("/newsletter/confirm?token=nope", headers={"Accept-Language": "pt-BR,pt;q=0.9"})
+    assert "inválido" in bad.text and "lang=pt" in bad.text
+
+    # A schedule feeding a Spanish newsletter asks for research in Spanish.
+    sched = secured.post("/api/v1/schedules", json={"name": "Semanal", "query": "Sugar price outlook", "cadence": "weekly",
+                                                    "engine": "deterministic", "formats": [], "newsletter": "send"}).json()
+    run_id = schedules.run_schedule(sched["schedule_id"], background=False)
+    with session_scope() as s:
+        assert s.get(ResearchRun, run_id).config["language"] == "es"
+    issue = secured.get("/api/v1/newsletter/issues").json()[0]
+    assert issue["status"] == "sent"
+    full = secured.get(f"/api/v1/newsletter/issues/{issue['issue_id']}").json()
+    assert "**Fuentes:**" in full["body_markdown"] and "no es una cotización en tiempo real" in full["html"]
+    mail = next(m for m in outbox if m["to"] == "lectora@mail.test" and m.get("html"))
+    assert "Recibes Azúcar Semanal porque te suscribiste" in mail["body"] and "Cancelar suscripción" in mail["html"]
+    assert 'lang="es"' in mail["html"]
+    unsub = mail["headers"]["List-Unsubscribe"].strip("<>").split("8010", 1)[1]
+    assert "Ya no recibirás Azúcar Semanal" in visitor.get(unsub).text
+    with session_scope() as s:
+        assert s.query(NewsletterSubscriber).filter(NewsletterSubscriber.email == "lectora@mail.test").one().status == "unsubscribed"
+    assert pub

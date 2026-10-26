@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { ErrorNote } from "@/components/ui";
 
-type Info = { slug: string; name: string; description: string; public_archive: boolean; issues: { issue_id: string; subject: string; sent_at: string }[] };
+type Text = Record<"subscribe" | "email_placeholder" | "check_inbox" | "free_note" | "past_issues" | "published_with", string>;
+type Info = { slug: string; name: string; description: string; public_archive: boolean; language: string; text: Text;
+  issues: { issue_id: string; subject: string; sent_at: string }[] };
 
 export default function PublicNewsletter() {
   const { slug } = useParams<{ slug: string }>();
@@ -17,6 +19,7 @@ export default function PublicNewsletter() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   useEffect(() => { api<Info>(`/api/v1/public/newsletters/${encodeURIComponent(slug)}`).then(setInfo).catch(() => setMissing(true)); }, [slug]);
+  useEffect(() => { if (info) document.documentElement.lang = info.language; }, [info]);
 
   const subscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,24 +35,24 @@ export default function PublicNewsletter() {
       <h1 style={{ marginBottom: 6 }}>{info.name}</h1>
       {info.description && <p style={{ whiteSpace: "pre-wrap" }}>{info.description}</p>}
       <div className="card" style={{ margin: "18px 0" }}>
-        {done ? <p style={{ margin: 0 }}>Check your inbox: we sent a link to confirm your subscription.</p> : (
+        {done ? <p style={{ margin: 0 }}>{info.text.check_inbox}</p> : (
           <form onSubmit={subscribe} className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" aria-label="Your email" style={{ flex: "1 1 220px" }} />
-            <button type="submit" disabled={busy}>Subscribe</button>
+            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder={info.text.email_placeholder} aria-label="Your email" style={{ flex: "1 1 220px" }} />
+            <button type="submit" disabled={busy}>{info.text.subscribe}</button>
           </form>
         )}
         <ErrorNote error={error} />
-        <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>Free. Unsubscribe with one click from any email. General research based on public data, not personalised investment advice.</p>
+        <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>{info.text.free_note}</p>
       </div>
       {info.issues.length > 0 && (
         <>
-          <h2 style={{ fontSize: 16 }}>Past issues</h2>
+          <h2 style={{ fontSize: 16 }}>{info.text.past_issues}</h2>
           <ul style={{ paddingLeft: 18 }}>
             {info.issues.map((i) => <li key={i.issue_id}><Link href={`/n/${info.slug}/${i.issue_id}`}>{i.subject}</Link> <span className="muted">· {i.sent_at.slice(0, 10)}</span></li>)}
           </ul>
         </>
       )}
-      <p className="muted" style={{ fontSize: 12, marginTop: 28 }}>Published with ATLAS</p>
+      <p className="muted" style={{ fontSize: 12, marginTop: 28 }}>{info.text.published_with}</p>
     </div>
   );
 }

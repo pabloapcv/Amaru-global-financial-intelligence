@@ -93,6 +93,12 @@ def run_schedule(schedule_id: str, *, background: bool = True, workspace_id: str
         ws, uid = sched.workspace_id, sched.user_id
     config.setdefault("formats", ["html", "xlsx"])
     config["schedule_id"] = schedule_id
+    if config.get("newsletter") in ("draft", "send") and not config.get("language"):
+        from atlas import newsletters
+
+        language = newsletters.language_for(ws)  # an issue in Spanish needs research written in Spanish
+        if language:
+            config["language"] = language
     run_id = engine.submit(query, config, uid, ws) if background else engine.create_run(query, config, uid, ws)
     with session_scope() as s:
         sched = s.get(ReportSchedule, schedule_id)
