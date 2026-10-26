@@ -543,6 +543,7 @@ class NewsletterSettings(BaseModel):
     reply_to: str | None = Field(None, max_length=320)
     postal_address: str = Field("", max_length=300)
     public_archive: bool = True
+    language: Literal["en", "es", "pt"] = "en"
 
 
 class SubscribeRequest(BaseModel):
@@ -1060,14 +1061,21 @@ def digest_unsubscribe(u: str, w: str, s: str) -> Response:
                     headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Robots-Tag": "noindex"})
 
 
-def _plain_page(msg: str, status: int = 200) -> Response:
+def _plain_page(msg: str, status: int = 200, lang: str = "en") -> Response:
     import html as _html
 
-    page = (f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>ATLAS</title>"
+    page = (f"<!doctype html><html lang={lang}><meta charset=utf-8><meta name=viewport content='width=device-width'><title>ATLAS</title>"
             f"<body style='font-family:system-ui;max-width:32rem;margin:15vh auto;padding:0 1rem'>"
             f"<h1 style='font-size:1.2rem'>ATLAS</h1><p>{_html.escape(msg)}</p></body>")
     return Response(page, status_code=status, media_type="text/html",
                     headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Robots-Tag": "noindex"})
+
+
+def _page_lang(request: Request) -> str:
+    """For pages that cannot tell which newsletter they belong to: the reader's preferred language."""
+    accept = request.headers.get("accept-language", "").lower()
+    first = accept.split(",")[0].split("-")[0].strip()
+    return first if first in ("es", "pt") else "en"
 
 
 def _client_throttle(request: Request, what: str) -> None:
@@ -1116,22 +1124,26 @@ def public_subscribe(slug: str, req: SubscribeRequest, request: Request) -> dict
 def newsletter_confirm(token: str, request: Request) -> Response:
     from atlas import newsletters
 
-    name = newsletters.confirm(token[:100])
-    if name is None:
+    from atlas import i18n
+
+    done = newsletters.confirm(token[:100])
+    if done is None:
         _client_throttle(request, "newsletter-confirm")
-        return _plain_page("This confirmation link is not valid or has expired. Subscribe again to get a new one.", 400)
-    return _plain_page(f"You're subscribed to {name}. Thank you!")
+        return _plain_page(i18n.newsletter_text(_page_lang(request), "confirm_invalid"), 400, _page_lang(request))
+    return _plain_page(i18n.newsletter_text(done["language"], "confirmed", name=done["name"]), lang=i18n.lang(done["language"]))
 
 
 @app.api_route("/newsletter/unsubscribe", methods=["GET", "POST"], include_in_schema=False)
-def newsletter_unsubscribe(s: str, sig: str) -> Response:
+def newsletter_unsubscribe(s: str, sig: str, request: Request) -> Response:
     """One-click unsubscribe (GET from the link, POST from mail clients' List-Unsubscribe-Post)."""
     from atlas import newsletters
 
-    name = newsletters.unsubscribe(s[:32], sig[:64])
-    if name is None:
-        return _plain_page("This unsubscribe link is not valid.", 400)
-    return _plain_page(f"You won't receive {name or 'this newsletter'} any more.")
+    from atlas import i18n
+
+    done = newsletters.unsubscribe(s[:32], sig[:64])
+    if done is None:
+        return _plain_page(i18n.newsletter_text(_page_lang(request), "unsubscribe_invalid"), 400, _page_lang(request))
+    return _plain_page(i18n.newsletter_text(done["language"], "unsubscribed", name=done["name"] or "ATLAS"), lang=i18n.lang(done["language"]))
 
 
 # ---------------------------------------------------------------- billing

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
-type Issue = { newsletter: string; slug: string; subject: string; sent_at: string; html: string };
+type Issue = { newsletter: string; slug: string; subject: string; sent_at: string; html: string; language: string; text: { subscribe_to: string } };
 
 export default function PublicIssue() {
   const { slug, issue } = useParams<{ slug: string; issue: string }>();
@@ -14,6 +14,7 @@ export default function PublicIssue() {
   useEffect(() => {
     api<Issue>(`/api/v1/public/newsletters/${encodeURIComponent(slug)}/issues/${encodeURIComponent(issue)}`).then(setData).catch(() => setMissing(true));
   }, [slug, issue]);
+  useEffect(() => { if (data) document.documentElement.lang = data.language; }, [data]);
 
   if (missing) return <div className="public-page"><p className="muted">This issue is not available.</p></div>;
   if (!data) return null;
@@ -23,7 +24,7 @@ export default function PublicIssue() {
       <h1 style={{ marginTop: 6 }}>{data.subject}</h1>
       {/* Server-rendered from Markdown with raw HTML escaped and only http(s)/mailto links kept. */}
       <article className="prose" dangerouslySetInnerHTML={{ __html: data.html }} />
-      <div className="card" style={{ marginTop: 24 }}><Link href={`/n/${data.slug}`}>Subscribe to {data.newsletter}</Link></div>
+      <div className="card" style={{ marginTop: 24 }}><Link href={`/n/${data.slug}`}>{data.text.subscribe_to.replace("{name}", data.newsletter)}</Link></div>
     </div>
   );
 }

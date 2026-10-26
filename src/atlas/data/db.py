@@ -557,6 +557,7 @@ class Newsletter(Base):
     reply_to: Mapped[str | None] = mapped_column(String(320))
     postal_address: Mapped[str] = mapped_column(String(300), default="")  # required by anti-spam laws to send
     public_archive: Mapped[bool] = mapped_column(default=True)
+    language: Mapped[str] = mapped_column(String(2), default="en")  # en | es | pt: emails, pages and scheduled research
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -762,6 +763,7 @@ _ADDED_COLUMNS = [
     ("source_documents", "summary", "TEXT", None),
     ("source_documents", "fetched_at", "TIMESTAMP", None),
     ("source_documents", "first_seen_at", "TIMESTAMP", None),
+    ("newsletters", "language", "VARCHAR(2)", "en"),
 ]
 
 
