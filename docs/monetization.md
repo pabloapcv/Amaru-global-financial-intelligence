@@ -76,7 +76,7 @@ Selling the codebase itself without customers would probably fetch little. Payin
 ## Next steps
 
 1. Talk to 15–20 people in the chosen niche before building more features.
-2. Get 3–5 of them to pay for a pilot, even at a discount, as design partners.
+2. Get 3–5 of them to pay for a pilot, even at a discount, as design partners. Their answer feedback (right or wrong, with reasons) reaches you by email and in the operator console.
 3. Then settle the data licences for that niche, set up billing and production hosting, and get terms of service and a privacy policy written.
 
 Still blocked on decisions or accounts from you:

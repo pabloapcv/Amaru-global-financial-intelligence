@@ -43,7 +43,7 @@ Please report suspected vulnerabilities privately to the maintainer (pabloapcv o
 
 **Auditing**
 - Owners and admins can review and export their workspace's activity log.
-- The operator console needs an allow-listed email, a browser session and two-factor sign-in; it shows metadata only, and every plan change or suspension is audited.
+- The operator console needs an allow-listed email, a browser session and two-factor sign-in. It shows metadata, plus feedback readers chose to send, and every plan change, suspension or feedback resolution is audited.
 
 **Personal data**
 - People can download their data and delete their account.

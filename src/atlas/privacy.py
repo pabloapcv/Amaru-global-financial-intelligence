@@ -36,6 +36,7 @@ from atlas.data.db import (
     ReportSchedule,
     ReportShare,
     ResearchEvidence,
+    ResearchFeedback,
     ResearchRun,
     User,
     WatchlistItem,
@@ -87,6 +88,9 @@ def export_personal_data(principal: Principal) -> dict[str, Any]:
             "research": [{"run_id": r.run_id, "question": r.query, "status": r.status, "created_at": _iso(r.created_at),
                           "workspace": names.get(r.workspace_id), "title": (r.result or {}).get("title")}
                          for r in s.execute(select(ResearchRun).where(ResearchRun.user_id == uid, ResearchRun.status != "deleted")).scalars()],
+            "research_feedback": [{"run_id": f.run_id, "rating": f.rating, "reasons": f.reasons, "comment": f.comment,
+                                   "question": f.question, "created_at": _iso(f.created_at)}
+                                  for f in s.execute(select(ResearchFeedback).where(ResearchFeedback.user_id == uid)).scalars()],
             "portfolios": rows(Portfolio, Portfolio.name, Portfolio.holdings, where=Portfolio.user_id == uid),
             "alerts": rows(Alert, Alert.name, Alert.rule, Alert.status, where=Alert.user_id == uid),
             "agents": rows(MonitorAgent, MonitorAgent.name, MonitorAgent.triggers, MonitorAgent.status, where=MonitorAgent.user_id == uid),
@@ -122,7 +126,7 @@ def _purge_workspace(s, ws_id: str) -> list[str]:
     if hook_ids:
         s.execute(delete(WebhookDelivery).where(WebhookDelivery.webhook_id.in_(hook_ids)))
     for model in (MonitorAgent, Alert, ReportSchedule, Portfolio, WatchlistItem, Invitation, ApiKey, AuthSession,
-                  ReportShare, Webhook, Membership, AuditEvent):
+                  ReportShare, Webhook, ResearchFeedback, Membership, AuditEvent):
         s.execute(delete(model).where(model.workspace_id == ws_id))
     s.execute(delete(Workspace).where(Workspace.workspace_id == ws_id))
     return report_ids
@@ -165,7 +169,7 @@ def delete_account(principal: Principal, password: str, code: str | None = None)
         report_ids: list[str] = []
         for ws_id in sole:
             report_ids += _purge_workspace(s, ws_id)
-        for model in (LoginChallenge, PasswordReset, EmailVerification, AuthSession, ApiKey, Membership):
+        for model in (LoginChallenge, PasswordReset, EmailVerification, AuthSession, ApiKey, ResearchFeedback, Membership):
             s.execute(delete(model).where(model.user_id == uid))
         s.execute(delete(Invitation).where(Invitation.email == email))
         # Keep the shared workspaces' security trail, without identifying the person.

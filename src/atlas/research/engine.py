@@ -381,6 +381,9 @@ def delete_run(run_id: str, workspace_id: str, user_id: str, role: str) -> bool:
             s.execute(delete(ReportShare).where(ReportShare.report_id.in_(report_ids)))
             s.execute(delete(Report).where(Report.report_id.in_(report_ids)))
         s.execute(delete(ResearchEvidence).where(ResearchEvidence.run_id == run_id))
+        from atlas.data.db import ResearchFeedback
+
+        s.execute(delete(ResearchFeedback).where(ResearchFeedback.run_id == run_id))  # it quotes the question
         s.execute(update(ResearchRun).where(ResearchRun.parent_run_id == run_id).values(parent_run_id=None))
         s.execute(update(ResearchRun).where(ResearchRun.cached_from == run_id).values(cached_from=None))
         s.execute(update(ReportSchedule).where(ReportSchedule.last_run_id == run_id).values(last_run_id=None))
