@@ -30,6 +30,10 @@ Please report suspected vulnerabilities privately to the maintainer (pabloapcv o
 - Deliveries are signed (HMAC-SHA256 with a timestamp), and signing secrets are encrypted at rest.
 - Endpoints must be HTTPS on public addresses, checked again at every send; redirects are not followed.
 
+**Newsletters**
+- Subscriptions are double opt-in. The form doesn't reveal who is subscribed, and unsubscribe links are signed.
+- Issue content has raw HTML escaped and only http(s) and mailto links kept.
+
 **Payments**
 - Workspace plans change only through signed and timestamped Stripe webhooks, each applied once.
 

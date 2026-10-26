@@ -21,6 +21,8 @@ const LABELS: Record<string, string> = {
   alerts: "Alerts",
   agents: "Monitoring agents",
   api_keys: "API keys",
+  webhooks: "Webhooks",
+  newsletter_subscribers: "Newsletter subscribers",
 };
 
 export default function AccountPage() {

@@ -532,6 +532,141 @@ def webhook_deliveries(webhook_id: str, limit: int = Query(50, ge=1, le=200), p:
     return _webhook_call(webhooks.deliveries, p.workspace_id, webhook_id, limit)
 
 
+# ---------------------------------------------------------------- newsletter
+
+
+class NewsletterSettings(BaseModel):
+    slug: str = Field(..., max_length=40)
+    name: str = Field(..., max_length=120)
+    description: str = Field("", max_length=2000)
+    from_name: str = Field("", max_length=120)
+    reply_to: str | None = Field(None, max_length=320)
+    postal_address: str = Field("", max_length=300)
+    public_archive: bool = True
+
+
+class SubscribeRequest(BaseModel):
+    email: str = Field(..., max_length=320)
+
+
+class IssueCreate(BaseModel):
+    run_id: str = Field(..., max_length=32)
+    subject: str | None = Field(None, max_length=200)
+    intro: str = Field("", max_length=5000)
+
+
+class IssueUpdate(BaseModel):
+    subject: str | None = Field(None, max_length=200)
+    intro: str | None = Field(None, max_length=5000)
+
+
+def require_publisher(p: Principal = Depends(principal)) -> Principal:
+    if p.role not in ("owner", "admin"):
+        raise HTTPException(403, "only workspace owners and admins can manage the newsletter")
+    return p
+
+
+def _newsletter_call(fn, *args, **kwargs):
+    from atlas import newsletters
+
+    try:
+        return fn(*args, **kwargs)
+    except KeyError as exc:
+        _404("newsletter" if exc.args and exc.args[0] == "newsletter" else "issue or subscriber")
+    except newsletters.NewsletterError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@api.get("/newsletter")
+def newsletter_settings(p: Principal = Depends(require_publisher)) -> dict[str, Any]:
+    from atlas import mailer, newsletters
+
+    return {"newsletter": newsletters.get_settings(p.workspace_id), "email_configured": mailer.configured()}
+
+
+@api.put("/newsletter")
+def save_newsletter(req: NewsletterSettings, p: Principal = Depends(require_publisher)) -> dict[str, Any]:
+    from atlas import newsletters
+
+    return _newsletter_call(newsletters.save_settings, p, **req.model_dump())
+
+
+@api.get("/newsletter/subscribers")
+def newsletter_subscribers(format: Literal["json", "csv"] = "json", p: Principal = Depends(require_publisher)):
+    from atlas import newsletters
+
+    if format == "csv":
+        return Response(_newsletter_call(newsletters.subscribers_csv, p.workspace_id), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="atlas-subscribers-{date.today().isoformat()}.csv"'})
+    return _newsletter_call(newsletters.list_subscribers, p.workspace_id)
+
+
+@api.post("/newsletter/subscribers", status_code=202)
+def invite_subscriber(req: SubscribeRequest, p: Principal = Depends(require_publisher)) -> dict[str, Any]:
+    from atlas import newsletters
+
+    _newsletter_call(newsletters.invite, p, req.email)
+    return {"status": "confirmation_sent"}
+
+
+@api.delete("/newsletter/subscribers/{subscriber_id}", status_code=204)
+def remove_subscriber(subscriber_id: str, p: Principal = Depends(require_publisher)) -> None:
+    from atlas import newsletters
+
+    _newsletter_call(newsletters.remove_subscriber, p, subscriber_id)
+
+
+@api.get("/newsletter/issues")
+def newsletter_issues(p: Principal = Depends(require_publisher)) -> list[dict[str, Any]]:
+    from atlas import newsletters
+
+    return _newsletter_call(newsletters.list_issues, p.workspace_id)
+
+
+@api.post("/newsletter/issues", status_code=201)
+def create_issue(req: IssueCreate, p: Principal = Depends(require_publisher)) -> dict[str, Any]:
+    from atlas import newsletters
+
+    return _newsletter_call(newsletters.create_issue, p, req.run_id, req.subject, req.intro)
+
+
+@api.get("/newsletter/issues/{issue_id}")
+def get_issue(issue_id: str, p: Principal = Depends(require_publisher)) -> dict[str, Any]:
+    from atlas import newsletters
+
+    return _newsletter_call(newsletters.get_issue, p.workspace_id, issue_id)
+
+
+@api.patch("/newsletter/issues/{issue_id}")
+def update_issue(issue_id: str, req: IssueUpdate, p: Principal = Depends(require_publisher)) -> dict[str, Any]:
+    from atlas import newsletters
+
+    return _newsletter_call(newsletters.update_issue, p, issue_id, subject=req.subject, intro=req.intro)
+
+
+@api.delete("/newsletter/issues/{issue_id}", status_code=204)
+def delete_issue(issue_id: str, p: Principal = Depends(require_publisher)) -> None:
+    from atlas import newsletters
+
+    _newsletter_call(newsletters.delete_issue, p, issue_id)
+
+
+@api.post("/newsletter/issues/{issue_id}/test")
+def test_issue(issue_id: str, p: Principal = Depends(require_publisher)) -> dict[str, Any]:
+    from atlas import newsletters
+
+    return _newsletter_call(newsletters.send_test, p, issue_id)
+
+
+@api.post("/newsletter/issues/{issue_id}/send")
+def send_issue(issue_id: str, p: Principal = Depends(require_publisher)) -> dict[str, Any]:
+    from atlas import newsletters
+
+    if p.via != "session":
+        raise HTTPException(403, "send issues from a signed-in browser session")
+    return _newsletter_call(newsletters.send_issue, p, issue_id)
+
+
 # ---------------------------------------------------------------- onboarding
 
 
@@ -925,6 +1060,80 @@ def digest_unsubscribe(u: str, w: str, s: str) -> Response:
                     headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Robots-Tag": "noindex"})
 
 
+def _plain_page(msg: str, status: int = 200) -> Response:
+    import html as _html
+
+    page = (f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>ATLAS</title>"
+            f"<body style='font-family:system-ui;max-width:32rem;margin:15vh auto;padding:0 1rem'>"
+            f"<h1 style='font-size:1.2rem'>ATLAS</h1><p>{_html.escape(msg)}</p></body>")
+    return Response(page, status_code=status, media_type="text/html",
+                    headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Robots-Tag": "noindex"})
+
+
+def _client_throttle(request: Request, what: str) -> None:
+    try:
+        auth._throttle(f"{what}|{request.client.host if request.client else ''}")
+    except auth.AuthError as exc:
+        raise HTTPException(429, "too many requests; try again later") from exc
+
+
+@app.get(f"{V1}/public/newsletters/{{slug}}", include_in_schema=False)
+def public_newsletter(slug: str) -> dict[str, Any]:
+    from atlas import newsletters
+
+    info = newsletters.public_info(slug[:40])
+    if info is None:
+        _404("newsletter")
+    return info
+
+
+@app.get(f"{V1}/public/newsletters/{{slug}}/issues/{{issue_id}}", include_in_schema=False)
+def public_newsletter_issue(slug: str, issue_id: str) -> dict[str, Any]:
+    from atlas import newsletters
+
+    issue = newsletters.public_issue(slug[:40], issue_id[:32])
+    if issue is None:
+        _404("issue")
+    return issue
+
+
+@app.post(f"{V1}/public/newsletters/{{slug}}/subscribe", status_code=202, include_in_schema=False)
+def public_subscribe(slug: str, req: SubscribeRequest, request: Request) -> dict[str, Any]:
+    """Double opt-in: always answers the same way, so it reveals nothing about who is subscribed."""
+    from atlas import newsletters
+
+    _client_throttle(request, "subscribe")
+    try:
+        newsletters.subscribe(slug[:40], req.email)
+    except KeyError:
+        _404("newsletter")
+    except newsletters.NewsletterError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"status": "check_your_email"}
+
+
+@app.get("/newsletter/confirm", include_in_schema=False)
+def newsletter_confirm(token: str, request: Request) -> Response:
+    from atlas import newsletters
+
+    name = newsletters.confirm(token[:100])
+    if name is None:
+        _client_throttle(request, "newsletter-confirm")
+        return _plain_page("This confirmation link is not valid or has expired. Subscribe again to get a new one.", 400)
+    return _plain_page(f"You're subscribed to {name}. Thank you!")
+
+
+@app.api_route("/newsletter/unsubscribe", methods=["GET", "POST"], include_in_schema=False)
+def newsletter_unsubscribe(s: str, sig: str) -> Response:
+    """One-click unsubscribe (GET from the link, POST from mail clients' List-Unsubscribe-Post)."""
+    from atlas import newsletters
+
+    name = newsletters.unsubscribe(s[:32], sig[:64])
+    if name is None:
+        return _plain_page("This unsubscribe link is not valid.", 400)
+    return _plain_page(f"You won't receive {name or 'this newsletter'} any more.")
+
+
 # ---------------------------------------------------------------- billing
 
 
@@ -1129,7 +1338,7 @@ def switch_workspace(req: SwitchRequest, request: Request, p: Principal = Depend
 
 
 @api.get("/activity")
-def activity(category: Literal["signin", "team", "sharing", "data", "keys", "security", "integrations"] | None = None,
+def activity(category: Literal["signin", "team", "sharing", "data", "keys", "security", "integrations", "newsletter"] | None = None,
              cursor: str | None = Query(None, max_length=80), limit: int = Query(100, ge=1, le=500), format: Literal["json", "csv"] = "json",
              p: Principal = Depends(principal)):
     """This workspace's audit log, newest first. Owners and admins only."""

@@ -115,6 +115,9 @@ def _purge_workspace(s, ws_id: str) -> list[str]:
         s.execute(delete(AgentEvent).where(AgentEvent.agent_id.in_(agent_ids)))
     if alert_ids:
         s.execute(delete(AlertEvent).where(AlertEvent.alert_id.in_(alert_ids)))
+    from atlas import newsletters
+
+    newsletters.purge_workspace(s, ws_id)
     hook_ids = list(s.execute(select(Webhook.webhook_id).where(Webhook.workspace_id == ws_id)).scalars())
     if hook_ids:
         s.execute(delete(WebhookDelivery).where(WebhookDelivery.webhook_id.in_(hook_ids)))

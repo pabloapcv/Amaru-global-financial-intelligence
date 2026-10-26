@@ -543,6 +543,56 @@ class WebhookDelivery(Base):
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class Newsletter(Base):
+    """A workspace's email newsletter: issues made from research runs, sent to double-opt-in subscribers."""
+
+    __tablename__ = "newsletters"
+
+    newsletter_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(String(32), unique=True)
+    slug: Mapped[str] = mapped_column(String(40), unique=True)
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text, default="")
+    from_name: Mapped[str] = mapped_column(String(120), default="")
+    reply_to: Mapped[str | None] = mapped_column(String(320))
+    postal_address: Mapped[str] = mapped_column(String(300), default="")  # required by anti-spam laws to send
+    public_archive: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class NewsletterSubscriber(Base):
+    __tablename__ = "newsletter_subscribers"
+    __table_args__ = (UniqueConstraint("newsletter_id", "email"),)
+
+    subscriber_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    newsletter_id: Mapped[str] = mapped_column(ForeignKey("newsletters.newsletter_id"), index=True)
+    email: Mapped[str] = mapped_column(String(320))
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | active | unsubscribed
+    confirm_token_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    confirm_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    source: Mapped[str] = mapped_column(String(16), default="form")  # form | invited
+    last_issue_id: Mapped[str | None] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    unsubscribed_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class NewsletterIssue(Base):
+    __tablename__ = "newsletter_issues"
+
+    issue_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    newsletter_id: Mapped[str] = mapped_column(ForeignKey("newsletters.newsletter_id"), index=True)
+    run_id: Mapped[str | None] = mapped_column(String(32))
+    subject: Mapped[str] = mapped_column(String(200))
+    intro: Mapped[str] = mapped_column(Text, default="")
+    body_markdown: Mapped[str] = mapped_column(Text)  # snapshot of the research when the draft was made
+    status: Mapped[str] = mapped_column(String(16), default="draft")  # draft | sending | sent
+    created_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    recipients: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class SchedulerLease(Base):
     """Only the process holding the lease runs the scheduler; it expires if the holder dies."""
 
