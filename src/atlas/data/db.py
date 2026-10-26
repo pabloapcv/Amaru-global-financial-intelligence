@@ -594,6 +594,30 @@ class NewsletterIssue(Base):
     recipients: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class ResearchFeedback(Base):
+    """A reader's rating of a research answer, shared with the operators (with the question and title)."""
+
+    __tablename__ = "research_feedback"
+    __table_args__ = (UniqueConstraint("run_id", "user_id"),)
+
+    feedback_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(String(32), index=True)
+    workspace_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(64))
+    rating: Mapped[str] = mapped_column(String(8))  # up | down
+    reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
+    comment: Mapped[str] = mapped_column(Text, default="")
+    question: Mapped[str] = mapped_column(Text)  # snapshots: the run may be deleted later
+    title: Mapped[str | None] = mapped_column(String(300))
+    engine: Mapped[str | None] = mapped_column(String(32))
+    verified: Mapped[bool | None] = mapped_column()
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)  # open | resolved
+    operator_note: Mapped[str | None] = mapped_column(String(2000))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class SchedulerLease(Base):
     """Only the process holding the lease runs the scheduler; it expires if the holder dies."""
 

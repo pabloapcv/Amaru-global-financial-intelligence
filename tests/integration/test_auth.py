@@ -935,3 +935,60 @@ def test_public_plans_need_no_sign_in_and_show_configured_prices(secured, monkey
     assert prices == {"explorer": 0.0, "investor": 49.0, "research_pro": 199.0, "pro": None}  # unparseable or unknown entries are ignored
     assert body["currency"] == "USD" and body["sales_email"] == "sales@atlas.test" and body["signup_allowed"] is False
     assert next(p for p in body["plans"] if p["key"] == "investor")["limits"] == auth.PLANS["investor"]
+
+
+def test_research_feedback_reaches_operators_and_is_private_and_deletable(secured, monkeypatch):
+    from atlas import mailer, secretbox, totp
+    from atlas.data.db import ResearchFeedback, session_scope
+    from atlas.research import engine
+
+    secretbox.reset()
+    sent = []
+    monkeypatch.setattr(mailer, "send", lambda to, subject, body, **kw: (subject.startswith("ATLAS feedback") and sent.append((to, body))) or True)
+    monkeypatch.setenv("ATLAS_OPERATOR_EMAILS", "ops@fb.test")
+    reader = TestClient(secured.app)
+    acct = _signup(reader, "reader@fb.test", "Readers")
+    ws = acct["workspace"]["workspace_id"]
+    run_id = engine.create_run("Sugar price outlook", {"engine": "deterministic", "formats": []}, acct["user"]["user_id"], ws)
+    assert reader.put(f"/api/v1/research/{run_id}/feedback", json={"rating": "down"}).status_code == 422  # not finished yet
+    engine.execute_run(run_id)
+
+    reasons = reader.get(f"/api/v1/research/{run_id}/feedback").json()
+    assert reasons["feedback"] is None and "wrong_number" in reasons["reasons"]
+    assert reader.put(f"/api/v1/research/{run_id}/feedback", json={"rating": "down", "reasons": ["nonsense"]}).status_code == 422
+    r = reader.put(f"/api/v1/research/{run_id}/feedback", json={"rating": "down", "reasons": ["wrong_number", "outdated"],
+                                                                "comment": "The July price looks off."})
+    assert r.status_code == 200 and r.json()["status"] == "open"
+    assert len(sent) == 1 and sent[0][0] == "ops@fb.test" and "Sugar price outlook" in sent[0][1] and "A number is wrong" in sent[0][1]
+    reader.put(f"/api/v1/research/{run_id}/feedback", json={"rating": "down", "reasons": ["wrong_number"], "comment": "edit"})
+    assert len(sent) == 1  # editing a complaint doesn't email again
+    with session_scope() as s:
+        assert s.query(ResearchFeedback).filter(ResearchFeedback.run_id == run_id).count() == 1  # one per person per run
+
+    # Other workspaces can't rate or read it.
+    outsider = TestClient(secured.app)
+    _signup(outsider, "other@fb.test", "Other")
+    assert outsider.put(f"/api/v1/research/{run_id}/feedback", json={"rating": "up"}).status_code == 404
+    assert outsider.get(f"/api/v1/research/{run_id}/feedback").json()["feedback"] is None
+    assert outsider.get("/api/v1/admin/feedback").status_code == 403
+
+    # The operator sees it, resolves it with a reply the reader can read.
+    _signup(secured, "ops@fb.test", "Ops")
+    secret = secured.post("/api/v1/account/2fa/setup").json()["secret"]
+    secured.post("/api/v1/account/2fa/enable", json={"code": totp.code_at(secret, totp.current_step())})
+    listed = secured.get("/api/v1/admin/feedback").json()
+    item = next(f for f in listed["feedback"] if f["question"] == "Sugar price outlook")
+    assert item["reader"] == "reader@fb.test" and item["workspace"] == "Readers" and item["reason_labels"] == ["A number is wrong"]
+    assert listed["summary"]["open"] >= 1
+    assert secured.patch(f"/api/v1/admin/feedback/{item['feedback_id']}", json={"status": "resolved", "note": "Fixed the FRED mapping."}).status_code == 200
+    mine = reader.get(f"/api/v1/research/{run_id}/feedback").json()["feedback"]
+    assert mine["status"] == "resolved" and mine["operator_note"] == "Fixed the FRED mapping."
+    assert secured.get("/api/v1/admin/overview").json()["feedback_open"] == listed["summary"]["open"] - 1
+
+    # Praise is recorded but needs no follow-up; the export includes it; deleting the run removes it.
+    reader.put(f"/api/v1/research/{run_id}/feedback", json={"rating": "up", "reasons": ["wrong_number"]})
+    assert reader.get(f"/api/v1/research/{run_id}/feedback").json()["feedback"]["reasons"] == []
+    assert reader.get("/api/v1/account/export").json()["research_feedback"][0]["rating"] == "up"
+    assert reader.delete(f"/api/v1/research/{run_id}").status_code == 204
+    with session_scope() as s:
+        assert s.query(ResearchFeedback).filter(ResearchFeedback.run_id == run_id).count() == 0

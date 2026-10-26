@@ -52,12 +52,16 @@ def overview() -> dict[str, Any]:
         runs_7d = s.execute(select(func.count()).select_from(ResearchRun)
                             .where(ResearchRun.created_at >= utcnow() - timedelta(days=7))).scalar() or 0
     pipe = pipeline_status(1)
+    from atlas import feedback
+
+    fb = feedback.summary()
     return {"workspaces": len(rows), "users": users, "research_runs_7d": runs_7d,
             "paying_workspaces": sum(1 for w in rows if w["billing_status"] in ("active", "trialing", "past_due")),
             "by_plan": {p: sum(1 for w in rows if w["plan"] == p) for p in PLANS},
             "claude_spend_month_usd": round(sum(w["claude_spend_month_usd"] for w in rows), 2),
             "suspended": sum(1 for w in rows if w["suspended_at"]),
-            "pipeline_success_rate_30d": pipe.get("success_rate_30d")}
+            "pipeline_success_rate_30d": pipe.get("success_rate_30d"),
+            "feedback_open": fb["open"], "satisfaction_30d": fb["satisfaction_30d"]}
 
 
 def change_plan(operator: Principal, workspace_id: str, plan: str) -> None:

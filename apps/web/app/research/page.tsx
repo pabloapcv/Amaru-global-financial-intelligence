@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Chart from "@/components/Chart";
+import Feedback from "@/components/Feedback";
 import { API_URL, api, type Account, type ResearchRun } from "@/lib/api";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 
@@ -167,7 +168,7 @@ function FollowUp({ run, onSubmitted }: { run: ResearchRun; onSubmitted: (id: st
   );
 }
 
-function RunView({ runId, onDone, onOpen }: { runId: string; onDone?: () => void; onOpen?: (id: string) => void }) {
+function RunView({ runId, onDone, onOpen, canRate }: { runId: string; onDone?: () => void; onOpen?: (id: string) => void; canRate?: boolean }) {
   const [run, setRun] = useState<ResearchRun | null>(null);
   const [error, setError] = useState<unknown>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -243,6 +244,7 @@ function RunView({ runId, onDone, onOpen }: { runId: string; onDone?: () => void
                 {linkCitations(res.narrative_markdown)}
               </ReactMarkdown>
             </div>
+            {canRate && <Feedback runId={run.run_id} />}
           </Card>
           {res.charts.length > 0 && (
             <div className="stack">
@@ -330,7 +332,7 @@ function Research() {
             </ul>
           </Card>
         </div>
-        <div>{runId ? <RunView runId={runId} onDone={refresh} onOpen={(id) => router.push(`/research?run=${id}`)} /> : <Card><p className="muted" style={{ margin: 0 }}>Results appear here. ATLAS resolves instruments, plans the investigation, runs calculations, verifies every number against evidence, and renders a versioned report.</p></Card>}</div>
+        <div>{runId ? <RunView runId={runId} canRate={!!me && me.auth !== "local"} onDone={refresh} onOpen={(id) => router.push(`/research?run=${id}`)} /> : <Card><p className="muted" style={{ margin: 0 }}>Results appear here. ATLAS resolves instruments, plans the investigation, runs calculations, verifies every number against evidence, and renders a versioned report.</p></Card>}</div>
       </div>
     </>
   );

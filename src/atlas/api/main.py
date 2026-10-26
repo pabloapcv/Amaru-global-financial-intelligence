@@ -1008,6 +1008,63 @@ def admin_update_workspace(workspace_id: str, req: AdminWorkspaceUpdate, p: Prin
     return next(w for w in admin.workspaces() if w["workspace_id"] == workspace_id)
 
 
+class FeedbackResolve(BaseModel):
+    status: Literal["open", "resolved"]
+    note: str | None = Field(None, max_length=2000)
+
+
+@api.get("/admin/feedback")
+def admin_feedback(status: Literal["open", "resolved", "all"] = "open", p: Principal = Depends(require_operator)) -> dict[str, Any]:
+    from atlas import feedback
+
+    return {"feedback": feedback.list_for_operators(None if status == "all" else status), "summary": feedback.summary()}
+
+
+@api.patch("/admin/feedback/{feedback_id}")
+def admin_resolve_feedback(feedback_id: str, req: FeedbackResolve, p: Principal = Depends(require_operator)) -> dict[str, Any]:
+    from atlas import feedback
+
+    try:
+        return feedback.resolve(p, feedback_id, req.status, req.note)
+    except KeyError:
+        _404("feedback")
+
+
+class FeedbackRequest(BaseModel):
+    rating: Literal["up", "down"]
+    reasons: list[str] = Field(default_factory=list, max_length=6)
+    comment: str = Field("", max_length=2000)
+
+
+@api.get("/research/{run_id}/feedback")
+def my_feedback(run_id: str, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import feedback
+
+    return {"feedback": feedback.get_mine(p, run_id), "reasons": feedback.REASONS}
+
+
+@api.put("/research/{run_id}/feedback")
+def give_feedback(run_id: str, req: FeedbackRequest, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import feedback
+
+    if p.via == "local":
+        raise HTTPException(400, "feedback needs an account (single-user mode has no operators to send it to)")
+    try:
+        return feedback.submit(p, run_id, req.rating, req.reasons, req.comment)
+    except KeyError:
+        _404("research run")
+    except feedback.FeedbackError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@api.delete("/research/{run_id}/feedback", status_code=204)
+def withdraw_feedback(run_id: str, p: Principal = Depends(principal)) -> None:
+    from atlas import feedback
+
+    if not feedback.withdraw(p, run_id):
+        _404("feedback")
+
+
 # ---------------------------------------------------------------- weekly digest
 
 
