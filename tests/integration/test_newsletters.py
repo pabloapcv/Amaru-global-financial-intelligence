@@ -191,3 +191,66 @@ def test_newsletter_is_scoped_capped_and_purged(secured, outbox, monkeypatch):
     with session_scope() as s:
         assert s.query(Newsletter).filter(Newsletter.slug == "small-list").count() == 0
         assert s.query(NewsletterSubscriber).filter(NewsletterSubscriber.email == "r1@mail.test").count() == 0
+
+
+def test_scheduled_reports_draft_or_send_issues(secured, outbox, monkeypatch):
+    from atlas import schedules
+    from atlas.data.db import NewsletterSubscriber, ResearchRun, session_scope
+
+    pub = _signup(secured, "auto@pub.test", "Automated")
+    ws = pub["workspace"]["workspace_id"]
+    auth.set_plan(ws, "investor")
+    body = {"name": "Weekly sugar", "query": "Sugar price outlook", "cadence": "weekly", "engine": "deterministic", "formats": []}
+    r = secured.post("/api/v1/schedules", json={**body, "newsletter": "draft"})
+    assert r.status_code == 422 and "set up the newsletter" in r.text
+    secured.put("/api/v1/newsletter", json={**SETTINGS, "slug": "auto-list", "postal_address": "PO Box 9"})
+    sched = secured.post("/api/v1/schedules", json={**body, "newsletter": "draft"}).json()
+    assert sched["config"]["newsletter"] == "draft"
+
+    # Draft mode: the finished run becomes a draft and the creator is told.
+    run_id = schedules.run_schedule(sched["schedule_id"], background=False)
+    issues = secured.get("/api/v1/newsletter/issues").json()
+    assert [(i["run_id"], i["status"]) for i in issues] == [(run_id, "draft")]
+    assert outbox[-1]["to"] == "auto@pub.test" and "draft ready" in outbox[-1]["subject"]
+    draft = secured.get(f"/api/v1/newsletter/issues/{issues[0]['issue_id']}").json()
+    body_md = draft["body_markdown"]
+    assert "**Evidence:**" in body_md and "- [E2] " in body_md  # citation markers resolve
+    assert "- [E1] " not in body_md or "[E1]" in body_md.split("**Evidence:**")[0]  # only evidence the text cites
+
+    # Send mode with no confirmed subscribers: stays a draft, with the reason.
+    assert secured.patch(f"/api/v1/schedules/{sched['schedule_id']}", json={"newsletter": "send"}).json()["config"]["newsletter"] == "send"
+    schedules.run_schedule(sched["schedule_id"], background=False)
+    assert "no confirmed subscribers" in outbox[-1]["body"]
+
+    # With a confirmed subscriber and verified research, it goes out.
+    secured.post("/api/v1/newsletter/subscribers", json={"email": "fan@mail.test"})
+    with session_scope() as s:
+        s.query(NewsletterSubscriber).filter(NewsletterSubscriber.email == "fan@mail.test").one().status = "active"
+    run3 = schedules.run_schedule(sched["schedule_id"], background=False)
+    assert any(m["to"] == "fan@mail.test" for m in outbox)
+    assert outbox[-1]["to"] == "auto@pub.test" and "sent" in outbox[-1]["subject"]
+    sent = next(i for i in secured.get("/api/v1/newsletter/issues").json() if i["run_id"] == run3)
+    assert sent["status"] == "sent" and sent["recipients"] == 1
+
+    # Research that fails verification is never sent automatically.
+    from atlas import newsletters
+
+    run4 = schedules.run_schedule(sched["schedule_id"], background=False)  # its issue was sent; make a fresh unverified one
+    with session_scope() as s:
+        r4 = s.get(ResearchRun, run4)
+        r4.result = {**r4.result, "verification": {**r4.result["verification"], "passed": False}}
+        from atlas.data.db import NewsletterIssue
+
+        s.query(NewsletterIssue).filter(NewsletterIssue.run_id == run4).delete()
+    before = len(outbox)
+    out = newsletters.from_scheduled_run(run4)
+    assert out["outcome"] == "drafted" and "verification" in out["reason"]
+    assert [m["to"] for m in outbox[before:]] == ["auto@pub.test"]
+    assert newsletters.from_scheduled_run(run4) is None  # one issue per run
+
+    # Members can't route schedules into the newsletter.
+    token = secured.post("/api/v1/team/invitations", json={"email": "member@auto.test"}).json()["link"].split("token=")[1]
+    member = TestClient(secured.app)
+    member.post("/api/v1/auth/invitations/accept", json={"token": token, "password": "member password!"})
+    assert member.patch(f"/api/v1/schedules/{sched['schedule_id']}", json={"newsletter": "send"}).status_code == 403
+    assert member.patch(f"/api/v1/schedules/{sched['schedule_id']}", json={"newsletter": "off"}).status_code == 200

@@ -320,6 +320,12 @@ def _emit_finished(run_id: str) -> None:
         webhooks.research_event(run_id)
     except Exception:
         log.exception("webhook event for run %s failed", run_id)
+    from atlas import newsletters
+
+    try:
+        newsletters.from_scheduled_run(run_id)
+    except Exception:
+        log.exception("newsletter issue for run %s failed", run_id)
 
 
 def _summary(r: ResearchRun | None) -> dict[str, Any] | None:

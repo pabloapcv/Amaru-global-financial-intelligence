@@ -272,29 +272,38 @@ def _snapshot(result: dict[str, Any]) -> str:
     lines = narrative.splitlines()
     if lines and lines[0].startswith("# "):  # the subject replaces the report title
         narrative = "\n".join(lines[1:]).strip()
+    evidence = [e for e in result.get("evidence") or [] if e.get("label") and e.get("citation")]
+    labels = set(re.findall(r"E\d+", " ".join(re.findall(r"\[(E\d+(?:\s*,\s*E\d+)*)\]", narrative))))
+    cited = [e for e in evidence if e["label"] in labels]
+    if cited:  # resolves the [E1] markers in the text
+        narrative += "\n\n**Evidence:**\n\n" + "\n".join(f"- [{e['label']}] {e['citation']}" for e in cited[:30])
     sources = result.get("sources") or []
     if sources:
-        narrative += "\n\n**Sources:** " + "; ".join(
-            f"{src.get('name') or src.get('dataset_id')} ({src.get('provider', 'n/a')})" for src in sources[:12])
+        narrative += "\n\n**Sources:**\n\n" + "\n".join(
+            f"- {src.get('name') or src.get('dataset_id')}: {src.get('citation') or src.get('url') or 'ATLAS'}" for src in sources[:12])
     return narrative
 
 
 def create_issue(p: Principal, run_id: str, subject: str | None = None, intro: str = "") -> dict[str, Any]:
+    out = _create_issue(p.workspace_id, p.user_id, run_id, subject, intro)
+    audit("newsletter.issue_created", p.user_id, p.workspace_id, issue_id=out["issue_id"], run_id=run_id)
+    return out
+
+
+def _create_issue(workspace_id: str, user_id: str, run_id: str, subject: str | None = None, intro: str = "") -> dict[str, Any]:
     with session_scope() as s:
-        n = _mine(s, p.workspace_id)
+        n = _mine(s, workspace_id)
         run = s.get(ResearchRun, run_id)
-        if run is None or run.workspace_id != p.workspace_id or run.status == "deleted":
+        if run is None or run.workspace_id != workspace_id or run.status == "deleted":
             raise NewsletterError("research run not found")
         if run.status != "complete" or not run.result:
             raise NewsletterError("only completed research can become an issue")
         result = dict(run.result)
         i = NewsletterIssue(newsletter_id=n.newsletter_id, run_id=run_id, subject=(subject or result.get("title") or run.query)[:200].strip(),
-                            intro=intro.strip()[:5000], body_markdown=_snapshot(result), created_by=p.user_id)
+                            intro=intro.strip()[:5000], body_markdown=_snapshot(result), created_by=user_id)
         s.add(i)
         s.flush()
-        out = _issue_dict(i, True)
-    audit("newsletter.issue_created", p.user_id, p.workspace_id, issue_id=out["issue_id"], run_id=run_id)
-    return out
+        return _issue_dict(i, True)
 
 
 def _issue(s, workspace_id: str, issue_id: str) -> tuple[Newsletter, NewsletterIssue]:
@@ -388,8 +397,14 @@ def send_test(p: Principal, issue_id: str) -> dict[str, Any]:
 
 
 def send_issue(p: Principal, issue_id: str) -> dict[str, Any]:
+    out = _start_send(p.workspace_id, issue_id)
+    audit("newsletter.issue_sent", p.user_id, p.workspace_id, issue_id=issue_id, subscribers=out["subscribers"])
+    return out
+
+
+def _start_send(workspace_id: str, issue_id: str) -> dict[str, Any]:
     with session_scope() as s:
-        n, i = _issue(s, p.workspace_id, issue_id)
+        n, i = _issue(s, workspace_id, issue_id)
         if i.status != "draft":
             raise NewsletterError("this issue was already sent")
         if not n.postal_address.strip():
@@ -399,7 +414,6 @@ def send_issue(p: Principal, issue_id: str) -> dict[str, Any]:
         if not active:
             raise NewsletterError("there are no confirmed subscribers yet")
         i.status, i.sent_at = "sending", utcnow()
-    audit("newsletter.issue_sent", p.user_id, p.workspace_id, issue_id=issue_id, subscribers=active)
     if BACKGROUND:
         threading.Thread(target=deliver, args=(issue_id,), daemon=True).start()
     else:
@@ -455,6 +469,66 @@ def resume_stalled(now=None) -> int:
     for issue_id in ids:
         deliver(issue_id)
     return len(ids)
+
+
+# ---------------------------------------------------------------- scheduled issues
+
+SCHEDULE_MODES = ("off", "draft", "send")
+
+
+def from_scheduled_run(run_id: str) -> dict[str, Any] | None:
+    """A scheduled report set to feed the newsletter has finished: draft an issue from it, and send it
+    when the schedule says so and it is safe to (verified research, creator still a publisher,
+    postal address set, confirmed subscribers). Tells the schedule's creator what happened."""
+    from atlas.data.db import Membership, ReportSchedule
+
+    with session_scope() as s:
+        run = s.get(ResearchRun, run_id)
+        if run is None or run.status != "complete" or not (run.config or {}).get("schedule_id"):
+            return None
+        sched = s.get(ReportSchedule, run.config["schedule_id"])
+        mode = (sched.config or {}).get("newsletter", "off") if sched else "off"
+        if mode not in ("draft", "send"):
+            return None
+        workspace_id, user_id, schedule_name = run.workspace_id, sched.user_id, sched.name
+        verified = bool(((run.result or {}).get("verification") or {}).get("passed"))
+        member = s.get(Membership, (user_id, workspace_id))
+        publisher = member is not None and member.role in ("owner", "admin")
+        n = s.execute(select(Newsletter).where(Newsletter.workspace_id == workspace_id)).scalar_one_or_none()
+        if n is None or s.execute(select(NewsletterIssue).where(NewsletterIssue.run_id == run_id)).first():
+            return None
+        name = n.name
+        user = s.get(User, user_id)
+        to = user.email if user else None
+    issue = _create_issue(workspace_id, user_id, run_id)
+    audit("newsletter.issue_created", user_id, workspace_id, issue_id=issue["issue_id"], run_id=run_id, schedule=schedule_name)
+    outcome, why = "drafted", None
+    if mode == "send":
+        if not verified:
+            why = "the research did not pass verification"
+        elif not publisher:
+            why = "the schedule's creator is no longer an owner or admin"
+        else:
+            try:
+                sent = _start_send(workspace_id, issue["issue_id"])
+                audit("newsletter.issue_sent", user_id, workspace_id, issue_id=issue["issue_id"], subscribers=sent["subscribers"], automatic=True)
+                outcome = "sent"
+            except NewsletterError as exc:
+                why = str(exc)
+    if to:
+        from atlas import mailer
+
+        link = web_url("/newsletter")
+        if outcome == "sent":
+            body = f"Your scheduled report '{schedule_name}' finished and \"{issue['subject']}\" is going out to {name}'s subscribers.\n\n{link}\n"
+        else:
+            body = (f"Your scheduled report '{schedule_name}' finished. A draft issue of {name} is ready to review and send:\n\n{link}\n"
+                    + (f"\nIt was not sent automatically because {why}.\n" if why else ""))
+        try:
+            mailer.send(to, f"{name}: issue {'sent' if outcome == 'sent' else 'draft ready'}", body)
+        except Exception:
+            log.exception("could not notify about scheduled issue %s", issue["issue_id"])
+    return {"issue_id": issue["issue_id"], "outcome": outcome, "reason": why}
 
 
 # ---------------------------------------------------------------- public pages

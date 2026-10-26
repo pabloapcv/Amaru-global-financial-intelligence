@@ -63,6 +63,15 @@ def list_schedules(workspace_id: str | None = None) -> list[dict[str, Any]]:
         return [_to_dict(r) for r in rows]
 
 
+def set_newsletter_mode(schedule_id: str, workspace_id: str, mode: str) -> dict[str, Any] | None:
+    with session_scope() as s:
+        sched = s.get(ReportSchedule, schedule_id)
+        if sched is None or sched.status == "deleted" or sched.workspace_id != workspace_id:
+            return None
+        sched.config = {**(sched.config or {}), "newsletter": mode}
+        return _to_dict(sched)
+
+
 def delete_schedule(schedule_id: str, workspace_id: str | None = None) -> bool:
     with session_scope() as s:
         sched = s.get(ReportSchedule, schedule_id)
