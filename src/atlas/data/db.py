@@ -536,6 +536,8 @@ class Membership(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"), primary_key=True)
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.workspace_id"), primary_key=True)
     role: Mapped[str] = mapped_column(String(16), default="member")  # owner | admin | member
+    digest_weekly: Mapped[bool | None] = mapped_column(default=False)  # opt-in weekly email for this workspace
+    digest_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class AuthSession(Base):
@@ -665,6 +667,8 @@ _ADDED_COLUMNS = [
     ("workspaces", "stripe_customer_id", "VARCHAR(64)", None),
     ("workspaces", "stripe_subscription_id", "VARCHAR(64)", None),
     ("workspaces", "billing_status", "VARCHAR(32)", None),
+    ("memberships", "digest_weekly", "BOOLEAN", None),
+    ("memberships", "digest_sent_at", "TIMESTAMP", None),
     ("source_documents", "source", "VARCHAR(32)", None),
     ("source_documents", "category", "VARCHAR(128)", None),
     ("source_documents", "summary", "TEXT", None),

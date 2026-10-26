@@ -729,6 +729,59 @@ def transfer_ownership(req: TransferRequest, p: Principal = Depends(principal)) 
         _404("member")
 
 
+# ---------------------------------------------------------------- weekly digest
+
+
+class DigestPreference(BaseModel):
+    weekly: bool
+
+
+@api.get("/account/digest")
+def get_digest(p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import digest
+
+    return {"weekly": digest.opted_in(p.user_id, p.workspace_id), "send_time": "Mondays from 07:00 UTC"}
+
+
+@api.put("/account/digest")
+def set_digest(req: DigestPreference, p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import digest
+
+    if p.via == "local":
+        raise HTTPException(400, "single-user mode has no email address")
+    digest.set_opt_in(p.user_id, p.workspace_id, req.weekly)
+    auth.audit("digest.subscribed" if req.weekly else "digest.unsubscribed", p.user_id, p.workspace_id)
+    return {"weekly": req.weekly}
+
+
+@api.get("/account/digest/preview")
+def preview_digest(p: Principal = Depends(principal)) -> dict[str, Any]:
+    from atlas import digest
+
+    if p.via == "local":
+        raise HTTPException(400, "single-user mode has no email address")
+    msg = digest.compose(p.user_id, p.workspace_id)
+    return {"subject": msg["subject"], "body": msg["body"]}
+
+
+@app.get("/digest/unsubscribe", include_in_schema=False)
+def digest_unsubscribe(u: str, w: str, s: str) -> Response:
+    """One-click unsubscribe from an email link (signed; no sign-in needed)."""
+    import html as _html
+
+    from atlas import digest
+
+    ok = digest.unsubscribe(u[:64], w[:64], s[:64])
+    if ok:
+        auth.audit("digest.unsubscribed", u[:64], w[:64], via="email link")
+    msg = "You will no longer receive the ATLAS weekly email for this workspace." if ok else "This unsubscribe link is not valid."
+    page = (f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>ATLAS</title>"
+            f"<body style='font-family:system-ui;max-width:32rem;margin:15vh auto;padding:0 1rem'>"
+            f"<h1 style='font-size:1.2rem'>ATLAS</h1><p>{_html.escape(msg)}</p></body>")
+    return Response(page, status_code=200 if ok else 400, media_type="text/html",
+                    headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Robots-Tag": "noindex"})
+
+
 # ---------------------------------------------------------------- billing
 
 
