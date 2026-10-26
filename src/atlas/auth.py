@@ -71,6 +71,18 @@ class ValidationError(ValueError):
     """Invalid input (HTTP 422)."""
 
 
+class WorkspaceSuspended(Exception):
+    """An operator suspended this workspace (HTTP 403)."""
+
+
+def operator_emails() -> set[str]:
+    return {e.strip().lower() for e in os.getenv("ATLAS_OPERATOR_EMAILS", "").split(",") if e.strip()}
+
+
+def is_operator(email: str) -> bool:
+    return email.strip().lower() in operator_emails()
+
+
 class SecondFactorRequired(Exception):
     """Password accepted; a TOTP or recovery code is needed to finish signing in."""
 
@@ -362,6 +374,8 @@ def _principal(s, user_id: str, workspace_id: str, via: str) -> Principal:
     if user is None or m is None:
         raise AuthError("account no longer has access to this workspace")
     ws = s.get(Workspace, workspace_id)
+    if ws is not None and ws.suspended_at is not None:
+        raise WorkspaceSuspended(f"the workspace '{ws.name}' is suspended; contact support")
     needs = bool(ws and ws.require_2fa and not user.totp_enabled_at)
     return Principal(user_id, workspace_id, m.role, user.email, via, needs, ws.plan if ws else "explorer")
 
@@ -410,6 +424,7 @@ def account(principal: Principal) -> dict[str, Any]:
             "email_verified": bool(user.email_verified_at) if user else True,
             "two_factor": bool(user.totp_enabled_at) if user else False,
             "workspace_requires_2fa": bool(ws.require_2fa) if ws else False,
+            "operator": bool(user and is_operator(user.email)),
             "recovery_codes_left": len(user.recovery_codes or []) if user and user.totp_enabled_at else None,
             "verification_required": verification_required(),
             "limits": PLANS.get(ws.plan if ws else "explorer"),

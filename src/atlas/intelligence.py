@@ -79,7 +79,10 @@ def evaluate_alerts(changed_datasets: Iterable[str] | None = None, workspace_id:
         q = select(Alert).where(Alert.status == "active")
         if workspace_id is not None:
             q = q.where(Alert.workspace_id == workspace_id)
-        alerts = s.execute(q).scalars().all()
+        from atlas.data.db import suspended_workspace_ids
+
+        suspended = suspended_workspace_ids()
+        alerts = [a for a in s.execute(q).scalars().all() if a.workspace_id not in suspended]
         for a in alerts:
             if changed is not None and a.rule.get("dataset_id") not in changed:
                 continue

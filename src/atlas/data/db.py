@@ -504,6 +504,7 @@ class Workspace(Base):
     stripe_customer_id: Mapped[str | None] = mapped_column(String(64), index=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(64))
     billing_status: Mapped[str | None] = mapped_column(String(32))  # Stripe subscription status
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime)  # set by an operator; blocks all access
 
 
 class SchedulerLease(Base):
@@ -668,6 +669,7 @@ _ADDED_COLUMNS = [
     ("workspaces", "stripe_subscription_id", "VARCHAR(64)", None),
     ("workspaces", "billing_status", "VARCHAR(32)", None),
     ("memberships", "digest_weekly", "BOOLEAN", None),
+    ("workspaces", "suspended_at", "TIMESTAMP", None),
     ("memberships", "digest_sent_at", "TIMESTAMP", None),
     ("source_documents", "source", "VARCHAR(32)", None),
     ("source_documents", "category", "VARCHAR(128)", None),
@@ -687,6 +689,14 @@ def _migrate(engine) -> None:
             if table in tables and column not in {c["name"] for c in insp.get_columns(table)}:
                 default_sql = "" if default is None else f" DEFAULT '{default}'"
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}{default_sql}"))
+
+
+def suspended_workspace_ids() -> set[str]:
+    """Workspaces an operator suspended: background work (reports, agents, alerts, digests) skips them."""
+    from sqlalchemy import select
+
+    with session_scope() as s:
+        return set(s.execute(select(Workspace.workspace_id).where(Workspace.suspended_at.is_not(None))).scalars())
 
 
 def init_db(url: str | None = None) -> None:

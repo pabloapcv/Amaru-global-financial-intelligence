@@ -77,6 +77,8 @@ def principal(request: Request, response: Response, creds: HTTPAuthorizationCred
         p = auth.authenticate(token)
     except auth.AuthError as exc:
         raise HTTPException(401, str(exc), headers={"WWW-Authenticate": "Bearer"}) from exc
+    except auth.WorkspaceSuspended as exc:
+        raise HTTPException(403, {"error": "workspace_suspended", "message": str(exc)}) from exc
     if p.needs_2fa and not (p.via == "session" and request.url.path in TWO_FACTOR_SETUP_PATHS):
         raise HTTPException(403, {"error": "two_factor_required",
                                   "message": "This workspace requires two-factor authentication. Turn it on from your Account page."})
@@ -727,6 +729,60 @@ def transfer_ownership(req: TransferRequest, p: Principal = Depends(principal)) 
         raise HTTPException(403, str(exc)) from exc
     except KeyError:
         _404("member")
+
+
+# ---------------------------------------------------------------- operator console
+
+
+def require_operator(p: Principal = Depends(principal)) -> Principal:
+    """Operators (ATLAS_OPERATOR_EMAILS) in a browser session with two-factor authentication on."""
+    from atlas.data.db import User
+
+    if p.via != "session" or not auth.is_operator(p.email):
+        raise HTTPException(403, "operator access required")
+    with session_scope() as s:
+        user = s.get(User, p.user_id)
+        if not (user and user.totp_enabled_at):
+            raise HTTPException(403, "operators must turn on two-factor authentication first (Account page)")
+    return p
+
+
+class AdminWorkspaceUpdate(BaseModel):
+    plan: str | None = Field(None, max_length=32)
+    suspended: bool | None = None
+    reason: str = Field("", max_length=200)
+
+
+@api.get("/admin/overview")
+def admin_overview(p: Principal = Depends(require_operator)) -> dict[str, Any]:
+    from atlas import admin
+
+    return admin.overview()
+
+
+@api.get("/admin/workspaces")
+def admin_workspaces(p: Principal = Depends(require_operator)) -> list[dict[str, Any]]:
+    from atlas import admin
+
+    return admin.workspaces()
+
+
+@api.patch("/admin/workspaces/{workspace_id}")
+def admin_update_workspace(workspace_id: str, req: AdminWorkspaceUpdate, p: Principal = Depends(require_operator)) -> dict[str, Any]:
+    from atlas import admin
+
+    try:
+        if req.plan is not None:
+            admin.change_plan(p, workspace_id, req.plan)
+        if req.suspended is not None:
+            admin.set_suspended(p, workspace_id, req.suspended, req.reason)
+    except auth.ValidationError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except KeyError:
+        _404("workspace")
+    return next(w for w in admin.workspaces() if w["workspace_id"] == workspace_id)
 
 
 # ---------------------------------------------------------------- weekly digest

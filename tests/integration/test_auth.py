@@ -840,3 +840,85 @@ def test_weekly_digest_opt_in_schedule_and_unsubscribe(secured, monkeypatch):
     assert page.status_code == 200 and "no longer receive" in page.text and "<script" not in page.text
     assert digest.opted_in(me["user"]["user_id"], ws) is False
     assert digest.send_due(monday_8 + timedelta(days=14)) == 0
+
+
+def test_operator_console_requires_operator_with_2fa_and_suspension_blocks_access(secured, monkeypatch):
+    from sqlalchemy import select
+
+    from atlas import secretbox, totp
+    from atlas.data.db import AuditEvent, session_scope, suspended_workspace_ids
+
+    secretbox.reset()
+    monkeypatch.setenv("ATLAS_OPERATOR_EMAILS", "Ops@Atlas.test, someone@else.test")
+    customer = TestClient(secured.app)
+    cust = _signup(customer, "client@buyer.test", "Buyer Co")
+    target = cust["workspace"]["workspace_id"]
+    key = customer.post("/api/v1/api-keys", json={"name": "etl"}).json()["key"]
+
+    _signup(secured, "plain@user.test", "Plain")
+    assert secured.get("/api/v1/admin/workspaces").status_code == 403  # not an operator
+    assert secured.get("/api/v1/account").json()["operator"] is False
+
+    ops = _signup(secured, "ops@atlas.test", "Operations")
+    assert secured.get("/api/v1/account").json()["operator"] is True
+    assert secured.get("/api/v1/admin/overview").status_code == 403  # operators need two-factor
+    secret = secured.post("/api/v1/account/2fa/setup").json()["secret"]
+    secured.post("/api/v1/account/2fa/enable", json={"code": totp.code_at(secret, totp.current_step())})
+    ops_key = secured.post("/api/v1/api-keys", json={"name": "ops"}).json()["key"]
+    assert secured.get("/api/v1/admin/overview", headers={"Authorization": f"Bearer {ops_key}"}).status_code == 403  # sessions only
+
+    rows = {w["workspace_id"]: w for w in secured.get("/api/v1/admin/workspaces").json()}
+    assert rows[target]["owner"] == "client@buyer.test" and rows[target]["members"] == 1 and rows[target]["suspended_at"] is None
+    assert "research" not in str(rows[target]).replace("research_runs_30d", "")  # metadata only
+    ov = secured.get("/api/v1/admin/overview").json()
+    assert ov["workspaces"] >= 4 and ov["suspended"] == 0
+
+    assert secured.patch(f"/api/v1/admin/workspaces/{target}", json={"plan": "research_pro"}).status_code == 200
+    assert customer.get("/api/v1/account").json()["workspace"]["plan"] == "research_pro"
+    assert secured.patch(f"/api/v1/admin/workspaces/{target}", json={"plan": "platinum"}).status_code == 422
+    assert secured.patch("/api/v1/admin/workspaces/nope", json={"suspended": True}).status_code == 404
+    assert secured.patch(f"/api/v1/admin/workspaces/{ops['workspace']['workspace_id']}", json={"suspended": True}).status_code == 409
+
+    assert secured.patch(f"/api/v1/admin/workspaces/{target}", json={"suspended": True, "reason": "chargeback"}).status_code == 200
+    r = customer.get("/api/v1/account")
+    assert r.status_code == 403 and r.json()["detail"]["error"] == "workspace_suspended"
+    assert customer.get("/api/v1/account", headers={"Authorization": f"Bearer {key}"}).status_code == 403
+    assert target in suspended_workspace_ids()
+    assert secured.get("/api/v1/admin/overview").json()["suspended"] == 1
+
+    assert secured.patch(f"/api/v1/admin/workspaces/{target}", json={"suspended": False}).status_code == 200
+    assert customer.get("/api/v1/account").status_code == 200
+    with session_scope() as s:
+        actions = [e.action for e in s.execute(select(AuditEvent).where(AuditEvent.workspace_id == target).order_by(AuditEvent.at)).scalars()]
+    assert {"admin.plan_changed", "admin.workspace_suspended", "admin.workspace_reinstated"} <= set(actions)
+
+
+def test_background_work_skips_suspended_workspaces(secured, monkeypatch):
+    from datetime import timedelta
+
+    from atlas import schedules
+    from atlas.data.db import ReportSchedule, Workspace, session_scope, utcnow
+
+    acct = _signup(secured, "dormant@buyer.test", "Dormant")
+    ws = acct["workspace"]["workspace_id"]
+    with session_scope() as s:
+        s.add(ReportSchedule(workspace_id=ws, user_id=acct["user"]["user_id"], name="weekly", query="sugar outlook",
+                             cadence="weekly", status="active", next_run_at=utcnow() - timedelta(minutes=5)))
+        s.get(Workspace, ws).suspended_at = utcnow()
+        sid = s.execute(select_schedule(ws)).scalar_one().schedule_id
+    started = []
+    monkeypatch.setattr(schedules, "run_schedule", lambda schedule_id, background=True: started.append(schedule_id) or schedule_id)
+    schedules.run_due()
+    assert sid not in started
+    with session_scope() as s:
+        s.get(Workspace, ws).suspended_at = None
+    schedules.run_due()
+    assert sid in started
+
+
+def select_schedule(workspace_id):
+    from sqlalchemy import select
+
+    from atlas.data.db import ReportSchedule
+
+    return select(ReportSchedule).where(ReportSchedule.workspace_id == workspace_id)

@@ -35,6 +35,7 @@ export interface Account {
   verification_required: boolean;
   two_factor?: boolean;
   workspace_requires_2fa?: boolean;
+  operator?: boolean;
   recovery_codes_left?: number | null;
   limits: Record<string, number | null>;
   usage: Record<string, number>;

@@ -97,10 +97,13 @@ def run_schedule(schedule_id: str, *, background: bool = True, workspace_id: str
 
 def run_due(now: datetime | None = None, *, background: bool = True) -> list[str]:
     now = now or utcnow()
+    from atlas.data.db import suspended_workspace_ids
+
+    suspended = suspended_workspace_ids()
     with session_scope() as s:
         due = [r.schedule_id for r in s.execute(
             select(ReportSchedule).where(ReportSchedule.status == "active", ReportSchedule.next_run_at <= now)
-        ).scalars()]
+        ).scalars() if r.workspace_id not in suspended]
     started = []
     for sid in due:
         try:
