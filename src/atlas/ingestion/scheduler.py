@@ -106,7 +106,11 @@ def run_once(holder: str = HOLDER) -> int:
     digests = digest.send_due()
     if digests:
         log.info("sent %d weekly digest(s)", digests)
-    _record({"datasets_refreshed": len(due), "reports_started": len(started), "digests_sent": digests}, holder)
+    from atlas import webhooks
+
+    retried = webhooks.deliver_due()
+    _record({"datasets_refreshed": len(due), "reports_started": len(started), "digests_sent": digests,
+             "webhook_retries": retried}, holder)
     return len(due)
 
 

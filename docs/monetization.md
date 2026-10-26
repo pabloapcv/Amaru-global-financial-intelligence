@@ -9,7 +9,7 @@ You can sell it: it is your software, built on permissively licensed open-source
 ## What is worth something
 
 - **Verified answers.** Every number in a research answer traces back to stored data or a calculation, every citation resolves, and all 8 of the spec's performance and quality targets pass (`atlas benchmark`). Few AI finance tools can say that, and it is the main thing to sell.
-- **Business-software foundations already in place.** Separate workspaces, teams with roles and invitations, two-factor sign-in (which owners can require), an activity log, quotas, API keys, shareable report links and monthly Claude spending caps.
+- **Business-software foundations already in place.** Separate workspaces, teams with roles and invitations, two-factor sign-in (which owners can require), an activity log, quotas, API keys, signed webhooks (including Slack) for plugging alerts and research into a customer's own systems, shareable report links, monthly Claude spending caps and an operator console.
 - **Analysis few competitors offer:**
   - USDA supply-and-demand balances, with a price-versus-stocks model;
   - CFTC positioning;

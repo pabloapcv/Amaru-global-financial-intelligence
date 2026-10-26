@@ -39,6 +39,8 @@ from atlas.data.db import (
     ResearchRun,
     User,
     WatchlistItem,
+    Webhook,
+    WebhookDelivery,
     Workspace,
     session_scope,
 )
@@ -113,8 +115,11 @@ def _purge_workspace(s, ws_id: str) -> list[str]:
         s.execute(delete(AgentEvent).where(AgentEvent.agent_id.in_(agent_ids)))
     if alert_ids:
         s.execute(delete(AlertEvent).where(AlertEvent.alert_id.in_(alert_ids)))
+    hook_ids = list(s.execute(select(Webhook.webhook_id).where(Webhook.workspace_id == ws_id)).scalars())
+    if hook_ids:
+        s.execute(delete(WebhookDelivery).where(WebhookDelivery.webhook_id.in_(hook_ids)))
     for model in (MonitorAgent, Alert, ReportSchedule, Portfolio, WatchlistItem, Invitation, ApiKey, AuthSession,
-                  ReportShare, Membership, AuditEvent):
+                  ReportShare, Webhook, Membership, AuditEvent):
         s.execute(delete(model).where(model.workspace_id == ws_id))
     s.execute(delete(Workspace).where(Workspace.workspace_id == ws_id))
     return report_ids

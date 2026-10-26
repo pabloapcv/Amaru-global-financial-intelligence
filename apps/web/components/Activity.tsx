@@ -7,7 +7,7 @@ import { Card, ErrorNote } from "@/components/ui";
 type Event = { event_id: string; at: string; action: string; label: string; actor: string | null; detail: Record<string, unknown> };
 type Page = { events: Event[]; next_cursor: string | null };
 
-const CATEGORIES: [string, string][] = [["", "All"], ["signin", "Sign-ins"], ["team", "Team"], ["sharing", "Sharing"], ["data", "Data"], ["keys", "API keys"], ["security", "Security"]];
+const CATEGORIES: [string, string][] = [["", "All"], ["signin", "Sign-ins"], ["team", "Team"], ["sharing", "Sharing"], ["data", "Data"], ["keys", "API keys"], ["integrations", "Webhooks"], ["security", "Security"]];
 
 function summary(d: Record<string, unknown>) {
   const parts = Object.entries(d).filter(([k]) => !k.endsWith("_id") || k === "dataset_id").map(([k, v]) => `${k.replace("_", " ")}: ${String(v)}`);
@@ -52,7 +52,7 @@ export default function Activity() {
         </tbody>
       </table>
       {next && <button className="secondary" style={{ marginTop: 10 }} onClick={() => load(next)}>Load more</button>}
-      <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>Sign-ins, team changes, share links and their views, data exports and API keys in this workspace. Visible to owners and admins.</p>
+      <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>Sign-ins, team changes, share links and their views, data exports, API keys and webhooks in this workspace. Visible to owners and admins.</p>
     </Card>
   );
 }

@@ -102,11 +102,15 @@ def evaluate_alerts(changed_datasets: Iterable[str] | None = None, workspace_id:
             a.last_triggered_at = utcnow()
             s.add(AlertEvent(alert_id=a.alert_id, message=msg, payload={"rule": a.rule}))
             fired.append({"alert_id": a.alert_id, "name": a.name, "message": msg,
-                          "notify": bool(a.notify_email), "user_id": a.user_id})
+                          "notify": bool(a.notify_email), "user_id": a.user_id, "workspace_id": a.workspace_id})
+    from atlas import webhooks
+
     for f in fired:
         if f.pop("notify"):
             _email(f)
         f.pop("user_id")
+        webhooks.emit(f.pop("workspace_id"), "alert.triggered", {"alert_id": f["alert_id"], "name": f["name"], "message": f["message"],
+                                                                  "alerts_url": webhooks.public_url("/intelligence")})
     return fired
 
 

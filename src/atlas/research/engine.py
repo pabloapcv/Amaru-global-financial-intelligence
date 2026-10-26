@@ -302,13 +302,24 @@ def execute_run(run_id: str) -> dict[str, Any]:
             _set(run_id, result=result)
         _progress(run_id, "Complete")
         _set(run_id, status="complete", finished_at=utcnow())
+        _emit_finished(run_id)
         return result
     except Exception as exc:
         _save_usage(run_id, researchers)
         log.exception("research run %s failed", run_id)
         status = "cancelled" if "cancelled" in str(exc) else "failed"
         _set(run_id, status=status, error=f"{type(exc).__name__}: {exc}", finished_at=utcnow())
+        _emit_finished(run_id)
         return {"error": str(exc)}
+
+
+def _emit_finished(run_id: str) -> None:
+    from atlas import webhooks
+
+    try:
+        webhooks.research_event(run_id)
+    except Exception:
+        log.exception("webhook event for run %s failed", run_id)
 
 
 def _summary(r: ResearchRun | None) -> dict[str, Any] | None:

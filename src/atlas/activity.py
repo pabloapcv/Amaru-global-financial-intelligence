@@ -18,9 +18,12 @@ CATEGORIES = {
     "sharing": ("report.share",),
     "data": ("data.", "research."),
     "keys": ("api_key.",),
+    "integrations": ("webhook.",),
     "security": ("password.", "email.", "security.", "workspace.require_2fa"),
 }
 LABELS = {
+    "webhook.created": "Added a webhook", "webhook.updated": "Changed a webhook", "webhook.deleted": "Deleted a webhook",
+    "webhook.secret_rotated": "Rotated a webhook secret", "webhook.disabled": "Webhook disabled after failures",
     "login.succeeded": "Signed in", "team.invited": "Invited a person", "team.invitation_revoked": "Revoked an invitation",
     "team.joined": "Joined the workspace", "team.removed": "Removed a member", "team.left": "Left the workspace",
     "team.role_changed": "Changed a role", "user.created": "Account created", "workspace.switched": "Switched into this workspace",
