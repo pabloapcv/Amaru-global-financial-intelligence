@@ -1085,6 +1085,14 @@ def _client_throttle(request: Request, what: str) -> None:
         raise HTTPException(429, "too many requests; try again later") from exc
 
 
+@app.get(f"{V1}/public/plans", include_in_schema=False)
+def public_plans() -> dict[str, Any]:
+    """Plans and their limits for the public pricing page (no sign-in)."""
+    from atlas import billing
+
+    return billing.public_plans()
+
+
 @app.get(f"{V1}/public/newsletters/{{slug}}", include_in_schema=False)
 def public_newsletter(slug: str) -> dict[str, Any]:
     from atlas import newsletters

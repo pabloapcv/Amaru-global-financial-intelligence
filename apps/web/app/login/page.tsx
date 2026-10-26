@@ -7,7 +7,7 @@ import { ErrorNote } from "@/components/ui";
 
 function Login() {
   const params = useSearchParams();
-  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">(params.get("mode") === "signup" ? "signup" : "login");
   const [notice, setNotice] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +20,10 @@ function Login() {
   const [code, setCode] = useState("");
 
   useEffect(() => {
-    api<{ signup_allowed: boolean }>("/health").then((h) => setSignupAllowed(h.signup_allowed)).catch(() => {});
+    api<{ signup_allowed: boolean }>("/health").then((h) => {
+      setSignupAllowed(h.signup_allowed);
+      if (!h.signup_allowed) setMode((m) => (m === "signup" ? "login" : m));
+    }).catch(() => {});
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -62,6 +65,7 @@ function Login() {
           <button type="button" className={mode === "login" ? "on" : ""} onClick={() => setMode("login")}>Sign in</button>
           {signupAllowed && <button type="button" className={mode === "signup" ? "on" : ""} onClick={() => setMode("signup")}>Create account</button>}
         </div>
+        {!challenge && <p className="muted" style={{ fontSize: 12.5, marginTop: -6 }}>New to ATLAS? <a href="/welcome">See what it does and the plans</a>.</p>}
         {challenge ? (
           <form onSubmit={submit}>
             <p style={{ marginTop: 0 }}>Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
