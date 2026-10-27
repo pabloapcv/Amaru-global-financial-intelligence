@@ -176,6 +176,8 @@ def execute_run(run_id: str) -> dict[str, Any]:
         depth = config.get("depth", "standard")
         engine_pref = config.get("engine", "auto")
         _progress(run_id, "Parsing intent and resolving instruments")
+        if config.get("engine_note"):
+            _progress(run_id, config["engine_note"])
         prior = prior_context(config["parent_run_id"], workspace_id) if config.get("parent_run_id") else None
         plan_query = query
         if prior and not [e for e in extract_entities(query) if (ds := get_dataset(e)) and ds.kind in ("market", "macro")]:
@@ -286,6 +288,7 @@ def execute_run(run_id: str) -> dict[str, Any]:
             "sources": list(sources.values()),
             "tool_log": ctx.log,
             "llm_usage": researchers[0].usage if researchers else None,
+            **({"engine_note": config["engine_note"]} if config.get("engine_note") else {}),
         }
         with session_scope() as s:
             for e in evidence:

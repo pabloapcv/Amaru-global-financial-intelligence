@@ -224,6 +224,7 @@ function RunView({ runId, onDone, onOpen, canRate }: { runId: string; onDone?: (
               </div>
             )}
           >
+            {res.engine_note && <div className="note" style={{ marginBottom: 8 }}>{res.engine_note}</div>}
             {res.verification.passed ? (
               <div className="note note-ok">Verified: {res.verification.numbers_verified}/{res.verification.numbers_checked} numerical claims trace to stored observations or calculations; all citations resolve.</div>
             ) : (

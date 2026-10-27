@@ -992,3 +992,26 @@ def test_research_feedback_reaches_operators_and_is_private_and_deletable(secure
     assert reader.delete(f"/api/v1/research/{run_id}").status_code == 204
     with session_scope() as s:
         assert s.query(ResearchFeedback).filter(ResearchFeedback.run_id == run_id).count() == 0
+
+
+def test_auto_engine_falls_back_at_the_daily_claude_limit(secured, monkeypatch):
+    from atlas.research import engine, llm
+
+    monkeypatch.setattr(llm, "available", lambda: True)
+    monkeypatch.setitem(auth.PLANS["explorer"], "llm_research_per_day", 0)
+    acct = _signup(secured, "limit@example.test", "Limits")
+    r = secured.post("/api/v1/research", json={"query": "Copper outlook", "engine": "llm", "report": {"formats": []}})
+    assert r.status_code == 429 and "llm research per day" in r.json()["detail"]  # explicit Claude is refused
+    r = secured.post("/api/v1/research", json={"query": "Copper outlook", "engine": "auto", "report": {"formats": []}, "no_cache": True})
+    assert r.status_code == 202 and "Written without Claude" in r.json()["engine_note"]
+    run = engine.get_run(r.json()["run_id"], acct["workspace"]["workspace_id"])
+    assert run["config"]["engine"] == "deterministic" and "engine_note" in run["config"]
+    import time
+
+    for _ in range(150):
+        run = engine.get_run(r.json()["run_id"], acct["workspace"]["workspace_id"])
+        if run["status"] not in ("queued", "running"):
+            break
+        time.sleep(0.2)
+    assert run["status"] == "complete", run.get("error")
+    assert run["engine"] == "deterministic" and "Written without Claude" in run["result"]["engine_note"]

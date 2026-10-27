@@ -1532,12 +1532,20 @@ def create_research(req: ResearchRequest, p: Principal = Depends(require_verifie
 
     def quotas() -> None:  # only charged when new research actually runs (cache hits are free)
         _quota(p.workspace_id, "research_per_day")
-        if req.engine == "llm" or (req.engine == "auto" and llm.available()):
+        if req.engine == "llm":
             _quota(p.workspace_id, "llm_research_per_day")
+        elif req.engine == "auto" and llm.available():
+            try:
+                auth.check_quota(p.workspace_id, "llm_research_per_day")
+            except auth.QuotaExceeded as exc:
+                # "auto" means "best available": past the daily Claude limit the deterministic engine
+                # answers, as it does when the monthly Claude budget runs out. An explicit "llm" is refused.
+                config["engine"] = "deterministic"
+                config["engine_note"] = f"Written without Claude: {exc}. The figures and their verification are unaffected."
 
     run_id, cached = engine.submit_or_cached(req.query, config, p.user_id, p.workspace_id, before_submit=quotas)
     return {"run_id": run_id, "status": "complete" if cached else "queued", "cached": cached,
-            "links": {"self": f"{V1}/research/{run_id}"}}
+            "engine_note": config.get("engine_note"), "links": {"self": f"{V1}/research/{run_id}"}}
 
 
 @api.get(f"/research")
