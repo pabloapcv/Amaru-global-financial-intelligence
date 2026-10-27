@@ -187,6 +187,8 @@ def execute_run(run_id: str) -> dict[str, Any]:
             lookback_years=config.get("lookback_years"), scope=config.get("assets"),
         )
         plan["query"] = query
+        if config.get("scenario_universe") or config.get("custom_scenarios"):
+            plan["scenario_inputs"] = {"universe": config.get("scenario_universe"), "custom_scenarios": config.get("custom_scenarios")}
         if prior:
             plan["follow_up_to"] = {"run_id": prior["run_id"], "query": prior["query"]}
         from atlas.research import templates
