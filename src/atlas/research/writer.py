@@ -87,6 +87,14 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
         lt = e["result"]["latest"]
         if lt["is_anomalous"]:
             summary.append(f"- The latest move in {_name(e['result']['dataset_id'])} is statistically unusual (robust z {_fmt(lt['robust_z'])}) [{e['label']}].")
+    for e in by_tool.get("scan_scenarios", []):
+        r = e["result"]
+        top = [s for s in r["scenarios"] if s.get("relevance")]
+        if top:
+            summary.append(f"- {len(r['scenarios'])} scenarios assessed across {len(r['universe'])} markets; the data points most to: "
+                           + "; ".join(f"**{s['name']}** ({s['relevance']} signal{'s' if s['relevance'] != 1 else ''})" for s in top[:3])
+                           + f" [{e['label']}].")
+        summary.append(f"- {r['method']['caveat']}")
     if not summary:
         summary.append("- See the sections below; no single-instrument snapshot was requested.")
     lines += ["## Executive summary", "", *summary, ""]
@@ -98,6 +106,35 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
         "calculations in the ATLAS quant engine; each claim cites its evidence item. This brief was composed by the "
         "deterministic writer, which restates evidence without causal interpretation.", "",
     ]
+
+    # Scenarios ------------------------------------------------------------------
+    for e in by_tool.get("scan_scenarios", []):
+        r = e["result"]
+        lines += ["## Scenarios", "",
+                  f"Data as of {r['as_of']}. {r['considered']} candidate scenarios were checked against the data; "
+                  f"{len(r['scenarios'])} are shown, ranked by how many data signals point to them [{e['label']}].", ""]
+        if r.get("missing"):
+            lines += [f"Not assessed (no stored data): {', '.join(_name(d) for d in r['missing'])}.", ""]
+        for i, s in enumerate(r["scenarios"], 1):
+            unit = "bp" if s["shock_unit"] == "bp" else "%"
+            why = "; ".join(sig["text"] for sig in s["signals"]) or "no current signal (standard stress test)"
+            lines += [f"### {i}. {s['name']}", "",
+                      f"*Driver:* {s['driver_name']} {_fmt(s['shock'], 0)}{' ' if unit == 'bp' else ''}{unit}. *Why it is here:* {why} [{e['label']}].", ""]
+            rows = [im for im in s["impacts"] if not im["is_driver"]]
+            if rows:
+                lines += ["| Market | Historical effect | 95% range | Reliable? |", "|---|---|---|---|"]
+                for im in sorted(rows, key=lambda im: (not im["significant"], -abs(im["implied_move"]))):
+                    u = " bp" if im["unit"] == "bp" else "%"
+                    rng = f"{_fmt(im['ci95'][0])} to {_fmt(im['ci95'][1])}{u}" if im["ci95"] else "n/a"
+                    lines.append(f"| {im['name']} | {_fmt(im['implied_move'])}{u} | {rng} | {'yes' if im['significant'] else 'no (p > 0.05)'} |")
+                lines.append("")
+                big = [next(im for im in rows if im["dataset_id"] == d) for d in s["clearest_effects"]]
+                if big:
+                    lines += ["Clearest effects (largest relative to their uncertainty): " + ", ".join(f"{im['name']} {_fmt(im['implied_move'])}{' bp' if im['unit'] == 'bp' else '%'}" for im in big)
+                              + f" [{e['label']}].", ""]
+        lines += [f"*Method:* {r['method']['selection']}. Effects: {r['method']['effects']}. {r['method']['caveat']}", ""]
+        if r.get("next_fomc"):
+            lines += [f"The next FOMC meeting is on {r['next_fomc']} [{e['label']}].", ""]
 
     # Historical analysis -------------------------------------------------------
     hist = by_tool.get("get_price_history", []) + by_tool.get("get_macro_series", [])

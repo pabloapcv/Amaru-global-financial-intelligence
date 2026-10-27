@@ -763,6 +763,22 @@ def t_get_fundamentals(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
     return {"evidence_id": label, **result}
 
 
+def t_scan_scenarios(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import scenarios
+
+    custom = args.get("custom_scenarios") or []
+    if not isinstance(custom, list) or len(custom) > 5 or any(not isinstance(c, dict) or "driver" not in c or "shock" not in c for c in custom):
+        raise ToolError("custom_scenarios: up to 5 objects with driver (dataset id) and shock (% or bp)")
+    try:
+        res, metas = scenarios.scan(args.get("universe") or None, custom, int(args.get("max_scenarios", scenarios.MAX_SCENARIOS)))
+    except scenarios.ScenarioError as exc:
+        raise ToolError(str(exc)) from exc
+    unique = list({m.dataset_id: m for m in metas}.values())
+    label = ctx.add("scan_scenarios", args, res, "ATLAS scenario scan (rules on stored data; historical-beta effects) on: " + _cite(unique),
+                    [_source(m) for m in unique])
+    return {"evidence_id": label, **res}
+
+
 def t_search_documents(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     from atlas import documents
 
@@ -876,6 +892,17 @@ TOOLS: dict[str, dict[str, Any]] = {
         "schema": {"type": "object", "properties": {
             "asset": _ID, "driver": _ID, "shock": {"type": "number"}, "lookback_years": _LB,
         }, "required": ["asset", "driver", "shock"]},
+    },
+    "scan_scenarios": {
+        "fn": t_scan_scenarios,
+        "description": "Scenario scan across markets: proposes the scenarios current data points to (FOMC calendar and 2-year yield moves → rates; dollar and oil momentum or 5-year extremes; calm volatility → a VIX spike; CFTC positioning extremes → unwinds; USDA stocks-to-use extremes → squeezes or surpluses), plus custom scenarios, and gives each scenario's historical-beta effect on every market in the universe with 95% ranges and significance. Relevance counts signals; it is NOT a probability.",
+        "schema": {"type": "object", "properties": {
+            "universe": {"type": "array", "items": _ID, "description": "Markets to assess (default: a cross-asset set of 11). At most 15."},
+            "custom_scenarios": {"type": "array", "items": {"type": "object", "properties": {
+                "name": {"type": "string"}, "driver": _ID, "shock": {"type": "number", "description": "% for price-like drivers, bp for rates"}},
+                "required": ["driver", "shock"]}, "description": "Up to 5 scenarios to include regardless of signals."},
+            "max_scenarios": {"type": "integer", "minimum": 1, "maximum": 8},
+        }},
     },
     "get_positioning": {
         "fn": t_get_positioning,

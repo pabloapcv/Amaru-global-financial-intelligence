@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/markets", label: "Markets", hint: "Explore asset classes" },
   { href: "/economy", label: "Global Economy", hint: "Countries and macro data" },
   { href: "/quant", label: "Quant Lab", hint: "Models and analysis" },
+  { href: "/scenarios", label: "Scenario Agent", hint: "What the data points to next" },
   { href: "/portfolio", label: "Portfolio", hint: "Risk, VaR and stress tests" },
   { href: "/reports", label: "Reports", hint: "Research outputs" },
   { href: "/intelligence", label: "Intelligence", hint: "Alerts and monitoring" },

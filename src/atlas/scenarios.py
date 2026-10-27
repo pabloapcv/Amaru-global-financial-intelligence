@@ -1,0 +1,250 @@
+"""Scenario scan: which scenarios does the current data point to, and what would each do to other markets?
+
+The scan reads the stored data and proposes scenarios from rules anyone can audit:
+
+- an FOMC meeting in the next 60 days, or a large move in the 2-year yield → rate scenarios
+- a large 3-month dollar move, or the dollar at an extreme of its 5-year range → dollar scenarios
+- a large oil move or extreme → oil scenarios
+- a calm volatility index → a volatility-spike scenario
+- speculators at an extreme of their 3-year positioning range (CFTC) → a positioning-unwind scenario
+- USDA stocks-to-use at an extreme of 20 years → a supply-squeeze or surplus scenario
+
+plus any scenario the user asks for. Each scenario's effect on every market in the universe comes from
+its historical sensitivity (analytics.scenario: HAC OLS of period changes over 10 years), with a 95%
+range, and effects that are not statistically significant are marked as such.
+
+"Relevance" counts the data signals behind a scenario. It is not a probability, and the output says so.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import date, timedelta
+from typing import Any
+
+from atlas import analytics
+from atlas.data.access import DataUnavailable, get_fundamentals, get_positioning, get_series
+from atlas.instruments import fundamentals_for, get_dataset, positioning_for
+
+log = logging.getLogger(__name__)
+
+DEFAULT_UNIVERSE = ["CMD.CRUDE.BRENT", "CMD.COPPER.LME", "CMD.SUGAR.ISA", "CMD.CORN.US", "CMD.SOYBEANS.US", "CMD.COFFEE.ARABICA",
+                    "FX.USD.BROAD", "FX.USDBRL", "FX.USDMXN", "RATE.UST.10Y", "EQ.US.SP500"]
+RATES, DOLLAR, OIL, VOL = "RATE.UST.2Y", "FX.USD.BROAD", "CMD.CRUDE.BRENT", "VOL.US.VIX"
+MAX_SCENARIOS = 8
+MAX_UNIVERSE = 15
+NOT_PROBABILITY = ("Relevance counts the data signals pointing to a scenario; it is not a probability. "
+                   "Effects are historical sensitivities (all else equal), not forecasts.")
+
+
+class ScenarioError(ValueError):
+    pass
+
+
+def _name(dsid: str) -> str:
+    ds = get_dataset(dsid)
+    return ds.name if ds else dsid
+
+
+def _ordinal(x: float) -> str:
+    n = int(round(x))
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _r(x: float | None, nd: int = 2) -> float | None:
+    return None if x is None else round(float(x), nd)
+
+
+def _perf(series, dsid: str) -> dict[str, Any]:
+    ds = get_dataset(dsid)
+    assert ds is not None
+    p = analytics.performance(series, unit=ds.unit, frequency=ds.frequency)
+    t3 = p["trailing"].get("3M") or {}
+    return {"value": p["last_value"], "date": p["last_date"], "pct_3m": t3.get("return_pct"), "bp_3m": t3.get("change_bp"),
+            "percentile_5y": p.get("percentile_in_5y_range")}
+
+
+def _scenario(sid: str, name: str, driver: str, shock: float, signals: list[dict[str, Any]], kind: str) -> dict[str, Any]:
+    ds = get_dataset(driver)
+    assert ds is not None
+    return {"id": sid, "name": name, "kind": kind, "driver": driver, "driver_name": ds.name, "shock": shock,
+            "shock_unit": "bp" if analytics.transform_kind(ds.unit) != "log_return" else "pct",
+            "signals": signals, "relevance": len(signals)}
+
+
+def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None = None,
+         max_scenarios: int = MAX_SCENARIOS) -> tuple[dict[str, Any], list]:
+    """Returns (result, metas used). Raises ScenarioError for bad input."""
+    universe = list(dict.fromkeys(universe or DEFAULT_UNIVERSE))
+    if len(universe) > MAX_UNIVERSE:
+        raise ScenarioError(f"at most {MAX_UNIVERSE} markets per scan")
+    for dsid in universe + [c.get("driver", "") for c in custom or []]:
+        ds = get_dataset(dsid)
+        if ds is None or ds.kind not in ("market", "macro"):
+            raise ScenarioError(f"unknown market or series: {dsid}")
+
+    needed = list(dict.fromkeys(universe + [RATES, DOLLAR, OIL, VOL] + [c["driver"] for c in custom or []]))
+    series, metas, perf = {}, [], {}
+    for dsid in needed:
+        try:
+            s, m = get_series(dsid)
+        except DataUnavailable:
+            continue
+        series[dsid] = s
+        metas.append(m)
+        try:
+            perf[dsid] = _perf(s, dsid)
+        except (ValueError, KeyError):
+            pass
+
+    candidates: list[dict[str, Any]] = []
+
+    # Rates: the next FOMC meeting and the 2-year yield's recent direction.
+    fomc = None
+    try:
+        from atlas import calendar
+
+        fomc = next((e for e in calendar.upcoming(60)["events"] if e["kind"] == "fomc"), None)
+    except Exception:  # the calendar is optional context
+        log.debug("calendar unavailable for scenario scan", exc_info=True)
+    if RATES in perf:
+        bp = perf[RATES]["bp_3m"]
+        for direction, shock in (("down", -50.0), ("up", 50.0)):
+            sig = []
+            if fomc:
+                sig.append({"text": f"FOMC meeting on {fomc['date']}", "date": fomc["date"]})
+            if bp is not None and abs(bp) >= 25 and (bp < 0) == (direction == "down"):
+                sig.append({"text": f"2-year Treasury yield moved {bp:+.0f} bp over 3 months", "value": bp, "unit": "bp"})
+            label = "Rates fall: 2-year Treasury yield −50 bp" if direction == "down" else "Rates rise: 2-year Treasury yield +50 bp"
+            candidates.append(_scenario(f"rates_{direction}", label, RATES, shock, sig, "macro"))
+
+    # Dollar and oil: momentum and stretch within the 5-year range.
+    for dsid, size, big, label in ((DOLLAR, 5.0, 2.0, "Dollar"), (OIL, 20.0, 10.0, "Brent crude")):
+        if dsid not in perf:
+            continue
+        pct, pctl = perf[dsid]["pct_3m"], perf[dsid]["percentile_5y"]
+        for direction, shock in (("up", size), ("down", -size)):
+            sig = []
+            if pct is not None and abs(pct) >= big and (pct > 0) == (direction == "up"):
+                sig.append({"text": f"{label} moved {pct:+.1f}% over 3 months", "value": pct, "unit": "pct"})
+            if pctl is not None and ((direction == "down" and pctl >= 90) or (direction == "up" and pctl <= 10)):
+                sig.append({"text": f"{label} sits at the {_ordinal(pctl)} percentile of its 5-year range", "value": pctl, "unit": "percentile"})
+            candidates.append(_scenario(f"{label.split()[0].lower()}_{direction}", f"{label} {shock:+.0f}%", dsid, shock, sig, "macro"))
+
+    # Volatility: calm markets are when a volatility spike would surprise most.
+    if VOL in perf:
+        pctl, pct = perf[VOL]["percentile_5y"], perf[VOL]["pct_3m"]
+        sig = []
+        if pctl is not None and pctl <= 20:
+            sig.append({"text": f"Volatility index at the {_ordinal(pctl)} percentile of its 5-year range", "value": pctl, "unit": "percentile"})
+        if pct is not None and pct >= 20:
+            sig.append({"text": f"Volatility index up {pct:+.1f}% over 3 months", "value": pct, "unit": "pct"})
+        candidates.append(_scenario("vol_spike", "Volatility spike: VIX +50%", VOL, 50.0, sig, "macro"))
+
+    # Commodities in the universe: positioning extremes and USDA balances.
+    start = date.today() - timedelta(days=4 * 365)
+    for dsid in universe:
+        ds = get_dataset(dsid)
+        if ds is None or not dsid.startswith("CMD.") or dsid not in series:
+            continue
+        cot = positioning_for(dsid)
+        if cot:
+            try:
+                df, m = get_positioning(cot, start=start)
+                stats = analytics.positioning_stats(df, lookback_years=3)
+                idx = stats.get("cot_index")
+                if idx is not None and (idx >= 90 or idx <= 10):
+                    metas.append(m)
+                    long_ = idx >= 90
+                    candidates.append(_scenario(
+                        f"unwind_{dsid}", f"{ds.name} {'−10%' if long_ else '+10%'}: speculators {'sell' if long_ else 'buy back'}",
+                        dsid, -10.0 if long_ else 10.0,
+                        [{"text": f"Speculators' net position is at {idx:.0f} on a 0–100 scale of its 3-year range (CFTC, {stats['report_date']})",
+                          "value": round(idx, 1), "unit": "index"}], "positioning"))
+            except (DataUnavailable, ValueError, KeyError):
+                pass
+        fid = fundamentals_for(dsid)
+        if fid:
+            try:
+                df, m = get_fundamentals(fid)
+                fds = get_dataset(fid)
+                bal = analytics.fundamentals_balance(df, unit=fds.unit if fds else "")
+                stu = bal.get("stocks_to_use") or {}
+                pc = stu.get("percentile")
+                if pc is not None and (pc <= 20 or pc >= 80):
+                    metas.append(m)
+                    tight = pc <= 20
+                    candidates.append(_scenario(
+                        f"balance_{dsid}", f"{ds.name} {'+15%: supply squeeze' if tight else '−10%: surplus weighs'}", dsid,
+                        15.0 if tight else -10.0,
+                        [{"text": f"USDA world stocks-to-use is {stu['latest_pct']}% ({bal['latest_market_year']}), the {_ordinal(pc)} percentile of {stu['history_years']} years",
+                          "value": stu["latest_pct"], "unit": "pct"}], "fundamentals"))
+            except (DataUnavailable, ValueError, KeyError):
+                pass
+
+    for i, c in enumerate(custom or []):
+        shock = float(c["shock"])
+        if shock == 0:
+            raise ScenarioError("a custom scenario needs a non-zero shock")
+        name = (c.get("name") or "").strip()[:120] or f"{_name(c['driver'])} {shock:+g}"
+        sc = _scenario(f"custom_{i + 1}", name, c["driver"], shock, [{"text": "Requested by you"}], "custom")
+        sc["relevance"] = None  # chosen, not signalled
+        candidates.append(sc)
+
+    signalled = [c for c in candidates if c["kind"] == "custom" or c["relevance"]]
+    if len([c for c in signalled if c["kind"] != "custom"]) < 2:  # quiet markets: keep the standard stress tests
+        signalled += [c for c in candidates if c["id"] in ("rates_down", "rates_up", "dollar_up", "dollar_down") and c not in signalled]
+    customs = [c for c in signalled if c["kind"] == "custom"]
+    ranked = sorted((c for c in signalled if c["kind"] != "custom"), key=lambda c: (-c["relevance"], c["id"]))
+    chosen = customs + ranked[:max(0, max_scenarios - len(customs))]
+
+    freqs = {d: get_dataset(d).frequency for d in series}  # type: ignore[union-attr]
+    units = {d: get_dataset(d).unit for d in series}  # type: ignore[union-attr]
+    for sc in chosen:
+        impacts = []
+        for asset in universe:
+            if asset not in series:
+                continue
+            if asset == sc["driver"]:
+                impacts.append({"dataset_id": asset, "name": _name(asset), "implied_move": sc["shock"], "unit": sc["shock_unit"],
+                                "ci95": None, "p_value": None, "significant": True, "r_squared": None, "is_driver": True})
+                continue
+            try:
+                res = analytics.scenario(asset, sc["driver"], sc["shock"], series, freqs, units, lookback_years=10)
+            except (ValueError, KeyError, StopIteration):
+                continue
+            p = res["beta_p_value"]
+            impacts.append({"dataset_id": asset, "name": _name(asset), "implied_move": res["implied_asset_move"],
+                            "unit": res["implied_unit"], "ci95": res["implied_asset_move_ci95"], "p_value": _r(p, 4),
+                            "significant": p is not None and p <= 0.05, "r_squared": res["r_squared"], "is_driver": False})
+        reliable = [i for i in impacts if i["significant"] and not i["is_driver"]]
+        sc["impacts"] = impacts
+        # Effects in % and bp are not comparable by size; rank by how clearly the data shows them
+        # (effect relative to the half-width of its 95% range).
+        def clarity(i: dict[str, Any]) -> float:
+            half = (i["ci95"][1] - i["ci95"][0]) / 2 if i["ci95"] else 0
+            return abs(i["implied_move"]) / half if half else 0
+
+        sc["clearest_effects"] = [i["dataset_id"] for i in sorted(reliable, key=lambda i: -clarity(i))[:3]]
+        if sc["relevance"] is not None:
+            sc["relevance_label"] = "strong" if sc["relevance"] >= 2 else "some" if sc["relevance"] == 1 else "standard stress test"
+
+    as_of = max((perf[d]["date"] for d in universe if d in perf), default=None)
+    result = {
+        "as_of": as_of, "universe": [d for d in universe if d in series],
+        "missing": [d for d in universe if d not in series],
+        "considered": len(candidates), "scenarios": chosen,
+        "latest": {d: {"value": perf[d]["value"], "date": perf[d]["date"], "change_3m_pct": perf[d]["pct_3m"],
+                       "change_3m_bp": perf[d]["bp_3m"], "percentile_5y": perf[d]["percentile_5y"]}
+                   for d in needed if d in perf},
+        "next_fomc": fomc["date"] if fomc else None,
+        "method": {
+            "selection": "rules on 3-month moves, 5-year percentiles, the FOMC calendar, CFTC positioning (3-year COT index ≥90 or ≤10) "
+                         "and USDA stocks-to-use (≤20th or ≥80th percentile of 20 years); custom scenarios always included",
+            "effects": "historical sensitivity of each market to the scenario's driver: HAC OLS on period changes over 10 years; "
+                       "95% range from the coefficient's standard error; 'significant' means p ≤ 0.05",
+            "caveat": NOT_PROBABILITY + " Sensitivities measure how markets moved together, not what causes what.",
+        },
+    }
+    return result, metas

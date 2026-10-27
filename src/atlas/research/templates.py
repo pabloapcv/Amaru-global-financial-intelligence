@@ -76,6 +76,16 @@ def _cross_asset(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     ]
 
 
+def _scenarios(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    inputs = plan.get("scenario_inputs") or {}
+    scan: dict[str, Any] = {}
+    if inputs.get("universe"):
+        scan["universe"] = inputs["universe"]
+    if inputs.get("custom_scenarios"):
+        scan["custom_scenarios"] = inputs["custom_scenarios"]
+    return [("scan_scenarios", scan), ("get_economic_calendar", {"days": 60}), ("screen_anomalies", {})]
+
+
 TEMPLATES: dict[str, dict[str, Any]] = {
     "research_report": {
         "name": "Research report",
@@ -114,6 +124,17 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "depth": "standard", "steps": _country,
         "brief": "Write a country intelligence report: economic profile, how it compares with regional peers, external position "
                  "and reserves, main trade relationships and product concentration, and financial risks.",
+    },
+    "scenario_outlook": {
+        "name": "Scenario Outlook",
+        "description": "Scenarios the current data points to (rates, dollar, oil, volatility, positioning, USDA balances, plus your own) and what each would mean for other markets.",
+        "default_query": "Scenario outlook: which scenarios does the current data point to, and what would each mean across markets?",
+        "depth": "standard", "steps": _scenarios,
+        "brief": "Write a scenario outlook from the scan_scenarios evidence. Rank scenarios by relevance and, for each: why the data puts it "
+                 "on the list (cite its signals), how it would carry across markets using only statistically significant sensitivities "
+                 "(say when an effect is not significant, and that sensitivities describe how markets moved together, not causes), and "
+                 "which scheduled events from the economic calendar would confirm or rule it out. Never state or imply a probability: "
+                 "relevance counts data signals. Close with what to watch.",
     },
     "cross_asset": {
         "name": "Cross-Asset Research",

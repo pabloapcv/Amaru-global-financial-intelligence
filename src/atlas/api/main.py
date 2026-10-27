@@ -1449,6 +1449,31 @@ class ResearchReportOptions(BaseModel):
     include_sources: bool = True
 
 
+class CustomScenario(BaseModel):
+    driver: str = Field(..., max_length=64, description="Dataset id that moves, e.g. FX.USDBRL or RATE.UST.2Y.")
+    shock: float = Field(..., ge=-500, le=500, description="% for price-like drivers, bp for rates.")
+    name: str = Field("", max_length=120)
+
+
+class ScenarioOptions(BaseModel):
+    universe: list[str] = Field(default_factory=list, max_length=15, description="Markets to assess (empty: a cross-asset default).")
+    custom: list[CustomScenario] = Field(default_factory=list, max_length=5)
+
+
+def _scenario_config(opts: ScenarioOptions | None) -> dict[str, Any]:
+    if opts is None:
+        return {}
+    unknown = [d for d in opts.universe + [c.driver for c in opts.custom] if not get_dataset(d)]
+    if unknown:
+        raise HTTPException(422, f"unknown datasets: {unknown}")
+    out: dict[str, Any] = {}
+    if opts.universe:
+        out["scenario_universe"] = list(dict.fromkeys(opts.universe))
+    if opts.custom:
+        out["custom_scenarios"] = [c.model_dump() for c in opts.custom]
+    return out
+
+
 class ResearchRequest(BaseModel):
     query: str = Field(..., min_length=3, max_length=2000)
     depth: Literal["quick", "standard", "deep"] = "standard"
@@ -1459,6 +1484,7 @@ class ResearchRequest(BaseModel):
     no_cache: bool = Field(False, description="Always run fresh research, even if an identical recent answer exists.")
     parent_run_id: str | None = Field(None, description="Ask a follow-up to this completed run in the same workspace.")
     language: Literal["en", "es", "pt"] = Field("en", description="Language of the brief and report (Claude engine; the deterministic engine writes English).")
+    scenarios: ScenarioOptions | None = Field(None, description="For the scenario_outlook template: markets to assess and your own scenarios.")
 
 
 def _parse_period(text: str | None, unit_months: dict[str, float]) -> float | None:
@@ -1494,6 +1520,7 @@ def create_research(req: ResearchRequest, p: Principal = Depends(require_verifie
         "geographies": req.scope.geographies, "lookback_years": lb, "horizon_months": int(hz) if hz else None,
         "analysis": req.analysis, "formats": req.report.formats, "template": req.report.template,
         **({"language": req.language} if req.language != "en" else {}),
+        **_scenario_config(req.scenarios),
     }
     if req.no_cache:
         config["cache"] = False
@@ -1720,6 +1747,7 @@ class ScheduleRequest(BaseModel):
     depth: Literal["quick", "standard", "deep"] = "standard"
     engine: Literal["auto", "llm", "deterministic"] = "auto"
     formats: list[Literal["html", "pdf", "xlsx"]] = Field(default_factory=lambda: ["html", "xlsx"])
+    scenarios: ScenarioOptions | None = None  # for the scenario_outlook template
     newsletter: Literal["off", "draft", "send"] = "off"  # turn each finished run into a newsletter issue
 
 
@@ -1732,6 +1760,7 @@ def create_schedule(req: ScheduleRequest, p: Principal = Depends(require_verifie
         _check_newsletter_mode(p)
     return schedules.create_schedule(req.name, req.query, req.cadence,
                                      {"depth": req.depth, "engine": req.engine, "formats": req.formats, "template": req.template,
+                                      **_scenario_config(req.scenarios),
                                       "newsletter": req.newsletter},
                                      workspace_id=p.workspace_id, user_id=p.user_id)
 
