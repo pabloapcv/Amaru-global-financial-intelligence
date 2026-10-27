@@ -120,6 +120,7 @@ export interface ResearchRun {
   parent?: RunLink | null;
   follow_ups?: RunLink[];
   result: {
+    engine_note?: string;
     title: string;
     narrative_markdown: string;
     engine: string;

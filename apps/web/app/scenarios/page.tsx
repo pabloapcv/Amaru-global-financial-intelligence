@@ -171,6 +171,7 @@ export default function Scenarios() {
             </div>
             <Link href={`/research?run=${run!.run_id}`}>Read the full brief</Link>
           </div>
+          {run?.result?.engine_note && <div className="note" style={{ marginBottom: 12, fontSize: 12.5 }}>{run.result.engine_note}</div>}
           <div className="grid grid-2">
             {scan.scenarios.map((s) => (
               <Card key={s.id} title={s.name} actions={<span className={`badge ${s.relevance && s.relevance >= 2 ? "badge-current" : "badge-delayed"}`}>
