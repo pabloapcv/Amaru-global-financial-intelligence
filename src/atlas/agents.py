@@ -32,7 +32,7 @@ TRIGGERS: dict[str, dict[str, Any]] = {
     "usda_revision": {"label": "USDA revision", "param": "abs_pct", "default": 2.0,
                       "help": "a new USDA report revises world production or ending stocks of the commodity by ≥ abs_pct %"},
     "official_release": {"label": "Official release", "param": "keywords", "default": "FOMC statement", "kind": "text",
-                         "help": "a new Fed, BEA or CFTC press release mentions any of these comma-separated keywords"},
+                         "help": "a new official press release (Fed, BEA, CFTC, USDA AMS, ECB, Bank of England) mentions any of these comma-separated keywords"},
 }
 RELEASE_TRIGGERS = {"official_release"}
 MANUAL_RELEASE_LOOKBACK = timedelta(days=7)

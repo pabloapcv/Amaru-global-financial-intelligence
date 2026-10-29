@@ -68,7 +68,7 @@ export default function Intelligence() {
     <>
       <PageHeader
         title="Intelligence"
-        subtitle="Agents and alerts are evaluated after every data refresh; official releases from the Fed, BEA and CFTC are indexed every 6 hours."
+        subtitle="Agents and alerts are evaluated after every data refresh; official releases (Fed, BEA, CFTC, USDA AMS, ECB, Bank of England) are indexed every 6 hours."
         actions={
           <div className="row">
             <div className="seg">
