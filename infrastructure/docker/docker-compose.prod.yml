@@ -1,0 +1,63 @@
+# Production overlay: HTTPS through Caddy (automatic Let's Encrypt certificates), secure cookies,
+# public URLs from your domain, no other ports exposed, and daily backups with retention.
+#
+# Needs DNS A/AAAA records for ATLAS_DOMAIN and api.ATLAS_DOMAIN pointing at this server, ports 80 and
+# 443 open, and Docker Compose 2.24 or later. See docs/deploy.md.
+#
+#   docker compose -f infrastructure/docker/docker-compose.yml -f infrastructure/docker/docker-compose.prod.yml --env-file .env up -d --build
+x-prod-env: &prod-env
+  ATLAS_PUBLIC_URL: https://${ATLAS_DOMAIN:?set ATLAS_DOMAIN in .env}
+  ATLAS_API_PUBLIC_URL: https://api.${ATLAS_DOMAIN}
+  ATLAS_CORS_ORIGINS: https://${ATLAS_DOMAIN}
+  ATLAS_COOKIE_SECURE: "true"
+
+services:
+  db:
+    restart: unless-stopped
+
+  api:
+    ports: !reset []
+    environment: *prod-env
+    restart: unless-stopped
+
+  scheduler:
+    environment: *prod-env
+    restart: unless-stopped
+
+  web:
+    ports: !reset []
+    build:
+      args: { NEXT_PUBLIC_API_URL: "https://api.${ATLAS_DOMAIN}" }
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      ATLAS_DOMAIN: ${ATLAS_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL (Let's Encrypt contact) in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [web, api]
+    restart: unless-stopped
+
+  backup:
+    # Daily portable backup into the atlas-backups volume, keeping the newest ATLAS_BACKUP_KEEP (default 14).
+    # Copy that volume off this server too: a backup on the same disk does not survive losing the server.
+    build: { context: ../.., dockerfile: infrastructure/docker/api.Dockerfile }
+    environment:
+      ATLAS_DATABASE_URL: postgresql+psycopg://atlas:${POSTGRES_PASSWORD:-atlas}@db:5432/atlas
+      ATLAS_OBJECT_STORE: /data/objects
+      ATLAS_SECRET_KEY: ${ATLAS_SECRET_KEY:-}
+      ATLAS_SECRET_KEY_FILE: /data/secret.key
+    command: ["sh", "-c", "while true; do atlas backup --out /backups --keep ${ATLAS_BACKUP_KEEP:-14} || echo 'backup failed'; sleep 86400; done"]
+    volumes: [atlas-objects:/data, atlas-backups:/backups]
+    depends_on: { api: { condition: service_healthy } }
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
+  atlas-backups:

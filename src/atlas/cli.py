@@ -39,6 +39,7 @@ def main(argv: list[str] | None = None) -> None:
     bk = sub.add_parser("backup", help="write a portable backup archive (database, reports, raw payloads)")
     bk.add_argument("--out", default="backups", help="directory for the archive (default ./backups)")
     bk.add_argument("--no-raw", action="store_true", help="skip raw provider payloads (they can be re-fetched)")
+    bk.add_argument("--keep", type=int, default=None, help="afterwards, delete all but the newest N archives in --out")
     rs2 = sub.add_parser("restore", help="restore a backup archive into an empty database")
     rs2.add_argument("archive")
     rs2.add_argument("--database-url", help="target database (default ATLAS_DATABASE_URL)")
@@ -95,6 +96,10 @@ def main(argv: list[str] | None = None) -> None:
         m = backup.describe(path)
         print(f"{path} ({path.stat().st_size / 1e6:.1f} MB, {sum(m['tables'].values()):,} rows, {len(m['files'])} files)")
         print("Not included: the two-factor encryption key (ATLAS_SECRET_KEY or data/secret.key). Keep it separately.")
+        if args.keep:
+            removed = backup.prune(args.out, args.keep)
+            if removed:
+                print(f"Deleted {len(removed)} older backup(s); kept the newest {args.keep}.")
     elif args.cmd == "restore":
         from atlas import backup
 
