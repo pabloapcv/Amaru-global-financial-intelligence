@@ -26,6 +26,7 @@ To use Claude for orchestration, set `ANTHROPIC_API_KEY` (or run `ant auth login
 The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, reports, alerts and schedules belong to a workspace and are invisible to other workspaces; market and macro data are shared.
 
 - **Web:** create an account on the sign-in page (`ATLAS_ALLOW_SIGNUP=true`), or create one from the CLI.
+- **Terms and privacy:** set `ATLAS_TERMS_URL` and `ATLAS_PRIVACY_URL` (http/https only) to your published documents. Sign-up then says that creating an account means agreeing to them, and the landing page and newsletter pages link to them. ATLAS doesn't write them for you: have a lawyer review yours.
 - **Landing and pricing page:** `/welcome` (English, Spanish, Portuguese) describes ATLAS and shows each plan's limits straight from the plan table. Prices shown come from `ATLAS_PLAN_PRICES` (e.g. `investor=49,research_pro=199,pro=799`; display only, since Stripe prices decide what customers pay) in `ATLAS_PLAN_CURRENCY` (default USD); plans without a price say "Contact us". With sign-up off, the call to action becomes a mailto link to `ATLAS_SALES_EMAIL`.
 - **Existing local data** lives in the `local` workspace. To own it: `atlas create-user you@example.com --workspace local`.
 - **API keys:** create on the Account page; send `Authorization: Bearer atk_…`. Keys are shown once and stored hashed.

@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
 type Plan = { key: string; limits: Record<string, number | null>; price_per_month: number | null };
-type Plans = { plans: Plan[]; currency: string; signup_allowed: boolean; self_service_billing: boolean; sales_email: string | null };
+type Plans = { plans: Plan[]; currency: string; signup_allowed: boolean; self_service_billing: boolean; sales_email: string | null;
+  terms_url: string | null; privacy_url: string | null };
 type Lang = "en" | "es" | "pt";
 
 const T = {
@@ -25,6 +26,7 @@ const T = {
     rows: { seats: "People", research_per_day: "Research runs per day", llm_research_per_day: "Claude research runs per day", llm_budget_usd_per_month: "Claude spending cap per month (USD)",
       schedules: "Scheduled reports", alerts: "Alerts", agents: "Monitoring agents", newsletter_subscribers: "Newsletter subscribers", api_keys: "API keys", requests_per_minute: "API requests per minute" },
     names: { explorer: "Explorer", investor: "Investor", research_pro: "Research Pro", pro: "Pro" },
+    terms: "Terms of Service", privacy: "Privacy Policy",
     disclaimer: "ATLAS provides general research and decision support, not personalised investment advice. Prices are public reference series published with a lag, not live quotes.",
   },
   es: {
@@ -43,6 +45,7 @@ const T = {
     rows: { seats: "Personas", research_per_day: "Investigaciones por día", llm_research_per_day: "Investigaciones con Claude por día", llm_budget_usd_per_month: "Límite mensual de gasto en Claude (USD)",
       schedules: "Informes programados", alerts: "Alertas", agents: "Agentes de monitoreo", newsletter_subscribers: "Suscriptores del boletín", api_keys: "Claves de API", requests_per_minute: "Solicitudes a la API por minuto" },
     names: { explorer: "Explorer", investor: "Investor", research_pro: "Research Pro", pro: "Pro" },
+    terms: "Términos del servicio", privacy: "Política de privacidad",
     disclaimer: "ATLAS ofrece investigación general y apoyo a decisiones, no asesoramiento de inversión personalizado. Los precios son series públicas de referencia publicadas con rezago, no cotizaciones en tiempo real.",
   },
   pt: {
@@ -61,6 +64,7 @@ const T = {
     rows: { seats: "Pessoas", research_per_day: "Pesquisas por dia", llm_research_per_day: "Pesquisas com o Claude por dia", llm_budget_usd_per_month: "Limite mensal de gasto com o Claude (USD)",
       schedules: "Relatórios agendados", alerts: "Alertas", agents: "Agentes de monitoramento", newsletter_subscribers: "Inscritos na newsletter", api_keys: "Chaves de API", requests_per_minute: "Requisições à API por minuto" },
     names: { explorer: "Explorer", investor: "Investor", research_pro: "Research Pro", pro: "Pro" },
+    terms: "Termos de serviço", privacy: "Política de privacidade",
     disclaimer: "O ATLAS oferece pesquisa geral e apoio à decisão, não recomendação de investimento personalizada. Os preços são séries públicas de referência publicadas com defasagem, não cotações em tempo real.",
   },
 } as const;
@@ -133,7 +137,15 @@ export default function Welcome() {
         </section>
       )}
 
-      <footer className="muted" style={{ fontSize: 12, marginTop: 48, borderTop: "1px solid var(--line)", paddingTop: 16 }}>{t.disclaimer}</footer>
+      <footer className="muted" style={{ fontSize: 12, marginTop: 48, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+        {t.disclaimer}
+        {(plans?.terms_url || plans?.privacy_url) && (
+          <div className="row" style={{ gap: 14, marginTop: 8 }}>
+            {plans.terms_url && <a href={plans.terms_url} target="_blank" rel="noreferrer">{t.terms}</a>}
+            {plans.privacy_url && <a href={plans.privacy_url} target="_blank" rel="noreferrer">{t.privacy}</a>}
+          </div>
+        )}
+      </footer>
     </div>
   );
 }

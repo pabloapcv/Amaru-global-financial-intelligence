@@ -558,7 +558,13 @@ def public_info(slug: str) -> dict[str, Any] | None:
                 select(NewsletterIssue).where(NewsletterIssue.newsletter_id == n.newsletter_id, NewsletterIssue.status == "sent")
                 .order_by(NewsletterIssue.sent_at.desc()).limit(100)).scalars()]
         return {"slug": n.slug, "name": n.name, "description": n.description, "issues": issues, "public_archive": n.public_archive,
-                "language": i18n.lang(n.language), "text": i18n.NEWSLETTER[i18n.lang(n.language)]}
+                "language": i18n.lang(n.language), "text": i18n.NEWSLETTER[i18n.lang(n.language)], "privacy_url": _privacy_url()}
+
+
+def _privacy_url() -> str | None:
+    from atlas.billing import legal_links
+
+    return legal_links()["privacy_url"]
 
 
 def public_issue(slug: str, issue_id: str) -> dict[str, Any] | None:

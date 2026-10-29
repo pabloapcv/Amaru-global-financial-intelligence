@@ -1015,3 +1015,12 @@ def test_auto_engine_falls_back_at_the_daily_claude_limit(secured, monkeypatch):
         time.sleep(0.2)
     assert run["status"] == "complete", run.get("error")
     assert run["engine"] == "deterministic" and "Written without Claude" in run["result"]["engine_note"]
+
+
+def test_legal_links_are_published_only_when_safe(secured, monkeypatch):
+    monkeypatch.setenv("ATLAS_TERMS_URL", "https://example.com/terms")
+    monkeypatch.setenv("ATLAS_PRIVACY_URL", "javascript:alert(1)")
+    h = secured.get("/health").json()
+    assert h["terms_url"] == "https://example.com/terms" and h["privacy_url"] is None
+    p = secured.get("/api/v1/public/plans").json()
+    assert p["terms_url"] == "https://example.com/terms" and p["privacy_url"] is None

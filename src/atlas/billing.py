@@ -105,7 +105,16 @@ def public_plans() -> dict[str, Any]:
     email = os.getenv("ATLAS_SALES_EMAIL", "").strip()
     return {"plans": [{"key": p, "limits": PLANS[p], "price_per_month": 0.0 if p == FREE_PLAN else shown.get(p)} for p in PLANS],
             "currency": os.getenv("ATLAS_PLAN_CURRENCY", "USD").upper()[:3], "signup_allowed": signup_allowed(),
-            "self_service_billing": configured(), "sales_email": email if "@" in email else None}
+            "self_service_billing": configured(), "sales_email": email if "@" in email else None, **legal_links()}
+
+
+def legal_links() -> dict[str, str | None]:
+    """Terms of service and privacy policy URLs (http/https only), shown at sign-up and on public pages."""
+    out: dict[str, str | None] = {}
+    for key, env in (("terms_url", "ATLAS_TERMS_URL"), ("privacy_url", "ATLAS_PRIVACY_URL")):
+        v = os.getenv(env, "").strip()
+        out[key] = v if v.startswith(("https://", "http://")) and len(v) < 500 else None
+    return out
 
 
 def summary(principal: Principal) -> dict[str, Any]:

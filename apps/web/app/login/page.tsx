@@ -14,14 +14,16 @@ function Login() {
   const [name, setName] = useState("");
   const [workspace, setWorkspace] = useState("");
   const [signupAllowed, setSignupAllowed] = useState(true);
+  const [legal, setLegal] = useState<{ terms_url: string | null; privacy_url: string | null }>({ terms_url: null, privacy_url: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState("");
 
   useEffect(() => {
-    api<{ signup_allowed: boolean }>("/health").then((h) => {
+    api<{ signup_allowed: boolean; terms_url: string | null; privacy_url: string | null }>("/health").then((h) => {
       setSignupAllowed(h.signup_allowed);
+      setLegal({ terms_url: h.terms_url ?? null, privacy_url: h.privacy_url ?? null });
       if (!h.signup_allowed) setMode((m) => (m === "signup" ? "login" : m));
     }).catch(() => {});
   }, []);
@@ -90,6 +92,13 @@ function Login() {
             {mode === "signup" && <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>At least 10 characters.</p>}
           </div>}
           <button type="submit" disabled={busy} style={{ marginTop: 14, width: "100%" }}>{busy ? "…" : mode === "login" ? "Sign in" : mode === "signup" ? "Create account" : "Send reset link"}</button>
+          {mode === "signup" && (legal.terms_url || legal.privacy_url) && (
+            <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
+              By creating an account you agree to the {legal.terms_url && <a href={legal.terms_url} target="_blank" rel="noreferrer">Terms of Service</a>}
+              {legal.terms_url && legal.privacy_url && " and the "}
+              {legal.privacy_url && <a href={legal.privacy_url} target="_blank" rel="noreferrer">Privacy Policy</a>}.
+            </p>
+          )}
         </form>
         )}
         {mode === "login" && !challenge && <p style={{ fontSize: 12.5, marginBottom: 0 }}><a href="#" onClick={(e) => { e.preventDefault(); setMode("forgot"); setNotice(null); }}>Forgot password?</a></p>}
