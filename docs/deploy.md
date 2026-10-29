@@ -72,11 +72,13 @@ To sell, see [monetization.md](monetization.md). The Stripe webhook endpoint is 
 
 The `backup` service writes a portable archive every day into the `atlas-backups` volume and keeps the newest 14 (`ATLAS_BACKUP_KEEP`).
 
-**Copy them off the server.** A backup on the same disk doesn't survive losing the server. For example, run a nightly cron job on another machine:
+**Copy them off the server.** A backup on the same disk doesn't survive losing the server. First, find the folder on the server where the volume lives:
 
 ```bash
-rsync -a server:/var/lib/docker/volumes/atlas-docker_atlas-backups/_data/ ~/atlas-backups/
+docker volume inspect $(docker volume ls -q | grep atlas-backups) --format '{{ .Mountpoint }}'
 ```
+
+Then copy that folder from another machine with a nightly cron job, for example `rsync -a server:<that folder>/ ~/atlas-backups/`.
 
 Restore into a fresh deployment's empty database:
 
