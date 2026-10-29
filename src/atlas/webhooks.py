@@ -43,6 +43,7 @@ EVENTS = {
     "agent.fired": "A monitoring agent fired and started research",
     "research.completed": "A research run finished",
     "research.failed": "A research run failed",
+    "scenarios.changed": "A scenario scan found new or stronger scenarios",
 }
 FORMATS = ("atlas", "slack")
 RETRY_DELAYS = [timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=30), timedelta(hours=2), timedelta(hours=6)]
@@ -241,6 +242,8 @@ def _slack_text(event: str, data: dict[str, Any]) -> str:
         text = f"*ATLAS agent fired: {data.get('name')}*\n" + "\n".join(f"• {m}" for m in data.get("findings", [])[:6])
     elif event == "research.completed":
         text = f"*Research ready: {data.get('title') or data.get('query')}*"
+    elif event == "scenarios.changed":
+        text = "*Scenario agent: what changed*\n" + "\n".join(f"• {m}" for m in data.get("summary", [])[:8])
     elif event == "research.failed":
         text = f"*Research failed:* {data.get('query')}"
     else:

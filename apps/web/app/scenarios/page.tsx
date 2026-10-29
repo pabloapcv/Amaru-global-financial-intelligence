@@ -11,8 +11,12 @@ const DEFAULT_UNIVERSE = ["CMD.CRUDE.BRENT", "CMD.COPPER.LME", "CMD.SUGAR.ISA", 
 
 type Impact = { dataset_id: string; name: string; implied_move: number; unit: "pct" | "bp"; ci95: [number, number] | null; significant: boolean; is_driver: boolean };
 type Scenario = { id: string; name: string; kind: string; driver_name: string; shock: number; shock_unit: string; relevance: number | null;
-  relevance_label?: string; signals: { text: string }[]; impacts: Impact[]; clearest_effects: string[] };
-type Scan = { as_of: string; considered: number; scenarios: Scenario[]; next_fomc: string | null; missing: string[]; method: { caveat: string } };
+  relevance_label?: string; signals: { text: string }[]; impacts: Impact[]; clearest_effects: string[]; is_new?: boolean };
+type Brief = { id: string; name: string; relevance: number | null };
+type Changes = { previous_scan_at: string; previous_as_of: string | null; new: Brief[]; dropped: Brief[];
+  stronger: { id: string; name: string; from: number; to: number }[]; weaker: { id: string; name: string; from: number; to: number }[] };
+type Scan = { as_of: string; considered: number; scenarios: Scenario[]; next_fomc: string | null; missing: string[]; method: { caveat: string };
+  changes?: Changes | null };
 type RunSummary = { run_id: string; query: string; status: string; title: string | null; created_at: string };
 type Schedule = { schedule_id: string; name: string; cadence: string; next_run_at: string; config: { template?: string } };
 type Custom = { driver: string; shock: string; name: string };
@@ -97,7 +101,7 @@ export default function Scenarios() {
     try {
       await api("/api/v1/schedules", { method: "POST", body: JSON.stringify({ name: "Weekly scenario outlook", query: QUERY, cadence: "weekly",
         template: "scenario_outlook", scenarios: options() }) });
-      setNote("The scenario agent will run every Monday after the data refresh. Results appear here and under Reports.");
+      setNote("The scenario agent will run every Monday after the data refresh. When it finds new or stronger scenarios you'll get an email (and a scenarios.changed webhook, if you have one).");
       loadLists();
     } catch (e) { setError(e); }
   };
@@ -172,10 +176,25 @@ export default function Scenarios() {
             <Link href={`/research?run=${run!.run_id}`}>Read the full brief</Link>
           </div>
           {run?.result?.engine_note && <div className="note" style={{ marginBottom: 12, fontSize: 12.5 }}>{run.result.engine_note}</div>}
+          {scan.changes && (
+            <Card title={`What changed since ${scan.changes.previous_scan_at.slice(0, 10)}`}>
+              {scan.changes.new.length + scan.changes.stronger.length + scan.changes.weaker.length + scan.changes.dropped.length === 0
+                ? <p className="muted" style={{ margin: 0 }}>Nothing changed: the same scenarios, with the same signals.</p>
+                : (
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                    {scan.changes.new.map((x) => <li key={`n${x.id}`}><strong>New:</strong> {x.name}</li>)}
+                    {scan.changes.stronger.map((x) => <li key={`s${x.id}`}><strong>Stronger:</strong> {x.name} ({x.from} → {x.to} signals)</li>)}
+                    {scan.changes.weaker.map((x) => <li key={`w${x.id}`}>Weaker: {x.name} ({x.from} → {x.to} signals)</li>)}
+                    {scan.changes.dropped.map((x) => <li key={`d${x.id}`} className="muted">No longer signalled: {x.name}</li>)}
+                  </ul>
+                )}
+            </Card>
+          )}
+          <div style={{ height: 14 }} />
           <div className="grid grid-2">
             {scan.scenarios.map((s) => (
-              <Card key={s.id} title={s.name} actions={<span className={`badge ${s.relevance && s.relevance >= 2 ? "badge-current" : "badge-delayed"}`}>
-                {s.kind === "custom" ? "Yours" : `${KIND[s.kind] ?? s.kind} · ${s.relevance_label}`}</span>}>
+              <Card key={s.id} title={s.name} actions={<span className="row" style={{ gap: 6 }}>{s.is_new && <span className="badge badge-current">New</span>}<span className={`badge ${s.relevance && s.relevance >= 2 ? "badge-current" : "badge-delayed"}`}>
+                {s.kind === "custom" ? "Yours" : `${KIND[s.kind] ?? s.kind} · ${s.relevance_label}`}</span></span>}>
                 <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 13 }}>
                   {s.signals.map((g, i) => <li key={i}>{g.text}</li>)}
                   {s.signals.length === 0 && <li className="muted">No current signal; included as a standard stress test.</li>}

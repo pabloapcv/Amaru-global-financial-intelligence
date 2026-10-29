@@ -773,6 +773,10 @@ def t_scan_scenarios(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         res, metas = scenarios.scan(args.get("universe") or None, custom, int(args.get("max_scenarios", scenarios.MAX_SCENARIOS)))
     except scenarios.ScenarioError as exc:
         raise ToolError(str(exc)) from exc
+    try:
+        res["changes"] = scenarios.compare(scenarios.previous_scan(ctx.workspace_id), res)
+    except Exception:  # the comparison is context; never fail the scan over it
+        res["changes"] = None
     unique = list({m.dataset_id: m for m in metas}.values())
     label = ctx.add("scan_scenarios", args, res, "ATLAS scenario scan (rules on stored data; historical-beta effects) on: " + _cite(unique),
                     [_source(m) for m in unique])

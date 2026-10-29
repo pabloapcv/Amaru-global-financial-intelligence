@@ -331,6 +331,12 @@ def _emit_finished(run_id: str) -> None:
         newsletters.from_scheduled_run(run_id)
     except Exception:
         log.exception("newsletter issue for run %s failed", run_id)
+    from atlas import scenarios
+
+    try:
+        scenarios.notify_changes(run_id)
+    except Exception:
+        log.exception("scenario change notice for run %s failed", run_id)
 
 
 def _summary(r: ResearchRun | None) -> dict[str, Any] | None:

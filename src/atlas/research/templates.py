@@ -134,7 +134,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
                  "on the list (cite its signals), how it would carry across markets using only statistically significant sensitivities "
                  "(say when an effect is not significant, and that sensitivities describe how markets moved together, not causes), and "
                  "which scheduled events from the economic calendar would confirm or rule it out. Never state or imply a probability: "
-                 "relevance counts data signals. Close with what to watch.",
+                 "relevance counts data signals. If the scan reports changes since the last scan, lead with them. Close with what to watch.",
     },
     "cross_asset": {
         "name": "Cross-Asset Research",
