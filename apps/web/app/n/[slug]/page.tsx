@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { ErrorNote } from "@/components/ui";
 
 type Text = Record<"subscribe" | "email_placeholder" | "check_inbox" | "free_note" | "past_issues" | "published_with", string>;
-type Info = { slug: string; name: string; description: string; public_archive: boolean; language: string; text: Text;
+type Info = { slug: string; name: string; description: string; public_archive: boolean; language: string; text: Text; privacy_url: string | null;
   issues: { issue_id: string; subject: string; sent_at: string }[] };
 
 export default function PublicNewsletter() {
@@ -52,7 +52,7 @@ export default function PublicNewsletter() {
           </ul>
         </>
       )}
-      <p className="muted" style={{ fontSize: 12, marginTop: 28 }}>{info.text.published_with}</p>
+      <p className="muted" style={{ fontSize: 12, marginTop: 28 }}>{info.text.published_with}{info.privacy_url && <> · <a href={info.privacy_url} target="_blank" rel="noreferrer">Privacy</a></>}</p>
     </div>
   );
 }

@@ -381,9 +381,11 @@ def readiness() -> Response:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
+    from atlas.billing import legal_links
+
     return {"status": "ok", "version": __version__, "llm_configured": llm.available(), "llm_model": settings.llm_model,
             "auth_required": auth.auth_required(), "signup_allowed": auth.signup_allowed(),
-            "commercial_mode": settings.commercial_mode}
+            "commercial_mode": settings.commercial_mode, **legal_links()}
 
 
 # ---------------------------------------------------------------- account
