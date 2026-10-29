@@ -31,6 +31,9 @@ def main(argv: list[str] | None = None) -> None:
     rs.add_argument("--engine", choices=["auto", "llm", "deterministic"], default="auto")
     sub.add_parser("llm-check", help="verify Anthropic credentials with a minimal API request")
     sub.add_parser("workspaces", help="list workspaces, plans, members and this month's Claude spend")
+    dr = sub.add_parser("doctor", help="check this deployment's configuration (exit 1 on errors)")
+    dr.add_argument("--production", action="store_true", help="apply production checks even if ATLAS_PUBLIC_URL is not https")
+    dr.add_argument("--json", action="store_true", help="print the report as JSON")
     bm = sub.add_parser("benchmark", help="measure the spec's acceptance targets (§16) on this deployment's data")
     bm.add_argument("--json", action="store_true", help="print the full result as JSON")
     bk = sub.add_parser("backup", help="write a portable backup archive (database, reports, raw payloads)")
@@ -144,6 +147,15 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"{'PASS' if r['pass'] else 'FAIL'}  {name:22} {r['target']:48} {detail}")
             print("ALL TARGETS MET" if res["all_pass"] else "SOME TARGETS MISSED")
         raise SystemExit(0 if res["all_pass"] else 1)
+    elif args.cmd == "doctor":
+        import json as _json
+
+        from atlas import doctor
+
+        report = doctor.run(True if args.production else None)
+        print(_json.dumps(report, indent=2) if args.json else doctor.format_text(report))
+        if not report["ok"]:
+            raise SystemExit(1)
     elif args.cmd == "workspaces":
         from atlas import auth
 

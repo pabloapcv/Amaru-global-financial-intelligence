@@ -1013,6 +1013,14 @@ class FeedbackResolve(BaseModel):
     note: str | None = Field(None, max_length=2000)
 
 
+@api.get("/admin/doctor")
+def admin_doctor(p: Principal = Depends(require_operator)) -> dict[str, Any]:
+    """The deployment's configuration check (`atlas doctor`), for the operator console."""
+    from atlas import doctor
+
+    return doctor.run()
+
+
 @api.get("/admin/feedback")
 def admin_feedback(status: Literal["open", "resolved", "all"] = "open", p: Principal = Depends(require_operator)) -> dict[str, Any]:
     from atlas import feedback
