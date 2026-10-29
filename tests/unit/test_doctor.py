@@ -39,3 +39,19 @@ def test_good_production_configuration_passes(monkeypatch):
     report = doctor.run(check_database=False)
     assert report["ok"], [c for c in report["checks"] if c["level"] == "error"]
     assert _levels(report)["CORS"] == "ok" and _levels(report)["Public URLs"] == "ok"
+
+
+def test_backup_prune_keeps_the_newest(tmp_path):
+    import pytest
+
+    from atlas import backup
+
+    names = [f"atlas-backup-2026101{i}T000000Z.tar.gz" for i in range(5)]
+    for n in names:
+        (tmp_path / n).write_bytes(b"x")
+    (tmp_path / "notes.txt").write_text("keep me")
+    removed = backup.prune(tmp_path, 2)
+    assert sorted(p.name for p in removed) == names[:3]
+    assert sorted(p.name for p in tmp_path.iterdir()) == sorted(names[3:] + ["notes.txt"])
+    with pytest.raises(ValueError):
+        backup.prune(tmp_path, 0)

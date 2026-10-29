@@ -87,6 +87,17 @@ def create(out_dir: str | Path, *, include_raw: bool = True) -> Path:
     return archive
 
 
+def prune(out_dir: str | Path, keep: int) -> list[Path]:
+    """Delete all but the newest `keep` ATLAS backup archives in `out_dir`; returns what was deleted."""
+    if keep < 1:
+        raise ValueError("keep at least one backup")
+    archives = sorted(Path(out_dir).glob("atlas-backup-*.tar.gz"))  # names sort by time
+    old = archives[:-keep]
+    for p in old:
+        p.unlink()
+    return old
+
+
 def _coerce(table, row: dict[str, Any]) -> dict[str, Any]:
     out = {}
     for col in table.columns:

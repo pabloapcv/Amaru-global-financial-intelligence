@@ -78,6 +78,13 @@ jobs:
         run: docker build -f infrastructure/docker/api.Dockerfile -t atlas-api:ci .
       - name: Build web image
         run: docker build -f infrastructure/docker/web.Dockerfile -t atlas-web:ci .
+      - name: Validate the production compose overlay and Caddyfile
+        env: { ATLAS_DOMAIN: atlas.example.com, ACME_EMAIL: ops@example.com }
+        run: |
+          docker compose -f infrastructure/docker/docker-compose.yml -f infrastructure/docker/docker-compose.prod.yml config -q
+          docker compose -f infrastructure/docker/docker-compose.yml -f infrastructure/docker/docker-compose.prod.yml config | grep -q "ATLAS_COOKIE_SECURE: \"true\""
+          docker run --rm -e ATLAS_DOMAIN -e ACME_EMAIL -v "$PWD/infrastructure/docker/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.8.4-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Smoke-test API image
         run: |
           docker run -d --name api -p 8010:8010 -e ATLAS_DATABASE_URL=sqlite:////data/atlas.db atlas-api:ci

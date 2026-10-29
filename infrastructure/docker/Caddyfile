@@ -1,0 +1,25 @@
+# Caddy obtains and renews HTTPS certificates for both names automatically.
+{
+	email {$ACME_EMAIL}
+}
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	encode zstd gzip
+}
+
+{$ATLAS_DOMAIN} {
+	import security
+	header X-Frame-Options "DENY"
+	reverse_proxy web:3010
+}
+
+api.{$ATLAS_DOMAIN} {
+	import security
+	reverse_proxy api:8010
+}
