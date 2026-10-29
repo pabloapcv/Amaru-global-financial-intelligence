@@ -248,3 +248,82 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
         },
     }
     return result, metas
+
+
+# ---------------------------------------------------------------- change since the last scan
+
+
+def previous_scan(workspace_id: str) -> dict[str, Any] | None:
+    """The workspace's most recent completed scan (from a Scenario Outlook run), with its run id and time."""
+    from sqlalchemy import select
+
+    from atlas.data.db import ResearchRun, session_scope
+
+    with session_scope() as s:
+        runs = s.execute(select(ResearchRun).where(ResearchRun.workspace_id == workspace_id, ResearchRun.status == "complete",
+                                                   ResearchRun.cached_from.is_(None))
+                         .order_by(ResearchRun.created_at.desc()).limit(50)).scalars()
+        for r in runs:
+            scan_ = next((e["result"] for e in (r.result or {}).get("evidence", []) if e.get("tool") == "scan_scenarios"), None)
+            if scan_:
+                return {"run_id": r.run_id, "at": r.created_at.isoformat(timespec="seconds") + "Z", "scan": scan_}
+    return None
+
+
+def compare(previous: dict[str, Any] | None, current: dict[str, Any]) -> dict[str, Any] | None:
+    """What changed between two scans; marks new scenarios in `current`. Custom scenarios are left out (you chose them)."""
+    if previous is None:
+        return None
+    # Only scenarios the data points to count; standard stress tests (0 signals) come and go with how quiet markets are.
+    before = {s["id"]: s for s in previous["scan"]["scenarios"] if s["kind"] != "custom" and s["relevance"]}
+    now = {s["id"]: s for s in current["scenarios"] if s["kind"] != "custom" and s["relevance"]}
+    brief = lambda s: {"id": s["id"], "name": s["name"], "relevance": s["relevance"]}  # noqa: E731
+    new = [brief(s) for k, s in now.items() if k not in before]
+    for s in current["scenarios"]:
+        s["is_new"] = s["id"] in now and s["id"] not in before
+    stronger = [{"id": k, "name": s["name"], "from": before[k]["relevance"], "to": s["relevance"]}
+                for k, s in now.items() if k in before and s["relevance"] > before[k]["relevance"]]
+    weaker = [{"id": k, "name": s["name"], "from": before[k]["relevance"], "to": s["relevance"]}
+              for k, s in now.items() if k in before and s["relevance"] < before[k]["relevance"]]
+    return {"previous_run_id": previous["run_id"], "previous_scan_at": previous["at"], "previous_as_of": previous["scan"].get("as_of"),
+            "new": new, "dropped": [brief(s) for k, s in before.items() if k not in now], "stronger": stronger, "weaker": weaker,
+            "changed": bool(new or stronger)}
+
+
+def change_summary(changes: dict[str, Any]) -> list[str]:
+    out = [f"New: {x['name']} ({x['relevance']} signal{'s' if x['relevance'] != 1 else ''})" for x in changes["new"]]
+    out += [f"Stronger: {x['name']} ({x['from']} → {x['to']} signals)" for x in changes["stronger"]]
+    out += [f"No longer signalled: {x['name']}" for x in changes["dropped"]]
+    return out
+
+
+def notify_changes(run_id: str) -> bool:
+    """After a Scenario Outlook run: webhook `scenarios.changed`, and email the creator of a scheduled scan."""
+    import os
+
+    from atlas import mailer, webhooks
+    from atlas.data.db import ReportSchedule, ResearchRun, User, session_scope
+
+    with session_scope() as s:
+        run = s.get(ResearchRun, run_id)
+        if run is None or run.status != "complete" or run.cached_from:
+            return False
+        scan_ = next((e["result"] for e in (run.result or {}).get("evidence", []) if e.get("tool") == "scan_scenarios"), None)
+        changes = (scan_ or {}).get("changes")
+        if not changes or not changes.get("changed"):
+            return False
+        ws, schedule_id = run.workspace_id, (run.config or {}).get("schedule_id")
+        sched = s.get(ReportSchedule, schedule_id) if schedule_id else None
+        user = s.get(User, sched.user_id) if sched else None
+        to = user.email if user else None
+    base = os.getenv("ATLAS_PUBLIC_URL", "http://localhost:3010").rstrip("/")
+    summary = change_summary(changes)
+    webhooks.emit(ws, "scenarios.changed", {"run_id": run_id, "summary": summary, "new": changes["new"], "stronger": changes["stronger"],
+                                            "dropped": changes["dropped"], "research_url": f"{base}/research?run={run_id}"})
+    if to:
+        try:
+            mailer.send(to, "ATLAS scenario agent: new scenarios", "Since the last scan:\n\n" + "\n".join(f"- {m}" for m in summary)
+                        + f"\n\nSee the scenarios: {base}/scenarios\n\n{NOT_PROBABILITY}\n")
+        except Exception:
+            log.exception("could not email scenario changes for %s", run_id)
+    return True

@@ -115,6 +115,15 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
                   f"{len(r['scenarios'])} are shown, ranked by how many data signals point to them [{e['label']}].", ""]
         if r.get("missing"):
             lines += [f"Not assessed (no stored data): {', '.join(_name(d) for d in r['missing'])}.", ""]
+        ch = r.get("changes")
+        if ch:
+            lines += ["### What changed since the last scan", "", f"Compared with the scan of {ch['previous_scan_at'][:10]} (data as of {ch['previous_as_of']}) [{e['label']}]:", ""]
+            bits = []
+            bits += [f"- New: **{x['name']}** ({x['relevance']} signal{'s' if x['relevance'] != 1 else ''})" for x in ch["new"]]
+            bits += [f"- Stronger: {x['name']} ({x['from']} → {x['to']} signals)" for x in ch["stronger"]]
+            bits += [f"- Weaker: {x['name']} ({x['from']} → {x['to']} signals)" for x in ch["weaker"]]
+            bits += [f"- No longer signalled: {x['name']}" for x in ch["dropped"]]
+            lines += (bits or ["- Nothing changed: the same scenarios, with the same signals."]) + [""]
         for i, s in enumerate(r["scenarios"], 1):
             unit = "bp" if s["shock_unit"] == "bp" else "%"
             why = "; ".join(sig["text"] for sig in s["signals"]) or "no current signal (standard stress test)"
