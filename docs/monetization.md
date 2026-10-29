@@ -49,12 +49,12 @@ ATLAS was built in roughly a week and has 136 automated tests and passing CI, bu
 ### 5. Missing commercial basics
 
 - Billing: the Stripe integration is now built (Checkout, Customer Portal, verified webhooks) and only needs your Stripe account, prices and webhook set up
-- Production hosting
+- Production hosting: the deployment kit is built (HTTPS through Caddy, secure cookies, daily backups, `atlas doctor`; see [deploy.md](deploy.md)). Still needed: a server and a domain
 - Prices: the public `/welcome` page shows plans and limits in three languages; set `ATLAS_PLAN_PRICES` once you've decided on prices
-- Terms of service and a privacy policy (the product side of data rights is built: people can download their data and delete their account, which privacy laws such as GDPR, Brazil's LGPD and California's CCPA expect)
-- Backups: `atlas backup` / `atlas restore` are built; scheduling them and storing copies off-site is part of hosting
+- Terms of service and a privacy policy. ATLAS links them at sign-up and on public pages once `ATLAS_TERMS_URL` and `ATLAS_PRIVACY_URL` are set (the product side of data rights is built: people can download their data and delete their account, which privacy laws such as GDPR, Brazil's LGPD and California's CCPA expect)
+- Backups: `atlas backup` and `atlas restore` are built, and the production setup runs them daily with retention. Copying them off the server is still yours to set up
 - Support
-- A security review
+- A security review (dependency audits run in CI, and `atlas doctor` catches risky configuration, but an outside review is still worth paying for)
 
 ## Where to aim it
 
