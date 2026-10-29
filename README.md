@@ -59,6 +59,8 @@ The API requires sign-in by default (`ATLAS_AUTH=required`). Research runs, repo
 
 ## Deployment
 
+Run `atlas doctor` on any deployment (add `--production` to apply production rules before switching to https). It checks sign-in, the encryption key, secure cookies, CORS and public URLs, the database, email, Claude, operators, metrics, webhooks, half-configured Stripe, data licences and legal pages, never prints secret values, and exits 1 on errors. The operator console shows the same report.
+
 `infrastructure/docker/docker-compose.yml` runs TimescaleDB, the API, the ingestion/report scheduler and the web app; the file header lists the bootstrap commands. `infrastructure/docker/smoke-test.sh` starts the stack and exercises it end to end (create user, sign in, ingest real data, run research through the API, download HTML/Excel reports, check metrics and the web app); CI runs it on every push.
 
 ## What's in the MVP

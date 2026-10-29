@@ -18,6 +18,8 @@ export default function Admin() {
   const [rows, setRows] = useState<Row[]>([]);
   const [filter, setFilter] = useState("");
   const [fb, setFb] = useState<Fb[]>([]);
+  const [doc, setDoc] = useState<{ production: boolean; counts: Record<string, number>; checks: { level: string; check: string; found: string; fix: string }[] } | null>(null);
+  useEffect(() => { api<typeof doc>("/api/v1/admin/doctor").then(setDoc).catch(() => {}); }, []);
   const [fbStatus, setFbStatus] = useState<"open" | "resolved" | "all">("open");
   const [error, setError] = useState<unknown>(null);
   const load = useCallback(() => {
@@ -109,6 +111,19 @@ export default function Admin() {
           )}
         </Card>
       </div>
+      {doc && (
+        <div style={{ marginTop: 14 }}>
+          <Card title={`Configuration (${doc.production ? "production" : "development"} checks)`}>
+            <p className="muted" style={{ marginTop: 0, fontSize: 12.5 }}>{doc.counts.error} error(s), {doc.counts.warning} warning(s), {doc.counts.info} note(s). Same as <code>atlas doctor</code>.</p>
+            <ul className="list-tight" style={{ fontSize: 13 }}>
+              {doc.checks.filter((c) => c.level !== "ok").map((c) => (
+                <li key={c.check}><span className={c.level === "error" ? "down" : c.level === "warning" ? "" : "muted"}>{c.level === "error" ? "✗" : c.level === "warning" ? "!" : "·"} <strong>{c.check}</strong>: {c.found}</span>
+                  {c.fix && <div className="muted" style={{ fontSize: 12 }}>{c.fix}</div>}</li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
