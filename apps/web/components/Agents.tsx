@@ -93,7 +93,7 @@ export default function Agents({ instruments }: { instruments: Instrument[] }) {
         <div className="field"><label htmlFor="aq">Research question</label><textarea id="aq" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
         <label className="row" style={{ fontWeight: 400, marginTop: 8 }}><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} style={{ width: "auto" }} /> Email workspace owners when it fires</label>
         <button style={{ marginTop: 12 }} onClick={create}>Create agent</button>
-        <p className="muted" style={{ fontSize: 12 }}>Agents are checked automatically after each data refresh (release triggers when new Fed, BEA or CFTC releases are indexed); a 24-hour cooldown prevents repeat reports.</p>
+        <p className="muted" style={{ fontSize: 12 }}>Agents are checked automatically after each data refresh (release triggers when new official releases are indexed); a 24-hour cooldown prevents repeat reports.</p>
         <ErrorNote error={error} />
       </Card>
       <div className="stack">

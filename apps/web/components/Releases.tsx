@@ -7,7 +7,7 @@ import { Card, ErrorNote } from "@/components/ui";
 type Doc = { title: string; publisher: string; source: string; category: string | null; published: string | null; url: string; summary: string | null };
 type Result = { results: Doc[]; indexed_sources: string[]; coverage: string };
 
-const SOURCES: Record<string, string> = { fed_press: "Federal Reserve", bea: "BEA", cftc_press: "CFTC" };
+const SOURCES: Record<string, string> = { fed_press: "Federal Reserve", bea: "BEA", cftc_press: "CFTC", usda_ams: "USDA AMS", ecb: "ECB", boe: "Bank of England" };
 
 export default function Releases() {
   const [q, setQ] = useState("");

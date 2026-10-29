@@ -42,7 +42,7 @@ export default function ThisWeek() {
         )}
       </Card>
       <Card title={<Link href="/intelligence">Official releases · 7 days</Link>}>
-        {b.releases.length === 0 && <p className="muted">No new releases from the Fed, BEA or CFTC.</p>}
+        {b.releases.length === 0 && <p className="muted">No new official releases.</p>}
         <ul className="list-tight">
           {b.releases.map((r) => (
             <li key={r.url}>

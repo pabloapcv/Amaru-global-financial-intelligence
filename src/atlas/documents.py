@@ -1,7 +1,8 @@
 """Official document index (spec §8.2 search_documents).
 
 Indexes public press-release feeds from official sources: the Federal Reserve Board, the
-Bureau of Economic Analysis and the CFTC. These are primary-source announcements, not a news
+Bureau of Economic Analysis, the CFTC, USDA's Agricultural Marketing Service, the European Central
+Bank and the Bank of England. These are primary-source announcements, not a news
 wire: commercial news and sell-side research still need a licensed source, and search results
 say so.
 """
@@ -28,9 +29,13 @@ FEEDS = [
     {"source": "fed_press", "publisher": "Federal Reserve Board", "url": "https://www.federalreserve.gov/feeds/press_all.xml"},
     {"source": "bea", "publisher": "U.S. Bureau of Economic Analysis", "url": "https://apps.bea.gov/rss/rss.xml"},
     {"source": "cftc_press", "publisher": "Commodity Futures Trading Commission", "url": "https://www.cftc.gov/RSS/RSSGP/rssgp.xml"},
+    {"source": "usda_ams", "publisher": "USDA Agricultural Marketing Service", "url": "https://www.ams.usda.gov/rss.xml"},
+    {"source": "ecb", "publisher": "European Central Bank", "url": "https://www.ecb.europa.eu/rss/press.html"},
+    {"source": "boe", "publisher": "Bank of England", "url": "https://www.bankofengland.co.uk/rss/news"},
 ]
 REFRESH_HOURS = 6
-COVERAGE = ("Official press releases from the Federal Reserve Board, BEA and CFTC only. "
+COVERAGE = ("Official press releases from the Federal Reserve Board, BEA, CFTC, USDA's Agricultural Marketing Service, "
+            "the European Central Bank and the Bank of England only. "
             "No commercial news wire or sell-side research is connected.")
 STOPWORDS = set("""a an and are as at be by can do does for from has have how i in is it its me of on or
 our over so than that the their this to vs was what whats when where which who why will with
