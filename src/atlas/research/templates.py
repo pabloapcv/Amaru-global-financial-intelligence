@@ -83,6 +83,8 @@ def _scenarios(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         scan["universe"] = inputs["universe"]
     if inputs.get("custom_scenarios"):
         scan["custom_scenarios"] = inputs["custom_scenarios"]
+    if inputs.get("portfolio_id"):
+        scan["portfolio_id"] = inputs["portfolio_id"]
     return [("scan_scenarios", scan), ("get_economic_calendar", {"days": 60}), ("screen_anomalies", {})]
 
 
@@ -133,7 +135,9 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "brief": "Write a scenario outlook from the scan_scenarios evidence. Rank scenarios by relevance and, for each: why the data puts it "
                  "on the list (cite its signals), how it would carry across markets using only statistically significant sensitivities "
                  "(say when an effect is not significant, and that sensitivities describe how markets moved together, not causes), and "
-                 "which scheduled events from the economic calendar would confirm or rule it out. Never state or imply a probability: "
+                 "which scheduled events from the economic calendar would confirm or rule it out. Compare each sensitivity with what happened in "
+                 "the past episodes, and say so when they disagree or when there are too few episodes to judge. If the scan tested a portfolio, "
+                 "say which scenarios would hurt it most and which holdings matter. Never state or imply a probability: "
                  "relevance counts data signals. If the scan reports changes since the last scan, lead with them. Close with what to watch.",
     },
     "cross_asset": {

@@ -41,6 +41,15 @@ def _strength(r: float) -> str:
     return "negligible" if a < 0.1 else "weak" if a < 0.3 else "moderate" if a < 0.6 else "strong"
 
 
+def _past(past: dict[str, Any] | None, unit: str) -> str:
+    if not past:
+        return "n/a"
+    if past["too_few"]:
+        return "too few to judge"
+    agreed = f"; {past['same_direction']} of {past['n']} same direction" if "same_direction" in past else f"; {past['n']} episodes"
+    return f"{_fmt(past['median'])}{unit}{agreed}"
+
+
 def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) -> str:
     by_tool: dict[str, list[dict[str, Any]]] = {}
     for e in evidence:
@@ -94,6 +103,10 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             summary.append(f"- {len(r['scenarios'])} scenarios assessed across {len(r['universe'])} markets; the data points most to: "
                            + "; ".join(f"**{s['name']}** ({s['relevance']} signal{'s' if s['relevance'] != 1 else ''})" for s in top[:3])
                            + f" [{e['label']}].")
+        hit = [s for s in r["scenarios"] if (s.get("portfolio") or {}).get("significant") and s["portfolio"]["implied_move"] < 0]
+        if hit:
+            worst = min(hit, key=lambda s: s["portfolio"]["implied_move"])
+            summary.append(f"- For {r['portfolio']['name']}, the largest reliable loss is under **{worst['name']}**: {_fmt(worst['portfolio']['implied_move'])}% [{e['label']}].")
         summary.append(f"- {r['method']['caveat']}")
     if not summary:
         summary.append("- See the sections below; no single-instrument snapshot was requested.")
@@ -124,24 +137,52 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             bits += [f"- Weaker: {x['name']} ({x['from']} → {x['to']} signals)" for x in ch["weaker"]]
             bits += [f"- No longer signalled: {x['name']}" for x in ch["dropped"]]
             lines += (bits or ["- Nothing changed: the same scenarios, with the same signals."]) + [""]
+        if r.get("portfolio_missing"):
+            lines += ["The portfolio chosen for this scan no longer exists, so it was not tested.", ""]
+        port = r.get("portfolio")
+        if port and not port["tested"]:
+            lines += [f"{port['name']} could not be tested: its holdings have too little shared monthly history.", ""]
+        tested = [s for s in r["scenarios"] if s.get("portfolio")]
+        if tested:
+            lines += [f"### Effect on {port['name']}", "",
+                      f"{port['holdings']} holdings, treated as one monthly series at current weights [{e['label']}]."
+                      + (f" Excluded (no usable history): {', '.join(port['excluded'])}." if port["excluded"] else ""), "",
+                      "| Scenario | Historical effect | 95% range | Reliable? | Past episodes (median) | Largest contributors |", "|---|---|---|---|---|---|"]
+            for s in sorted(tested, key=lambda s: s["portfolio"]["implied_move"]):
+                pf = s["portfolio"]
+                who = ", ".join(f"{c['name']} {_fmt(c['contribution'])}" for c in pf["largest"]) or "n/a"
+                lines.append(f"| {s['name']} | {_fmt(pf['implied_move'])}% | {_fmt(pf['ci95'][0])} to {_fmt(pf['ci95'][1])}% | "
+                             f"{'yes' if pf['significant'] else 'no (p > 0.05)'} | {_past(pf['past'], '%')} | {who} |")
+            lines.append("")
         for i, s in enumerate(r["scenarios"], 1):
             unit = "bp" if s["shock_unit"] == "bp" else "%"
             why = "; ".join(sig["text"] for sig in s["signals"]) or "no current signal (standard stress test)"
             lines += [f"### {i}. {s['name']}", "",
                       f"*Driver:* {s['driver_name']} {_fmt(s['shock'], 0)}{' ' if unit == 'bp' else ''}{unit}. *Why it is here:* {why} [{e['label']}].", ""]
             rows = [im for im in s["impacts"] if not im["is_driver"]]
+            hist = s.get("history")
+            if hist and hist["n"]:
+                last = hist["episodes"][-1]
+                lines += [f"*Past episodes:* {s['driver_name']} moved at least this much within {hist['horizon_months']} months {hist['n']} "
+                          f"time{'s' if hist['n'] != 1 else ''} since {hist['since'][:7]}, most recently by {last['end'][:7]} [{e['label']}].", ""]
+            elif hist:
+                lines += [f"*Past episodes:* {s['driver_name']} has not moved this much within {hist['horizon_months']} months since {hist['since'][:7]}, "
+                          f"so this scenario has no precedent in the stored data [{e['label']}].", ""]
             if rows:
-                lines += ["| Market | Historical effect | 95% range | Reliable? |", "|---|---|---|---|"]
+                lines += ["| Market | Historical effect | 95% range | Reliable? | Past episodes (median) |", "|---|---|---|---|---|"]
                 for im in sorted(rows, key=lambda im: (not im["significant"], -abs(im["implied_move"]))):
                     u = " bp" if im["unit"] == "bp" else "%"
                     rng = f"{_fmt(im['ci95'][0])} to {_fmt(im['ci95'][1])}{u}" if im["ci95"] else "n/a"
-                    lines.append(f"| {im['name']} | {_fmt(im['implied_move'])}{u} | {rng} | {'yes' if im['significant'] else 'no (p > 0.05)'} |")
+                    lines.append(f"| {im['name']} | {_fmt(im['implied_move'])}{u} | {rng} | {'yes' if im['significant'] else 'no (p > 0.05)'} | {_past(im.get('past'), u)} |")
                 lines.append("")
+                against = [im["name"] for im in rows if im["significant"] and (im.get("past") or {}).get("disagrees")]
+                if against:
+                    lines += [f"In past episodes the median move went the other way from the sensitivity for: {', '.join(against)}. Treat those effects with care [{e['label']}].", ""]
                 big = [next(im for im in rows if im["dataset_id"] == d) for d in s["clearest_effects"]]
                 if big:
                     lines += ["Clearest effects (largest relative to their uncertainty): " + ", ".join(f"{im['name']} {_fmt(im['implied_move'])}{' bp' if im['unit'] == 'bp' else '%'}" for im in big)
                               + f" [{e['label']}].", ""]
-        lines += [f"*Method:* {r['method']['selection']}. Effects: {r['method']['effects']}. {r['method']['caveat']}", ""]
+        lines += [f"*Method:* {r['method']['selection']}. Effects: {r['method']['effects']}. Past episodes: {r['method']['history']}. {r['method']['caveat']}", ""]
         if r.get("next_fomc"):
             lines += [f"The next FOMC meeting is on {r['next_fomc']} [{e['label']}].", ""]
 
