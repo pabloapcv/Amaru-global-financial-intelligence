@@ -790,6 +790,27 @@ def t_scan_scenarios(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     return {"evidence_id": label, **res}
 
 
+def t_get_central_bank_tone(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import tone
+
+    limit = int(args.get("limit", 4))
+    if not 1 <= limit <= 24:
+        raise ToolError("limit must be between 1 and 24")
+    bank = args.get("bank")
+    if bank and bank not in tone.BANKS:
+        raise ToolError(f"bank must be one of {sorted(tone.BANKS)}")
+    res = tone.overview(limit)
+    res["banks"] = [{**b, "statements": [s for s in b["statements"] if s["read"]]} for b in res["banks"] if not bank or b["bank"] == bank]
+    read = [s for b in res["banks"] for s in b["statements"]]
+    if not read:
+        raise ToolError("DATA UNAVAILABLE — no central-bank statements have been read yet. Disclose this gap.")
+    sources = [{"dataset_id": f"TONE.{s['bank'].upper()}.{s['meeting_date']}", "name": f"{s['bank_name']} statement, {s['meeting_date']}",
+                "citation": f"{s['bank_name']}, {s['title']}, {s['meeting_date']}", "url": s["url"], "observation_through": s["meeting_date"],
+                "ingested_at": None, "freshness": "current", "price_basis": "document"} for s in read]
+    label = ctx.add("get_central_bank_tone", args, res, "Official Fed and ECB statements, tone as read by Claude; decisions checked against the text", sources)
+    return {"evidence_id": label, **res}
+
+
 def t_search_documents(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     from atlas import documents
 
@@ -915,6 +936,14 @@ TOOLS: dict[str, dict[str, Any]] = {
             "max_scenarios": {"type": "integer", "minimum": 1, "maximum": 8},
             "portfolio_name": {"type": "string", "description": "A saved portfolio to test each scenario against."},
             "portfolio_id": {"type": "string", "description": "The same, by id."},
+        }},
+    },
+    "get_central_bank_tone": {
+        "fn": t_get_central_bank_tone,
+        "description": "Tone of recent Fed and ECB policy statements: the decision, a stance from -2 (much more dovish) to +2 (much more hawkish) compared with the previous statement, balance sheet, dissents (Fed) and a one-line summary. The stance is Claude's reading of the language, not a measurement or forecast; say so. Decisions are checked against the statement text, and 'consistent: false' flags a mismatch.",
+        "schema": {"type": "object", "properties": {
+            "bank": {"type": "string", "enum": ["fed", "ecb"], "description": "One bank (default: both)."},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 24, "description": "Statements per bank, newest first (default 4)."},
         }},
     },
     "get_positioning": {

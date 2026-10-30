@@ -94,6 +94,12 @@ def run_once(holder: str = HOLDER) -> int:
             from atlas.agents import evaluate_release_agents
 
             evaluate_release_agents()
+        from atlas import tone
+
+        try:
+            log.info("central-bank statements: %s", tone.refresh())
+        except Exception:  # noqa: BLE001 — tone is an extra; the data refresh must still run
+            log.exception("central-bank statement refresh failed")
     due = due_datasets()
     if due:
         log.info("refreshing %d due dataset(s)", len(due))

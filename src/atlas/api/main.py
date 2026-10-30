@@ -853,6 +853,13 @@ def search_documents(q: str = "", days: int = Query(30, ge=1, le=730), limit: in
     return documents.search(q, days=days, limit=limit)
 
 
+@api.get("/central-banks/tone")
+def central_bank_tone(limit: int = Query(8, ge=1, le=24)) -> dict[str, Any]:
+    from atlas import tone
+
+    return tone.overview(limit)
+
+
 @api.get("/datasets/{dataset_id}/export")
 def export_dataset(dataset_id: str, format: Literal["csv", "json"] = "csv", start: date | None = None, end: date | None = None,
                    as_of: datetime | None = None, header: bool = True, p: Principal = Depends(principal)):

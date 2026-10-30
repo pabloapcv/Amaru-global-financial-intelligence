@@ -13,6 +13,7 @@ from typing import Any, Iterator
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Date,
     DateTime,
     Float,
@@ -270,6 +271,34 @@ class SourceDocument(Base):
     summary: Mapped[str | None] = mapped_column(Text)
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime)
     first_seen_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+
+
+class CentralBankStatement(Base):
+    """A Fed or ECB policy statement and, once Claude has read it, its reading (see atlas.tone)."""
+
+    __tablename__ = "central_bank_statements"
+
+    statement_id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    bank: Mapped[str] = mapped_column(String(16), index=True)
+    meeting_date: Mapped[date] = mapped_column(Date, index=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime)
+    title: Mapped[str] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(String(512), unique=True)
+    text: Mapped[str] = mapped_column(Text)
+    first_seen_at: Mapped[datetime | None] = mapped_column(DateTime)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime)
+    action: Mapped[str | None] = mapped_column(String(16))
+    change_bp: Mapped[int | None] = mapped_column(Integer)
+    stance: Mapped[int | None] = mapped_column(Integer)
+    balance_sheet: Mapped[str | None] = mapped_column(String(16))
+    dissents: Mapped[int | None] = mapped_column(Integer)
+    summary: Mapped[str | None] = mapped_column(Text)
+    compared_with: Mapped[date | None] = mapped_column(Date)
+    text_change_bp: Mapped[int | None] = mapped_column(Integer)
+    consistent: Mapped[bool | None] = mapped_column(Boolean)
+    model: Mapped[str | None] = mapped_column(String(64))
+    cost_usd: Mapped[float | None] = mapped_column(Float)
 
 
 class CalendarEvent(Base):

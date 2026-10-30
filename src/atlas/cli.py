@@ -19,6 +19,7 @@ def main(argv: list[str] | None = None) -> None:
     ing.add_argument("--backfill", action="store_true", help="full history instead of incremental")
     ing.add_argument("--calendar", action="store_true", help="refresh the economic calendar only")
     ing.add_argument("--documents", action="store_true", help="refresh the official press-release index only")
+    ing.add_argument("--tone", action="store_true", help="fetch new Fed and ECB statements and read their tone only")
     sub.add_parser("status", help="print dataset freshness")
     sch = sub.add_parser("schedule", help="run the refresh scheduler")
     sch.add_argument("--once", action="store_true")
@@ -65,13 +66,15 @@ def main(argv: list[str] | None = None) -> None:
     if args.cmd == "ingest":
         from atlas.ingestion.pipeline import ingest
 
-        if args.calendar or args.documents:
-            from atlas import calendar, documents
+        if args.calendar or args.documents or args.tone:
+            from atlas import calendar, documents, tone
 
             if args.calendar:
                 print(json.dumps(calendar.refresh(), indent=2))
             if args.documents:
                 print(json.dumps(documents.refresh(), indent=2))
+            if args.tone:
+                print(json.dumps(tone.refresh(), indent=2))
             return
         for r in ingest(args.dataset_ids or None, backfill=args.backfill):
             print(f"{r.dataset_id:24} {r.status:10} fetched={r.rows_fetched:6} inserted={r.rows_inserted:6} "

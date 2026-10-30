@@ -186,6 +186,17 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
         if r.get("next_fomc"):
             lines += [f"The next FOMC meeting is on {r['next_fomc']} [{e['label']}].", ""]
 
+    # Central banks ---------------------------------------------------------------
+    for e in by_tool.get("get_central_bank_tone", []):
+        r = e["result"]
+        lines += ["## Central-bank tone", "", "| Statement | Decision | Tone vs previous | Decision check | Summary |", "|---|---|---|---|---|"]
+        for b in r["banks"]:
+            for st in b["statements"]:
+                act = st["action"] if st["action"] in ("hold", "other") else f"{st['action']} {abs(st['change_bp'])} bp"
+                checked = "matches the text" if st["consistent"] and st["text_change_bp"] is not None else "not checkable" if st["consistent"] else "**mismatch with the text**"
+                lines.append(f"| {b['name']}, {st['meeting_date']} | {act} | {st['stance_label']} ({st['stance']:+d}) | {checked} | {st['summary']} |")
+        lines += ["", f"{r['caveat']} [{e['label']}]", ""]
+
     # Historical analysis -------------------------------------------------------
     hist = by_tool.get("get_price_history", []) + by_tool.get("get_macro_series", [])
     if hist:
