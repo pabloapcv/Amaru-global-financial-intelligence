@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type Instrument } from "@/lib/api";
 import { Card, ErrorNote, PageHeader } from "@/components/ui";
 import Agents from "@/components/Agents";
+import CentralBankTone from "@/components/CentralBankTone";
 import Releases from "@/components/Releases";
 
 type AlertRow = {
@@ -18,10 +19,13 @@ type AlertRow = {
   mine: boolean;
 };
 
+const BANK: Record<string, string> = { fed: "Fed", ecb: "ECB", any: "Fed or ECB" };
+
 function describe(rule: Record<string, any>) {
   if (rule.type === "threshold") return `${rule.dataset_id} ${rule.op} ${rule.value}`;
   if (rule.type === "pct_change") return `${rule.dataset_id} moves ≥ ${rule.abs_pct}% over ${rule.window_days ?? 30}d`;
   if (rule.type === "anomaly") return `${rule.dataset_id} |robust z| ≥ ${rule.z ?? 3.5}`;
+  if (rule.type === "central_bank") return `${BANK[rule.bank] ?? rule.bank} statement: rate change or tone shift ≥ ${rule.min_stance ?? 1}`;
   return JSON.stringify(rule);
 }
 
@@ -31,6 +35,7 @@ export default function Intelligence() {
   const [error, setError] = useState<unknown>(null);
   const [type, setType] = useState("pct_change");
   const [dataset, setDataset] = useState("CMD.CRUDE.BRENT");
+  const [bank, setBank] = useState("any");
   const [value, setValue] = useState(10);
   const [op, setOp] = useState(">");
   const [fired, setFired] = useState<string[] | null>(null);
@@ -45,11 +50,12 @@ export default function Intelligence() {
 
   const create = async () => {
     setError(null);
-    const rule: Record<string, unknown> = { type, dataset_id: dataset };
+    const central = type === "central_bank";
+    const rule: Record<string, unknown> = central ? { type, bank, min_stance: value } : { type, dataset_id: dataset };
     if (type === "threshold") Object.assign(rule, { op, value });
     if (type === "pct_change") Object.assign(rule, { abs_pct: value, window_days: 30 });
     if (type === "anomaly") Object.assign(rule, { z: value });
-    const name = `${instruments.find((i) => i.dataset_id === dataset)?.name.split(" (")[0]} — ${type.replace("_", " ")}`;
+    const name = central ? `${BANK[bank]} tone shift` : `${instruments.find((i) => i.dataset_id === dataset)?.name.split(" (")[0]} — ${type.replace("_", " ")}`;
     try {
       await api("/api/v1/alerts", { method: "POST", body: JSON.stringify({ name, rule, notify_email: notify }) });
       load();
@@ -81,7 +87,7 @@ export default function Intelligence() {
         }
       />
       {tab === "agents" && <Agents instruments={instruments} />}
-      {tab === "releases" && <Releases />}
+      {tab === "releases" && <><CentralBankTone /><div style={{ height: 14 }} /><Releases /></>}
       {tab === "alerts" && <>
       <ErrorNote error={error} />
       {fired && <div className={`note ${fired.length ? "note-warn" : ""}`} style={{ marginBottom: 14 }}>{fired.length ? fired.join(" · ") : "No alerts fired."}</div>}
@@ -89,22 +95,42 @@ export default function Intelligence() {
         <Card title="New alert">
           <div className="field">
             <label>Rule</label>
-            <select value={type} onChange={(e) => { setType(e.target.value); setValue(e.target.value === "anomaly" ? 3.5 : 10); }}>
+            <select value={type} onChange={(e) => { setType(e.target.value); setValue(e.target.value === "anomaly" ? 3.5 : e.target.value === "central_bank" ? 1 : 10); }}>
               <option value="pct_change">% move over 30 days</option>
               <option value="threshold">Level threshold</option>
               <option value="anomaly">Unusual move (robust z)</option>
+              <option value="central_bank">Central-bank statement</option>
             </select>
           </div>
-          <div className="field">
-            <label>Dataset</label>
-            <select value={dataset} onChange={(e) => setDataset(e.target.value)}>
-              {instruments.map((i) => <option key={i.dataset_id} value={i.dataset_id}>{i.name}</option>)}
-            </select>
-          </div>
-          <div className="row" style={{ marginTop: 12 }}>
-            {type === "threshold" && <select value={op} onChange={(e) => setOp(e.target.value)} style={{ width: 70 }}><option>{">"}</option><option>{"<"}</option></select>}
-            <input type="number" value={value} onChange={(e) => setValue(+e.target.value)} style={{ flex: 1 }} />
-          </div>
+          {type === "central_bank" ? (
+            <>
+              <div className="field">
+                <label>Bank</label>
+                <select value={bank} onChange={(e) => setBank(e.target.value)}>
+                  <option value="any">Fed or ECB</option><option value="fed">Federal Reserve</option><option value="ecb">European Central Bank</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>Fires on</label>
+                <select value={value} onChange={(e) => setValue(+e.target.value)}>
+                  <option value={1}>A rate change or any tone shift</option><option value={2}>A rate change or a large tone shift</option>
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="field">
+                <label>Dataset</label>
+                <select value={dataset} onChange={(e) => setDataset(e.target.value)}>
+                  {instruments.map((i) => <option key={i.dataset_id} value={i.dataset_id}>{i.name}</option>)}
+                </select>
+              </div>
+              <div className="row" style={{ marginTop: 12 }}>
+                {type === "threshold" && <select value={op} onChange={(e) => setOp(e.target.value)} style={{ width: 70 }}><option>{">"}</option><option>{"<"}</option></select>}
+                <input type="number" value={value} onChange={(e) => setValue(+e.target.value)} style={{ flex: 1 }} />
+              </div>
+            </>
+          )}
           <label className="row" style={{ fontWeight: 400, marginTop: 12 }}>
             <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} style={{ width: "auto" }} /> Email me when it fires
           </label>

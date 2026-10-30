@@ -19,6 +19,7 @@ RULE_TYPES = {
     "threshold": "Fires when the latest value crosses `value` using `op` ('>' or '<').",
     "pct_change": "Fires when the change over `window_days` exceeds `abs_pct` percent (absolute).",
     "anomaly": "Fires when the latest period change has |robust z| >= `z` (default 3.5).",
+    "central_bank": "Fires when a new `bank` ('fed', 'ecb' or 'any') statement changes rates or its tone shifts by at least `min_stance` (default 1).",
 }
 
 
@@ -26,6 +27,12 @@ def validate_rule(rule: dict[str, Any]) -> None:
     t = rule.get("type")
     if t not in RULE_TYPES:
         raise ValueError(f"rule.type must be one of {sorted(RULE_TYPES)}")
+    if t == "central_bank":
+        if rule.get("bank") not in ("fed", "ecb", "any"):
+            raise ValueError("central_bank rules need bank ('fed', 'ecb' or 'any')")
+        if rule.get("min_stance", 1) not in (1, 2):
+            raise ValueError("min_stance must be 1 or 2")
+        return
     if not get_dataset(rule.get("dataset_id", "")):
         raise ValueError("rule.dataset_id must be a registered dataset")
     if t == "threshold" and (rule.get("op") not in (">", "<") or not isinstance(rule.get("value"), (int, float))):
@@ -42,7 +49,10 @@ def evaluate_rule(rule: dict[str, Any]) -> str | None:
 
 def evaluate_rule_keyed(rule: dict[str, Any]) -> tuple[str, str] | None:
     """(message, trigger key) when the condition holds. The key identifies what fired: a state rule
-    (threshold, % move) has one key while it holds; an anomaly is keyed by its observation date."""
+    (threshold, % move) has one key while it holds; an anomaly is keyed by its observation date; a
+    central-bank rule by the statement."""
+    if rule["type"] == "central_bank":
+        return _central_bank_hit(rule)
     ds = get_dataset(rule["dataset_id"])
     assert ds is not None
     series, meta = get_series(rule["dataset_id"])
@@ -72,6 +82,18 @@ def evaluate_rule_keyed(rule: dict[str, Any]) -> tuple[str, str] | None:
     return None
 
 
+def _central_bank_hit(rule: dict[str, Any]) -> tuple[str, str] | None:
+    from atlas import tone
+
+    banks = list(tone.BANKS) if rule["bank"] == "any" else [rule["bank"]]
+    readings = [r for b in banks if (r := tone.latest_reading(b, tone.ALERT_DAYS))]
+    for r in sorted(readings, key=lambda x: x["meeting_date"], reverse=True):
+        shifted = r["compared_with"] and abs(r["stance"]) >= rule.get("min_stance", 1)
+        if shifted or r["change_bp"]:
+            return f"{tone.describe(r)} {r['summary']}", r["statement_id"]
+    return None
+
+
 def evaluate_alerts(changed_datasets: Iterable[str] | None = None, workspace_id: str | None = None) -> list[dict[str, Any]]:
     changed = set(changed_datasets) if changed_datasets is not None else None
     fired = []
@@ -84,7 +106,7 @@ def evaluate_alerts(changed_datasets: Iterable[str] | None = None, workspace_id:
         suspended = suspended_workspace_ids()
         alerts = [a for a in s.execute(q).scalars().all() if a.workspace_id not in suspended]
         for a in alerts:
-            if changed is not None and a.rule.get("dataset_id") not in changed:
+            if changed is not None and (a.rule.get("dataset_id") or a.rule.get("type")) not in changed:
                 continue
             a.last_evaluated_at = utcnow()
             try:

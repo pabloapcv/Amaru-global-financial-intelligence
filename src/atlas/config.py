@@ -52,6 +52,7 @@ class Settings:
     # Anthropic credentials are configured, so the platform still works offline.
     llm_model: str = field(default_factory=lambda: os.getenv("ATLAS_LLM_MODEL", "claude-opus-5-5"))
     llm_effort: str = field(default_factory=lambda: os.getenv("ATLAS_LLM_EFFORT", "high"))
+    tone_model: str = field(default_factory=lambda: os.getenv("ATLAS_TONE_MODEL", os.getenv("ATLAS_LLM_MODEL", "claude-opus-5-5")))
     llm_enabled: bool = field(
         default_factory=lambda: os.getenv("ATLAS_LLM", "auto").lower() != "off"
     )
