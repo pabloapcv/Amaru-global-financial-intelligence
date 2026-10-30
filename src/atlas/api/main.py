@@ -853,6 +853,16 @@ def search_documents(q: str = "", days: int = Query(30, ge=1, le=730), limit: in
     return documents.search(q, days=days, limit=limit)
 
 
+@api.get("/macro/cycle")
+def business_cycle() -> dict[str, Any]:
+    from atlas import cycle
+
+    try:
+        return {"available": True, **cycle.outlook()}
+    except cycle.CycleUnavailable as exc:
+        return {"available": False, "reason": str(exc)}
+
+
 @api.get("/central-banks/tone")
 def central_bank_tone(limit: int = Query(8, ge=1, le=24)) -> dict[str, Any]:
     from atlas import tone

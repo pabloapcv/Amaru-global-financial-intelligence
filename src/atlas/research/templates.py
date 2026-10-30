@@ -49,6 +49,7 @@ def _macro(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     steps += [("get_macro_series", {"series_id": s, "lookback_years": 5}) for s in ("US.GDP.REAL", "US.CPI.HEADLINE", "US.CPI.CORE", "US.UNRATE")]
     steps.append(("compare_performance", {"dataset_ids": ["RATE.US.FEDFUNDS", "RATE.UST.2Y", "RATE.UST.10Y", "RATE.UST.10Y.REAL", "FX.USD.BROAD", "EQ.US.SP500"]}))
     steps += [("detect_regime", {"dataset_id": d}) for d in ("FX.USD.BROAD", "RATE.UST.10Y")]
+    steps.append(("get_business_cycle", {}))
     steps.append(("get_economic_calendar", {"days": 60}))
     return steps
 
@@ -85,7 +86,7 @@ def _scenarios(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         scan["custom_scenarios"] = inputs["custom_scenarios"]
     if inputs.get("portfolio_id"):
         scan["portfolio_id"] = inputs["portfolio_id"]
-    return [("get_central_bank_tone", {}), ("scan_scenarios", scan), ("get_economic_calendar", {"days": 60}), ("screen_anomalies", {})]
+    return [("get_central_bank_tone", {}), ("get_business_cycle", {}), ("scan_scenarios", scan), ("get_economic_calendar", {"days": 60}), ("screen_anomalies", {})]
 
 
 TEMPLATES: dict[str, dict[str, Any]] = {
