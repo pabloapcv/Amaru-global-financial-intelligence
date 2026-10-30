@@ -186,6 +186,25 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
         if r.get("next_fomc"):
             lines += [f"The next FOMC meeting is on {r['next_fomc']} [{e['label']}].", ""]
 
+    # Business cycle --------------------------------------------------------------
+    for e in by_tool.get("get_business_cycle", []):
+        r, s = e["result"]["recession"], e["result"]["similar"]
+        rec, simple = r["record"], r["simple_model"]
+        lines += ["## Business cycle", "",
+                  f"The model puts the chance of a U.S. recession within {r['horizon_months']} months at **{_fmt(r['probability_pct'], 1)}%**, on data through {r['as_of'][:7]} [{e['label']}].", "",
+                  "| Input | Reading | Weight |", "|---|---|---|"]
+        lines += [f"| {i['name']} | {_fmt(i['reading'])} | {_fmt(i['weight'], 3)} |" for i in r["inputs"]]
+        lines += ["", f"*Track record:* re-estimated every month from {rec['first_month'][:7]} to {rec['last_month'][:7]} using only what was knowable then, it scored AUC {_fmt(rec['auc'], 3)} "
+                      f"(0.5 is a coin flip) and a Brier score of {_fmt(rec['brier'], 4)}, against {_fmt(rec['brier_average_only'], 4)} for always guessing the historical average. "
+                      f"That covers {rec['recessions_covered']} recessions. Without the two labour inputs the same test gives AUC {_fmt(simple['auc'], 3)} and {_fmt(simple['brier'], 4)} [{e['label']}].", ""]
+        lines += [f"### Similar periods ({s['as_of'][:7]})", "", "| Month | Distance | Recession within 12 months? |", "|---|---|---|"]
+        lines += [f"| {p['month'][:7]} | {_fmt(p['distance'])} | {'not yet known' if p['recession_within_12m'] is None else 'yes' if p['recession_within_12m'] else 'no'} |" for p in s["periods"]]
+        lines += ["", "| Market | Median over the next 12 months | Range |", "|---|---|---|"]
+        for m in s["markets"]:
+            u = " bp" if m["unit"] == "bp" else "%"
+            lines.append(f"| {m['name']} | too few periods | n/a |" if m["too_few"] else f"| {m['name']} | {_fmt(m['median'])}{u} | {_fmt(m['low'])} to {_fmt(m['high'])}{u} |")
+        lines += ["", f"{e['result']['caveat']} [{e['label']}]", ""]
+
     # Central banks ---------------------------------------------------------------
     for e in by_tool.get("get_central_bank_tone", []):
         r = e["result"]

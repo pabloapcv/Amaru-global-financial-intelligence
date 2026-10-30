@@ -790,6 +790,23 @@ def t_scan_scenarios(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     return {"evidence_id": label, **res}
 
 
+def t_get_business_cycle(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import cycle
+    from atlas.data.access import series_meta
+
+    try:
+        full = cycle.outlook()
+    except cycle.CycleUnavailable as exc:
+        raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap.") from exc
+    r = full["recession"]
+    res = {**full, "recession": {k: v for k, v in r.items() if k not in ("path", "recession_months")}}
+    metas = [series_meta(d) for d in cycle.SERIES.values()]
+    chart = {"type": "line", "title": "U.S. recession probability, next 12 months", "unit": "%",
+             "series": [{"name": "Estimate made at the time", "points": r["path"]}]}
+    label = ctx.add("get_business_cycle", args, res, "ATLAS business-cycle model on: " + _cite(metas), [_source(m) for m in metas], chart)
+    return {"evidence_id": label, **res}
+
+
 def t_get_central_bank_tone(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     from atlas import tone
 
@@ -937,6 +954,11 @@ TOOLS: dict[str, dict[str, Any]] = {
             "portfolio_name": {"type": "string", "description": "A saved portfolio to test each scenario against."},
             "portfolio_id": {"type": "string", "description": "The same, by id."},
         }},
+    },
+    "get_business_cycle": {
+        "fn": t_get_business_cycle,
+        "description": "U.S. business cycle: a 12-month recession probability from a probit on the yield spread, financial conditions and unemployment, with its walk-forward record (AUC, Brier score against always guessing the average) and a simpler model for comparison; plus the past months most like today and what markets did in the next 12 months. State the limits: very few recessions were tested, unemployment history is revised, and similar periods are a lookup, not a tested signal.",
+        "schema": {"type": "object", "properties": {}},
     },
     "get_central_bank_tone": {
         "fn": t_get_central_bank_tone,

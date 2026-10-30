@@ -1126,6 +1126,85 @@
         "owner": "BLS / BEA / Federal Reserve",
         "note": "U.S. government data."
       }
+    },
+    {
+      "series_id": "US.NBER.RECESSION",
+      "name": "U.S. recession indicator (NBER dates)",
+      "country": "US",
+      "indicator": "recession_indicator",
+      "frequency": "monthly",
+      "unit": "percent",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "fred",
+      "provider_symbol": "USREC",
+      "description": "1 in months the National Bureau of Economic Research dates as a U.S. recession, otherwise 0 (via FRED). NBER announces dates months after the fact.",
+      "tags": [
+        "cycle",
+        "us"
+      ],
+      "keywords": [
+        "nber recession",
+        "recession dates",
+        "business cycle"
+      ],
+      "licence": {
+        "class": "check_terms",
+        "owner": "National Bureau of Economic Research (via FRED)",
+        "note": "Confirm NBER's terms before redistributing commercially."
+      }
+    },
+    {
+      "series_id": "US.CURVE.10Y3M",
+      "name": "U.S. yield curve, 10-year minus 3-month",
+      "country": "US",
+      "indicator": "yield_curve",
+      "frequency": "daily",
+      "unit": "percent",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "fred",
+      "provider_symbol": "T10Y3M",
+      "description": "10-year Treasury constant maturity minus 3-month Treasury constant maturity (Federal Reserve via FRED).",
+      "tags": [
+        "rates",
+        "cycle",
+        "us"
+      ],
+      "keywords": [
+        "yield curve",
+        "curve inversion",
+        "10y3m",
+        "term spread"
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "BLS / BEA / Federal Reserve",
+        "note": "U.S. government data."
+      }
+    },
+    {
+      "series_id": "US.FCI.NFCI",
+      "name": "Chicago Fed National Financial Conditions Index",
+      "country": "US",
+      "indicator": "financial_conditions",
+      "frequency": "weekly",
+      "unit": "index",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "fred",
+      "provider_symbol": "NFCI",
+      "description": "Weekly index of U.S. financial conditions: above zero is tighter than average (Federal Reserve Bank of Chicago via FRED).",
+      "tags": [
+        "cycle",
+        "us"
+      ],
+      "keywords": [
+        "financial conditions",
+        "nfci"
+      ],
+      "licence": {
+        "class": "check_terms",
+        "owner": "Federal Reserve Bank of Chicago (via FRED)",
+        "note": "Confirm the Chicago Fed's terms before redistributing commercially."
+      }
     }
   ],
   "positioning": [

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import BusinessCycle from "@/components/BusinessCycle";
 import Chart from "@/components/Chart";
 import InstrumentDetail from "@/components/InstrumentDetail";
 import TradeFlows from "@/components/TradeFlows";
@@ -185,6 +186,7 @@ export default function Economy() {
       <ErrorNote error={error} />
       <div className="stack">
         <EconomicCalendar />
+        <BusinessCycle />
         <CountryComparison />
         <TradeFlows />
         <div className="split">

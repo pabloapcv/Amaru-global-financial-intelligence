@@ -37,6 +37,7 @@ RATES, DOLLAR, OIL, VOL = "RATE.UST.2Y", "FX.USD.BROAD", "CMD.CRUDE.BRENT", "VOL
 MAX_SCENARIOS = 8
 MAX_UNIVERSE = 15
 PORTFOLIO = "PORTFOLIO"
+RECESSION_SIGNAL_PCT = 30.0
 NOT_PROBABILITY = ("Relevance counts the data signals pointing to a scenario; it is not a probability. "
                    "Effects are historical sensitivities (all else equal), not forecasts.")
 
@@ -161,6 +162,9 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
         log.debug("tone unavailable for scenario scan", exc_info=True)
     if fed_tone and not (fed_tone["compared_with"] and fed_tone["consistent"] and fed_tone["stance"]):
         fed_tone = None  # nothing to compare with, a flagged decision, or no change in tone
+    from atlas import cycle
+
+    recession = cycle.recession_signal()
     if RATES in perf:
         bp = perf[RATES]["bp_3m"]
         for direction, shock in (("down", -50.0), ("up", 50.0)):
@@ -172,6 +176,9 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
             if fed_tone and (fed_tone["stance"] < 0) == (direction == "down"):
                 sig.append({"text": f"Fed statement of {fed_tone['meeting_date']} read as {fed_tone['stance_label']} ({fed_tone['stance']:+d} on a −2 to +2 scale; Claude's reading)",
                             "value": fed_tone["stance"], "unit": "stance", "url": fed_tone["url"]})
+            if direction == "down" and recession and recession["probability_pct"] >= RECESSION_SIGNAL_PCT:
+                sig.append({"text": f"The recession model puts the 12-month chance at {recession['probability_pct']}%",
+                            "value": recession["probability_pct"], "unit": "pct"})
             label = "Rates fall: 2-year Treasury yield −50 bp" if direction == "down" else "Rates rise: 2-year Treasury yield +50 bp"
             candidates.append(_scenario(f"rates_{direction}", label, RATES, shock, sig, "macro"))
 
@@ -321,7 +328,7 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
                       "excluded": [_name(d) for d in weights if d not in held],
                       "tested": period_levels is not None} if portfolio else None,
         "method": {
-            "selection": "rules on 3-month moves, 5-year percentiles, the FOMC calendar, the latest Fed statement's tone, CFTC positioning (3-year COT index ≥90 or ≤10) "
+            "selection": "rules on 3-month moves, 5-year percentiles, the FOMC calendar, the latest Fed statement's tone, the recession model (30% or more), CFTC positioning (3-year COT index ≥90 or ≤10) "
                          "and USDA stocks-to-use (≤20th or ≥80th percentile of 20 years); custom scenarios always included",
             "effects": "historical sensitivity of each market to the scenario's driver: HAC OLS on period changes over 10 years; "
                        "95% range from the coefficient's standard error; 'significant' means p ≤ 0.05",
