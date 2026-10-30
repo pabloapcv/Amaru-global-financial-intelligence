@@ -69,7 +69,7 @@ def _save_usage(run_id: str, researchers: list) -> None:
 # ---------------------------------------------------------------- result cache
 
 CACHE_CONFIG_KEYS = ("depth", "engine", "template", "lookback_years", "horizon_months", "assets", "formats", "documents_query",
-                     "parent_run_id", "language")
+                     "parent_run_id", "language", "scenario_universe", "custom_scenarios", "scenario_portfolio")
 
 
 def cache_key(query: str, config: dict[str, Any]) -> str:
@@ -189,8 +189,9 @@ def execute_run(run_id: str) -> dict[str, Any]:
             lookback_years=config.get("lookback_years"), scope=config.get("assets"),
         )
         plan["query"] = query
-        if config.get("scenario_universe") or config.get("custom_scenarios"):
-            plan["scenario_inputs"] = {"universe": config.get("scenario_universe"), "custom_scenarios": config.get("custom_scenarios")}
+        if config.get("scenario_universe") or config.get("custom_scenarios") or config.get("scenario_portfolio"):
+            plan["scenario_inputs"] = {"universe": config.get("scenario_universe"), "custom_scenarios": config.get("custom_scenarios"),
+                                       "portfolio_id": config.get("scenario_portfolio")}
         if prior:
             plan["follow_up_to"] = {"run_id": prior["run_id"], "query": prior["query"]}
         from atlas.research import templates

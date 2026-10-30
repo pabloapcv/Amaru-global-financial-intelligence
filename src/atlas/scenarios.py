@@ -11,7 +11,10 @@ The scan reads the stored data and proposes scenarios from rules anyone can audi
 
 plus any scenario the user asks for. Each scenario's effect on every market in the universe comes from
 its historical sensitivity (analytics.scenario: HAC OLS of period changes over 10 years), with a 95%
-range, and effects that are not statistically significant are marked as such.
+range, and effects that are not statistically significant are marked as such. Next to each sensitivity
+is what actually happened: the market's move in the past episodes when the driver moved that much
+within 3 months. A saved portfolio can be tested too: its own monthly return series gets the same
+treatment, so diversification between holdings is measured rather than assumed.
 
 "Relevance" counts the data signals behind a scenario. It is not a probability, and the output says so.
 """
@@ -33,6 +36,7 @@ DEFAULT_UNIVERSE = ["CMD.CRUDE.BRENT", "CMD.COPPER.LME", "CMD.SUGAR.ISA", "CMD.C
 RATES, DOLLAR, OIL, VOL = "RATE.UST.2Y", "FX.USD.BROAD", "CMD.CRUDE.BRENT", "VOL.US.VIX"
 MAX_SCENARIOS = 8
 MAX_UNIVERSE = 15
+PORTFOLIO = "PORTFOLIO"
 NOT_PROBABILITY = ("Relevance counts the data signals pointing to a scenario; it is not a probability. "
                    "Effects are historical sensitivities (all else equal), not forecasts.")
 
@@ -73,9 +77,48 @@ def _scenario(sid: str, name: str, driver: str, shock: float, signals: list[dict
             "signals": signals, "relevance": len(signals)}
 
 
+def _portfolio_levels(weights: dict[str, float], levels: dict[str, Any]) -> Any:
+    """Index of the holdings at fixed weights, or None if a period would wipe it out."""
+    import pandas as pd
+
+    returns = pd.concat({d: levels[d].pct_change(fill_method=None) for d in weights}, axis=1).dropna()
+    if len(returns) < 24:
+        return None
+    combined = sum(returns[d] * w for d, w in weights.items())
+    return None if (combined <= -1).any() else (1 + combined).cumprod()
+
+
+def _portfolio_effect(sc: dict[str, Any], levels: Any, period_levels: Any, weights: dict[str, float], series: dict[str, Any],
+                      freqs: dict[str, str], units: dict[str, str], episodes: list[dict[str, Any]]) -> dict[str, Any] | None:
+    try:
+        res = analytics.scenario(PORTFOLIO, sc["driver"], sc["shock"], {**series, PORTFOLIO: period_levels},
+                                 {**freqs, PORTFOLIO: "monthly"}, {**units, PORTFOLIO: "index"}, lookback_years=10)
+    except (ValueError, KeyError, StopIteration):
+        return None
+    contributions = []
+    for dsid, weight in weights.items():
+        if dsid == sc["driver"]:
+            move = sc["shock"] if sc["shock_unit"] == "pct" else None
+        else:
+            try:
+                move = analytics.scenario(dsid, sc["driver"], sc["shock"], series, freqs, units, lookback_years=10)["implied_asset_move"]
+            except (ValueError, KeyError, StopIteration):
+                move = None
+        if move is not None:
+            contributions.append({"dataset_id": dsid, "name": _name(dsid), "weight": weight, "contribution": _r(weight * move, 2)})
+    p = res["beta_p_value"]
+    return {"implied_move": res["implied_asset_move"], "unit": "pct", "ci95": res["implied_asset_move_ci95"], "p_value": _r(p, 4),
+            "significant": p is not None and p <= 0.05,
+            "past": analytics.episode_response(levels, "log_return", episodes, res["implied_asset_move"]),
+            "largest": sorted(contributions, key=lambda c: -abs(c["contribution"]))[:3]}
+
+
 def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None = None,
-         max_scenarios: int = MAX_SCENARIOS) -> tuple[dict[str, Any], list]:
-    """Returns (result, metas used). Raises ScenarioError for bad input."""
+         max_scenarios: int = MAX_SCENARIOS, portfolio: dict[str, Any] | None = None) -> tuple[dict[str, Any], list]:
+    """Returns (result, metas used). Raises ScenarioError for bad input.
+
+    `portfolio` is a saved portfolio (name and holdings) to test each scenario against.
+    """
     universe = list(dict.fromkeys(universe or DEFAULT_UNIVERSE))
     if len(universe) > MAX_UNIVERSE:
         raise ScenarioError(f"at most {MAX_UNIVERSE} markets per scan")
@@ -84,7 +127,8 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
         if ds is None or ds.kind not in ("market", "macro"):
             raise ScenarioError(f"unknown market or series: {dsid}")
 
-    needed = list(dict.fromkeys(universe + [RATES, DOLLAR, OIL, VOL] + [c["driver"] for c in custom or []]))
+    weights = {h["dataset_id"]: float(h["weight"]) for h in (portfolio or {}).get("holdings", [])}
+    needed = list(dict.fromkeys(universe + [RATES, DOLLAR, OIL, VOL] + [c["driver"] for c in custom or []] + list(weights)))
     series, metas, perf = {}, [], {}
     for dsid in needed:
         try:
@@ -201,7 +245,26 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
 
     freqs = {d: get_dataset(d).frequency for d in series}  # type: ignore[union-attr]
     units = {d: get_dataset(d).unit for d in series}  # type: ignore[union-attr]
+    monthly = {d: m for d, s in series.items() if (m := analytics.monthly_levels(s)) is not None}
+    held = {d: w for d, w in weights.items() if d in monthly}
+    # Month-end levels for episodes; monthly averages, like every other market, for the sensitivity.
+    portfolio_levels = _portfolio_levels(held, monthly) if held else None
+    period_levels = None
+    if portfolio_levels is not None:
+        averages = {d: series[d] if freqs[d] == "monthly" else analytics.resample(series[d], "monthly", how="mean") for d in held}
+        period_levels = _portfolio_levels(held, averages)
+
     for sc in chosen:
+        driver_levels = monthly.get(sc["driver"])
+        history = analytics.past_episodes(driver_levels, sc["shock"], analytics.transform_kind(units[sc["driver"]])) if driver_levels is not None else None
+        sc["history"] = history
+        episodes = history["episodes"] if history else []
+
+        def past(dsid: str, implied: float) -> dict[str, Any] | None:
+            if history is None or dsid not in monthly:
+                return None
+            return analytics.episode_response(monthly[dsid], analytics.transform_kind(units[dsid]), episodes, implied)
+
         impacts = []
         for asset in universe:
             if asset not in series:
@@ -217,7 +280,8 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
             p = res["beta_p_value"]
             impacts.append({"dataset_id": asset, "name": _name(asset), "implied_move": res["implied_asset_move"],
                             "unit": res["implied_unit"], "ci95": res["implied_asset_move_ci95"], "p_value": _r(p, 4),
-                            "significant": p is not None and p <= 0.05, "r_squared": res["r_squared"], "is_driver": False})
+                            "significant": p is not None and p <= 0.05, "r_squared": res["r_squared"], "is_driver": False,
+                            "past": past(asset, res["implied_asset_move"])})
         reliable = [i for i in impacts if i["significant"] and not i["is_driver"]]
         sc["impacts"] = impacts
         # Effects in % and bp are not comparable by size; rank by how clearly the data shows them
@@ -229,6 +293,8 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
         sc["clearest_effects"] = [i["dataset_id"] for i in sorted(reliable, key=lambda i: -clarity(i))[:3]]
         if sc["relevance"] is not None:
             sc["relevance_label"] = "strong" if sc["relevance"] >= 2 else "some" if sc["relevance"] == 1 else "standard stress test"
+        if period_levels is not None:
+            sc["portfolio"] = _portfolio_effect(sc, portfolio_levels, period_levels, held, series, freqs, units, episodes)
 
     as_of = max((perf[d]["date"] for d in universe if d in perf), default=None)
     result = {
@@ -239,11 +305,19 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
                        "change_3m_bp": perf[d]["bp_3m"], "percentile_5y": perf[d]["percentile_5y"]}
                    for d in needed if d in perf},
         "next_fomc": fomc["date"] if fomc else None,
+        "portfolio": {"id": portfolio.get("portfolio_id"), "name": portfolio["name"], "holdings": len(held),
+                      "excluded": [_name(d) for d in weights if d not in held],
+                      "tested": period_levels is not None} if portfolio else None,
         "method": {
             "selection": "rules on 3-month moves, 5-year percentiles, the FOMC calendar, CFTC positioning (3-year COT index ≥90 or ≤10) "
                          "and USDA stocks-to-use (≤20th or ≥80th percentile of 20 years); custom scenarios always included",
             "effects": "historical sensitivity of each market to the scenario's driver: HAC OLS on period changes over 10 years; "
                        "95% range from the coefficient's standard error; 'significant' means p ≤ 0.05",
+            "history": "past episodes are the non-overlapping 3-month windows, at month-ends, in which the driver moved at least the "
+                       "scenario's shock, over up to 30 years; each market's move is measured over the same windows, and a median is shown "
+                       "only with at least 3 episodes. Other things were also happening in those periods",
+            "portfolio": "the portfolio is treated as one monthly series at its current weights, so correlations between holdings are "
+                         "included; 'largest' shows each holding's weight times its own sensitivity",
             "caveat": NOT_PROBABILITY + " Sensitivities measure how markets moved together, not what causes what.",
         },
     }

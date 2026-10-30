@@ -9,39 +9,71 @@ const QUERY = "Scenario outlook: which scenarios does the current data point to,
 const DEFAULT_UNIVERSE = ["CMD.CRUDE.BRENT", "CMD.COPPER.LME", "CMD.SUGAR.ISA", "CMD.CORN.US", "CMD.SOYBEANS.US", "CMD.COFFEE.ARABICA",
   "FX.USD.BROAD", "FX.USDBRL", "FX.USDMXN", "RATE.UST.10Y", "EQ.US.SP500"];
 
-type Impact = { dataset_id: string; name: string; implied_move: number; unit: "pct" | "bp"; ci95: [number, number] | null; significant: boolean; is_driver: boolean };
+type Past = { n: number; too_few: boolean; median?: number; low?: number; high?: number; same_direction?: number; disagrees?: boolean };
+type Impact = { dataset_id: string; name: string; implied_move: number; unit: "pct" | "bp"; ci95: [number, number] | null; significant: boolean; is_driver: boolean; past?: Past | null };
+type History = { n: number; horizon_months: number; since: string | null; episodes: { start: string; end: string; driver_move: number }[] };
+type PortfolioEffect = { implied_move: number; ci95: [number, number]; significant: boolean; past: Past;
+  largest: { dataset_id: string; name: string; weight: number; contribution: number }[] };
 type Scenario = { id: string; name: string; kind: string; driver_name: string; shock: number; shock_unit: string; relevance: number | null;
-  relevance_label?: string; signals: { text: string }[]; impacts: Impact[]; clearest_effects: string[]; is_new?: boolean };
+  relevance_label?: string; signals: { text: string }[]; impacts: Impact[]; clearest_effects: string[]; is_new?: boolean;
+  history?: History | null; portfolio?: PortfolioEffect | null };
 type Brief = { id: string; name: string; relevance: number | null };
 type Changes = { previous_scan_at: string; previous_as_of: string | null; new: Brief[]; dropped: Brief[];
   stronger: { id: string; name: string; from: number; to: number }[]; weaker: { id: string; name: string; from: number; to: number }[] };
 type Scan = { as_of: string; considered: number; scenarios: Scenario[]; next_fomc: string | null; missing: string[]; method: { caveat: string };
-  changes?: Changes | null };
+  changes?: Changes | null; portfolio?: { name: string; holdings: number; excluded: string[]; tested: boolean } | null; portfolio_missing?: boolean };
 type RunSummary = { run_id: string; query: string; status: string; title: string | null; created_at: string };
 type Schedule = { schedule_id: string; name: string; cadence: string; next_run_at: string; config: { template?: string } };
 type Custom = { driver: string; shock: string; name: string };
 
 const KIND: Record<string, string> = { macro: "Macro", positioning: "Positioning", fundamentals: "Supply and demand", custom: "Yours" };
 
+const signed = (v: number, unit: string, nd = 1) => `${v > 0 ? "+" : ""}${v.toFixed(nd)}${unit === "bp" ? " bp" : "%"}`;
+
+function PastCell({ past, unit }: { past?: Past | null; unit: string }) {
+  if (!past) return <>n/a</>;
+  if (past.too_few) return <>too few</>;
+  const range = `Ranged from ${signed(past.low!, unit)} to ${signed(past.high!, unit)} over ${past.n} past episodes`;
+  return (
+    <span title={range}>
+      {signed(past.median!, unit)}{past.same_direction !== undefined ? ` · ${past.same_direction}/${past.n} same way` : ""}
+      {past.disagrees && <span style={{ color: "var(--down)" }}> · went the other way</span>}
+    </span>
+  );
+}
+
+function HistoryLine({ h }: { h?: History | null }) {
+  if (!h || !h.since) return null;
+  const since = h.since.slice(0, 4);
+  if (h.n === 0) return <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>No move this large within {h.horizon_months} months since {since}, so this has no precedent in the stored data.</p>;
+  return (
+    <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>
+      Moved this much within {h.horizon_months} months {h.n === 1 ? "once" : `${h.n} times`} since {since}, most recently by {h.episodes[h.n - 1].end.slice(0, 7)}.
+    </p>
+  );
+}
+
 function ImpactBars({ s }: { s: Scenario }) {
   const rows = s.impacts.filter((i) => !i.is_driver).sort((a, b) => Number(b.significant) - Number(a.significant) || Math.abs(b.implied_move) - Math.abs(a.implied_move));
   const max = (unit: string) => Math.max(1e-9, ...rows.filter((r) => r.unit === unit).map((r) => Math.abs(r.implied_move)));
   return (
     <table style={{ fontSize: 12.5 }}>
+      <thead><tr><th>Market</th><th /><th className="num">Effect</th><th className="num">95% range</th><th className="num">Past median</th></tr></thead>
       <tbody>{rows.map((r) => {
         const w = (Math.abs(r.implied_move) / max(r.unit)) * 50;
         const up = r.implied_move >= 0;
         return (
           <tr key={r.dataset_id} style={{ opacity: r.significant ? 1 : 0.5 }} title={r.significant ? "Statistically significant (p ≤ 0.05)" : "Not statistically significant"}>
-            <td style={{ width: "38%" }}>{r.name}</td>
-            <td style={{ width: "34%" }}>
+            <td>{r.name}</td>
+            <td style={{ width: "20%", minWidth: 80 }}>
               <div style={{ position: "relative", height: 8, background: "var(--panel-2)", borderRadius: 4 }}>
                 <div style={{ position: "absolute", top: 0, height: 8, borderRadius: 4, left: up ? "50%" : `${50 - w}%`, width: `${w}%`, background: up ? "var(--up)" : "var(--down)" }} />
                 <div style={{ position: "absolute", left: "50%", top: -2, width: 1, height: 12, background: "var(--line)" }} />
               </div>
             </td>
-            <td className="num" style={{ whiteSpace: "nowrap" }}>{r.implied_move > 0 ? "+" : ""}{r.implied_move.toFixed(2)}{r.unit === "bp" ? " bp" : "%"}</td>
+            <td className="num" style={{ whiteSpace: "nowrap" }}>{signed(r.implied_move, r.unit, 2)}</td>
             <td className="num muted" style={{ whiteSpace: "nowrap", fontSize: 11.5 }}>{r.ci95 ? `${r.ci95[0].toFixed(1)} to ${r.ci95[1].toFixed(1)}` : ""}{r.significant ? "" : " · not reliable"}</td>
+            <td className="num muted" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}><PastCell past={r.past} unit={r.unit} /></td>
           </tr>
         );
       })}</tbody>
@@ -60,6 +92,8 @@ export default function Scenarios() {
   const [run, setRun] = useState<ResearchRun | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [portfolios, setPortfolios] = useState<{ portfolio_id: string; name: string }[]>([]);
+  const [portfolioId, setPortfolioId] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const loadLists = useCallback(() => {
@@ -70,6 +104,7 @@ export default function Scenarios() {
   }, []);
   useEffect(() => {
     api<Instrument[]>("/api/v1/instruments").then((all) => setInstruments(all.filter((i) => i.has_source && (i.kind === "market" || i.kind === "macro")))).catch(setError);
+    api<{ portfolio_id: string; name: string }[]>("/api/v1/portfolios").then(setPortfolios).catch(() => {});
     loadLists();
   }, [loadLists]);
 
@@ -87,6 +122,7 @@ export default function Scenarios() {
   const options = () => ({
     universe,
     custom: custom.filter((c) => c.driver && Number(c.shock)).map((c) => ({ driver: c.driver, shock: Number(c.shock), name: c.name })),
+    ...(portfolioId ? { portfolio_id: portfolioId } : {}),
   });
   const runNow = async () => {
     setError(null); setNote(null);
@@ -110,10 +146,11 @@ export default function Scenarios() {
   const name = (id: string) => instruments.find((i) => i.dataset_id === id)?.name ?? id;
   const scan = run?.result?.evidence.find((e) => e.tool === "scan_scenarios")?.result as Scan | undefined;
   const active = run && (run.status === "queued" || run.status === "running");
+  const tested = (scan?.scenarios ?? []).filter((s) => s.portfolio).sort((a, b) => a.portfolio!.implied_move - b.portfolio!.implied_move);
 
   return (
     <>
-      <PageHeader title="Scenario Agent" subtitle="Scans all stored data for the scenarios it points to (rates, the dollar, oil, volatility, speculative positioning, USDA supply and demand, plus your own) and shows what each would mean for other markets, based on how they have moved together over 10 years." />
+      <PageHeader title="Scenario Agent" subtitle="Scans all stored data for the scenarios it points to (rates, the dollar, oil, volatility, speculative positioning, USDA supply and demand, plus your own) and shows what each would mean for other markets, based on how they have moved together over 10 years and what they did the last times it happened. Test any saved portfolio too." />
       <ErrorNote error={error} />
       {note && <div className="note" style={{ marginBottom: 14 }}>{note}</div>}
 
@@ -154,6 +191,12 @@ export default function Scenarios() {
       </div>
 
       <div className="row" style={{ gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        {portfolios.length > 0 && (
+          <select value={portfolioId} onChange={(e) => setPortfolioId(e.target.value)} aria-label="Portfolio to test" style={{ width: "auto" }}>
+            <option value="">No portfolio</option>
+            {portfolios.map((x) => <option key={x.portfolio_id} value={x.portfolio_id}>Test on: {x.name}</option>)}
+          </select>
+        )}
         <button onClick={runNow} disabled={!!active || universe.length === 0}>{active ? "Scanning…" : "Run the scenario agent now"}</button>
         <button className="secondary" onClick={weekly} disabled={universe.length === 0}>Run it every week</button>
         {schedules.map((s) => (
@@ -190,8 +233,37 @@ export default function Scenarios() {
                 )}
             </Card>
           )}
+          {scan.portfolio_missing && <div className="note" style={{ marginTop: 12, fontSize: 12.5 }}>The portfolio chosen for this scan no longer exists, so it was not tested.</div>}
+          {scan.portfolio && !scan.portfolio.tested && <div className="note" style={{ marginTop: 12, fontSize: 12.5 }}>{scan.portfolio.name} could not be tested: its holdings have too little shared monthly history.</div>}
+          {tested.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <Card title={`Effect on ${scan.portfolio!.name}`}>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ fontSize: 12.5 }}>
+                    <thead><tr><th>Scenario</th><th className="num">Effect</th><th className="num">95% range</th><th className="num">Past median</th><th>Largest contributors</th></tr></thead>
+                    <tbody>{tested.map((s) => {
+                      const f = s.portfolio!;
+                      return (
+                        <tr key={s.id} style={{ opacity: f.significant ? 1 : 0.5 }} title={f.significant ? "Statistically significant (p ≤ 0.05)" : "Not statistically significant"}>
+                          <td>{s.name}</td>
+                          <td className="num" style={{ whiteSpace: "nowrap", color: f.significant ? (f.implied_move < 0 ? "var(--down)" : "var(--up)") : undefined }}>{signed(f.implied_move, "pct", 2)}</td>
+                          <td className="num muted" style={{ whiteSpace: "nowrap" }}>{f.ci95[0].toFixed(1)} to {f.ci95[1].toFixed(1)}{f.significant ? "" : " · not reliable"}</td>
+                          <td className="num muted"><PastCell past={f.past} unit="pct" /></td>
+                          <td className="muted">{f.largest.map((c) => `${c.name} ${signed(c.contribution, "pct")}`).join(", ")}</td>
+                        </tr>
+                      );
+                    })}</tbody>
+                  </table>
+                </div>
+                <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
+                  {scan.portfolio!.holdings} holdings, measured as one monthly series at current weights, so diversification between them is included.
+                  {scan.portfolio!.excluded.length > 0 && ` Excluded (no usable history): ${scan.portfolio!.excluded.join(", ")}.`}
+                </p>
+              </Card>
+            </div>
+          )}
           <div style={{ height: 14 }} />
-          <div className="grid grid-2">
+          <div style={{ display: "grid", gap: 14 }}>
             {scan.scenarios.map((s) => (
               <Card key={s.id} title={s.name} actions={<span className="row" style={{ gap: 6 }}>{s.is_new && <span className="badge badge-current">New</span>}<span className={`badge ${s.relevance && s.relevance >= 2 ? "badge-current" : "badge-delayed"}`}>
                 {s.kind === "custom" ? "Yours" : `${KIND[s.kind] ?? s.kind} · ${s.relevance_label}`}</span></span>}>
@@ -199,7 +271,8 @@ export default function Scenarios() {
                   {s.signals.map((g, i) => <li key={i}>{g.text}</li>)}
                   {s.signals.length === 0 && <li className="muted">No current signal; included as a standard stress test.</li>}
                 </ul>
-                <ImpactBars s={s} />
+                <HistoryLine h={s.history} />
+                <div style={{ overflowX: "auto" }}><ImpactBars s={s} /></div>
               </Card>
             ))}
           </div>

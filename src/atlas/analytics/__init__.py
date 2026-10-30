@@ -515,6 +515,62 @@ def scenario(
     }
 
 
+MIN_EPISODES = 3  # fewer past episodes than this are listed but not summarized
+
+
+def monthly_levels(series: pd.Series) -> pd.Series | None:
+    """Month-end levels with calendar gaps kept as NaN; None for series slower than monthly."""
+    s = series.dropna()
+    if len(s) < 13 or s.index.to_series().diff().median() > pd.Timedelta(days=45):
+        return None
+    return s.resample("ME").last().ffill(limit=1)
+
+
+def _window_move(levels: pd.Series, kind: str, months: int) -> pd.Series:
+    if kind == "diff":
+        return (levels - levels.shift(months)) * 100  # percentage points → bp
+    return (levels / levels.shift(months) - 1) * 100
+
+
+def past_episodes(levels: pd.Series, shock: float, kind: str, horizon_months: int = 3, lookback_years: float = 30) -> dict[str, Any]:
+    """The past times a series moved at least `shock` within the horizon (non-overlapping windows).
+
+    Each episode is the first month-end the move reached the threshold; the search resumes one
+    horizon later, so the same move is never counted twice.
+    """
+    moves = _window_move(levels, kind, horizon_months).dropna()
+    moves = moves[moves.index >= moves.index[-1] - pd.DateOffset(years=lookback_years)] if len(moves) else moves
+    episodes: list[dict[str, Any]] = []
+    resume = None
+    for ts, move in moves.items():
+        if resume is not None and ts < resume:
+            continue
+        if move * math.copysign(1, shock) >= abs(shock):
+            start = ts - pd.offsets.MonthEnd(horizon_months)
+            episodes.append({"start": start.date().isoformat(), "end": ts.date().isoformat(), "driver_move": _r(float(move), 2)})
+            resume = ts + pd.offsets.MonthEnd(horizon_months)
+    return {"n": len(episodes), "horizon_months": horizon_months, "threshold": shock,
+            "since": moves.index[0].date().isoformat() if len(moves) else None, "episodes": episodes}
+
+
+def episode_response(levels: pd.Series, kind: str, episodes: list[dict[str, Any]], implied: float | None = None) -> dict[str, Any]:
+    """What a series did over the same windows, compared with the move its sensitivity implies."""
+    moved = []
+    for ep in episodes:
+        a, b = levels.get(pd.Timestamp(ep["start"])), levels.get(pd.Timestamp(ep["end"]))
+        if a is None or b is None or pd.isna(a) or pd.isna(b) or (kind != "diff" and a <= 0):
+            continue
+        moved.append(float((b - a) * 100 if kind == "diff" else (b / a - 1) * 100))
+    if len(moved) < MIN_EPISODES:
+        return {"n": len(moved), "too_few": True}
+    median = float(np.median(moved))
+    out = {"n": len(moved), "median": _r(median, 2), "low": _r(min(moved), 2), "high": _r(max(moved), 2), "too_few": False}
+    if implied:
+        out["same_direction"] = sum(1 for v in moved if v * implied > 0)
+        out["disagrees"] = len(moved) >= 5 and median * implied < 0
+    return out
+
+
 # ---------------------------------------------------------------- positioning
 
 

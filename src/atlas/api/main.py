@@ -1468,9 +1468,12 @@ class CustomScenario(BaseModel):
 class ScenarioOptions(BaseModel):
     universe: list[str] = Field(default_factory=list, max_length=15, description="Markets to assess (empty: a cross-asset default).")
     custom: list[CustomScenario] = Field(default_factory=list, max_length=5)
+    portfolio_id: str | None = Field(None, max_length=64, description="A saved portfolio to test each scenario against.")
 
 
-def _scenario_config(opts: ScenarioOptions | None) -> dict[str, Any]:
+def _scenario_config(opts: ScenarioOptions | None, workspace_id: str) -> dict[str, Any]:
+    from atlas import portfolios
+
     if opts is None:
         return {}
     unknown = [d for d in opts.universe + [c.driver for c in opts.custom] if not get_dataset(d)]
@@ -1481,6 +1484,10 @@ def _scenario_config(opts: ScenarioOptions | None) -> dict[str, Any]:
         out["scenario_universe"] = list(dict.fromkeys(opts.universe))
     if opts.custom:
         out["custom_scenarios"] = [c.model_dump() for c in opts.custom]
+    if opts.portfolio_id:
+        if not portfolios.get(opts.portfolio_id, workspace_id):
+            raise HTTPException(422, "unknown portfolio")
+        out["scenario_portfolio"] = opts.portfolio_id
     return out
 
 
@@ -1530,7 +1537,7 @@ def create_research(req: ResearchRequest, p: Principal = Depends(require_verifie
         "geographies": req.scope.geographies, "lookback_years": lb, "horizon_months": int(hz) if hz else None,
         "analysis": req.analysis, "formats": req.report.formats, "template": req.report.template,
         **({"language": req.language} if req.language != "en" else {}),
-        **_scenario_config(req.scenarios),
+        **_scenario_config(req.scenarios, p.workspace_id),
     }
     if req.no_cache:
         config["cache"] = False
@@ -1778,7 +1785,7 @@ def create_schedule(req: ScheduleRequest, p: Principal = Depends(require_verifie
         _check_newsletter_mode(p)
     return schedules.create_schedule(req.name, req.query, req.cadence,
                                      {"depth": req.depth, "engine": req.engine, "formats": req.formats, "template": req.template,
-                                      **_scenario_config(req.scenarios),
+                                      **_scenario_config(req.scenarios, p.workspace_id),
                                       "newsletter": req.newsletter},
                                      workspace_id=p.workspace_id, user_id=p.user_id)
 

@@ -769,10 +769,17 @@ def t_scan_scenarios(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     custom = args.get("custom_scenarios") or []
     if not isinstance(custom, list) or len(custom) > 5 or any(not isinstance(c, dict) or "driver" not in c or "shock" not in c for c in custom):
         raise ToolError("custom_scenarios: up to 5 objects with driver (dataset id) and shock (% or bp)")
+    saved = None
+    portfolio_id, portfolio_name = args.get("portfolio_id"), args.get("portfolio_name")
+    if portfolio_id or portfolio_name:
+        from atlas import portfolios
+
+        saved = portfolios.get(portfolio_id, ctx.workspace_id) if portfolio_id else portfolios.find_by_name(portfolio_name, ctx.workspace_id)
     try:
-        res, metas = scenarios.scan(args.get("universe") or None, custom, int(args.get("max_scenarios", scenarios.MAX_SCENARIOS)))
+        res, metas = scenarios.scan(args.get("universe") or None, custom, int(args.get("max_scenarios", scenarios.MAX_SCENARIOS)), saved)
     except scenarios.ScenarioError as exc:
         raise ToolError(str(exc)) from exc
+    res["portfolio_missing"] = bool((portfolio_id or portfolio_name) and not saved)  # e.g. deleted since a schedule was set up
     try:
         res["changes"] = scenarios.compare(scenarios.previous_scan(ctx.workspace_id), res)
     except Exception:  # the comparison is context; never fail the scan over it
@@ -899,13 +906,15 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "scan_scenarios": {
         "fn": t_scan_scenarios,
-        "description": "Scenario scan across markets: proposes the scenarios current data points to (FOMC calendar and 2-year yield moves → rates; dollar and oil momentum or 5-year extremes; calm volatility → a VIX spike; CFTC positioning extremes → unwinds; USDA stocks-to-use extremes → squeezes or surpluses), plus custom scenarios, and gives each scenario's historical-beta effect on every market in the universe with 95% ranges and significance. Relevance counts signals; it is NOT a probability.",
+        "description": "Scenario scan across markets: proposes the scenarios current data points to (FOMC calendar and 2-year yield moves → rates; dollar and oil momentum or 5-year extremes; calm volatility → a VIX spike; CFTC positioning extremes → unwinds; USDA stocks-to-use extremes → squeezes or surpluses), plus custom scenarios, and gives each scenario's historical-beta effect on every market in the universe with 95% ranges and significance, plus what each market actually did in past episodes when the driver moved that much within 3 months. With portfolio_name, also the effect on that saved portfolio. Relevance counts signals; it is NOT a probability.",
         "schema": {"type": "object", "properties": {
             "universe": {"type": "array", "items": _ID, "description": "Markets to assess (default: a cross-asset set of 11). At most 15."},
             "custom_scenarios": {"type": "array", "items": {"type": "object", "properties": {
                 "name": {"type": "string"}, "driver": _ID, "shock": {"type": "number", "description": "% for price-like drivers, bp for rates"}},
                 "required": ["driver", "shock"]}, "description": "Up to 5 scenarios to include regardless of signals."},
             "max_scenarios": {"type": "integer", "minimum": 1, "maximum": 8},
+            "portfolio_name": {"type": "string", "description": "A saved portfolio to test each scenario against."},
+            "portfolio_id": {"type": "string", "description": "The same, by id."},
         }},
     },
     "get_positioning": {

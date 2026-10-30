@@ -120,3 +120,100 @@ def test_scans_report_changes_and_notify_scheduled_owners(seeded, monkeypatch):
     assert scan3["changes"]["changed"] is False and not any(s.get("is_new") for s in scan3["scenarios"])
     assert hooks == [] and sent == []
     assert "scenarios.changed" in webhooks.EVENTS
+
+
+def _monthly(values, start="2010-01-31"):
+    import pandas as pd
+
+    return pd.Series(values, index=pd.date_range(start, periods=len(values), freq="ME"), dtype=float)
+
+
+def test_past_episodes_do_not_count_one_move_twice():
+    from atlas import analytics
+
+    # Up 10% a month for six months: the threshold is reached in month two, and the search resumes three months later.
+    levels = _monthly([100.0] * 6 + [100 * 1.1 ** i for i in range(1, 7)] + [177.0] * 6 + [130.0, 120.0, 110.0] + [110.0] * 4)
+    up = analytics.past_episodes(levels, 20, "log_return")
+    assert up["n"] == 2 and up["episodes"][0]["end"] == "2010-08-31" and up["episodes"][1]["end"] == "2010-11-30"
+    assert up["episodes"][0]["start"] == "2010-05-31" and up["episodes"][0]["driver_move"] == pytest.approx(21, abs=0.01)
+    down = analytics.past_episodes(levels, -30, "log_return")
+    assert [e["end"] for e in down["episodes"]] == ["2011-08-31"]
+
+    rates = _monthly([2.0, 2.0, 2.0, 2.6, 2.6, 2.6, 2.6, 2.6])
+    assert analytics.past_episodes(rates, 50, "diff")["episodes"][0]["driver_move"] == pytest.approx(60)
+    assert analytics.past_episodes(rates, -50, "diff")["n"] == 0
+
+    # A market's response, including how it is compared with the sensitivity.
+    episodes = [{"start": "2010-01-31", "end": "2010-02-28"}, {"start": "2010-02-28", "end": "2010-03-31"}, {"start": "2010-03-31", "end": "2010-04-30"},
+                {"start": "2010-04-30", "end": "2010-05-31"}, {"start": "2010-05-31", "end": "2010-06-30"}]
+    falling = _monthly([100, 90, 81, 72.9, 65.61, 59.049])
+    res = analytics.episode_response(falling, "log_return", episodes, implied=3.0)
+    assert res["n"] == 5 and res["median"] == pytest.approx(-10) and res["same_direction"] == 0 and res["disagrees"] is True
+    agrees = analytics.episode_response(falling, "log_return", episodes, implied=-3.0)
+    assert agrees["same_direction"] == 5 and agrees["disagrees"] is False
+    few = analytics.episode_response(falling, "log_return", episodes[:2], implied=3.0)
+    assert few == {"n": 2, "too_few": True}
+    assert analytics.monthly_levels(_monthly(range(1, 6))) is None  # too short to be useful
+
+
+def test_scan_shows_past_episodes_and_tests_a_portfolio(seeded):
+    from atlas import auth, portfolios, scenarios
+    from atlas.api.main import app
+    from atlas.research import engine
+
+    uid, ws = auth.create_user("port@scen.test", "correct horse battery", workspace_name="Portfolio tests")
+    saved = portfolios.save("Softs book 2026", [{"dataset_id": "CMD.SUGAR.ISA", "weight": 0.6}, {"dataset_id": "CMD.CORN.US", "weight": -0.4}], ws, uid)
+    other = portfolios.save("Not yours", [{"dataset_id": "CMD.SUGAR.ISA", "weight": 1}], "someone-else", "x")
+    custom = [{"driver": "CMD.CRUDE.BRENT", "shock": 10, "name": "Oil +10%"}]
+
+    res, _ = scenarios.scan(["CMD.COPPER.LME", "EQ.US.SP500"], custom, portfolio=saved)
+    assert res["portfolio"]["name"] == "Softs book 2026" and res["portfolio"]["tested"] and res["portfolio"]["holdings"] == 2
+    sc = res["scenarios"][0]
+    hist = sc["history"]
+    assert hist["n"] == len(hist["episodes"]) and hist["n"] > 0 and hist["threshold"] == 10
+    assert all(e["driver_move"] >= 10 for e in hist["episodes"])
+    assert all(a["end"] <= b["start"] for a, b in zip(hist["episodes"], hist["episodes"][1:]))  # windows never overlap
+    for i in sc["impacts"]:
+        if not i["is_driver"]:
+            assert i["past"]["n"] <= hist["n"]
+    pf = sc["portfolio"]
+    assert pf["unit"] == "pct" and pf["ci95"][0] <= pf["implied_move"] <= pf["ci95"][1]
+    assert pf["significant"] == (pf["p_value"] is not None and pf["p_value"] <= 0.05)
+    # Each holding's contribution is its weight times its own sensitivity.
+    res2, _ = scenarios.scan(["CMD.SUGAR.ISA"], custom)
+    sugar = next(i for i in res2["scenarios"][0]["impacts"] if i["dataset_id"] == "CMD.SUGAR.ISA")
+    top = next(c for c in pf["largest"] if c["dataset_id"] == "CMD.SUGAR.ISA")
+    assert top["contribution"] == pytest.approx(0.6 * sugar["implied_move"], abs=0.01) and res2["portfolio"] is None
+
+    # A portfolio that holds the driver itself counts the full shock for that holding.
+    holds, _ = scenarios.scan(["EQ.US.SP500"], custom, portfolio={"name": "Oil", "holdings": [{"dataset_id": "CMD.CRUDE.BRENT", "weight": 0.5}]})
+    assert holds["scenarios"][0]["portfolio"]["largest"][0]["contribution"] == 5.0
+
+    # Through the report, with its figures verified; the portfolio name's digits are not treated as data.
+    run_id = engine.create_run("Scenario outlook", {"engine": "deterministic", "template": "scenario_outlook", "formats": [], "scenario_portfolio": saved["portfolio_id"],
+                                                    "scenario_universe": ["CMD.CRUDE.BRENT", "EQ.US.SP500"], "custom_scenarios": custom}, uid, ws)
+    out = engine.execute_run(run_id)
+    assert out["verification"]["passed"], out["verification"]["unverified_numbers"][:5]
+    md = out["narrative_markdown"]
+    assert "### Effect on Softs book 2026" in md and "*Past episodes:*" in md and "Past episodes (median)" in md
+
+    # A portfolio deleted after a schedule was set up doesn't stop the scan.
+    portfolios.delete(saved["portfolio_id"], ws)
+    run_id = engine.create_run("Scenario outlook again", {"engine": "deterministic", "template": "scenario_outlook", "formats": [], "scenario_portfolio": saved["portfolio_id"],
+                                                          "scenario_universe": ["CMD.CRUDE.BRENT", "EQ.US.SP500"]}, uid, ws)
+    out = engine.execute_run(run_id)
+    assert "no longer exists" in out["narrative_markdown"]
+
+    # The API refuses another workspace's portfolio (ATLAS_AUTH=off: the local workspace).
+    with TestClient(app) as c:
+        r = c.post("/api/v1/research", json={"query": "Scenario outlook", "report": {"template": "scenario_outlook"}, "scenarios": {"portfolio_id": other["portfolio_id"]}})
+        assert r.status_code == 422 and "portfolio" in r.json()["detail"]
+
+
+def test_scan_options_are_part_of_the_cache_key():
+    from atlas.research import engine
+
+    base = {"template": "scenario_outlook"}
+    keys = {engine.cache_key("Scenario outlook", {**base, **extra}) for extra in
+            ({}, {"scenario_universe": ["EQ.US.SP500"]}, {"custom_scenarios": [{"driver": "FX.USDBRL", "shock": 10}]}, {"scenario_portfolio": "p1"})}
+    assert len(keys) == 4
