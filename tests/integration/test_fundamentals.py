@@ -148,6 +148,7 @@ def test_briefing_combines_calendar_releases_and_usda(seeded):
     from atlas.api.main import app
 
     r = TestClient(app).get("/api/v1/briefing", params={"days": 14})
+    assert isinstance(r.json()["policy_moves"], list)
     assert r.status_code == 200
     b = r.json()
     assert {"events", "series_due", "releases", "usda", "calendar_window"} <= set(b)

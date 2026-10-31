@@ -2,7 +2,8 @@
 
 The scan reads the stored data and proposes scenarios from rules anyone can audit:
 
-- an FOMC meeting in the next 60 days, or a large move in the 2-year yield → rate scenarios
+- an FOMC meeting in the next 60 days, a large move in the 2-year yield, or central banks worldwide
+  leaning one way over 6 months → rate scenarios
 - a large 3-month dollar move, or the dollar at an extreme of its 5-year range → dollar scenarios
 - a large oil move or extreme → oil scenarios
 - a calm volatility index → a volatility-spike scenario
@@ -40,6 +41,7 @@ MAX_SCENARIOS = 8
 MAX_UNIVERSE = 15
 PORTFOLIO = "PORTFOLIO"
 RECESSION_SIGNAL_PCT = 30.0
+GLOBAL_LEAN_PCT = 25.0  # banks raising minus banks cutting, as a share of all banks
 NOT_PROBABILITY = ("Relevance counts the data signals pointing to a scenario; it is not a probability. "
                    "Effects are historical sensitivities (all else equal), not forecasts.")
 
@@ -180,6 +182,16 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
     from atlas import cycle
 
     recession = cycle.recession_signal()
+    lean = None
+    try:
+        from atlas import policy_rates
+
+        rates_now = policy_rates.overview()
+        d = rates_now["direction"]
+        if d["banks"] and abs(d["hiking"] - d["cutting"]) / d["banks"] * 100 >= GLOBAL_LEAN_PCT:
+            lean = d
+    except Exception:  # global rates are optional context
+        log.debug("policy rates unavailable for scenario scan", exc_info=True)
     if RATES in perf:
         bp = perf[RATES]["bp_3m"]
         for direction, shock in (("down", -50.0), ("up", 50.0)):
@@ -191,6 +203,10 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
             if fed_tone and (fed_tone["stance"] < 0) == (direction == "down"):
                 sig.append({"text": f"Fed statement of {fed_tone['meeting_date']} read as {fed_tone['stance_label']} ({fed_tone['stance']:+d} on a −2 to +2 scale; Claude's reading)",
                             "value": fed_tone["stance"], "unit": "stance", "url": fed_tone["url"]})
+            if lean and (lean["cutting"] > lean["hiking"]) == (direction == "down"):
+                sig.append({"text": f"Over {lean['months']} months, {lean['hiking']} of {lean['banks']} central banks raised rates and {lean['cutting']} cut",
+                            "value": lean["hiking"] - lean["cutting"], "unit": "banks"})
+                metas += [m for m in rates_now["sources"] if m not in metas]
             if direction == "down" and recession and recession["probability_pct"] >= RECESSION_SIGNAL_PCT:
                 sig.append({"text": f"The recession model puts the 12-month chance at {recession['probability_pct']}%",
                             "value": recession["probability_pct"], "unit": "pct"})
@@ -345,7 +361,7 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
                       "excluded": [_name(d) for d in weights if d not in held],
                       "tested": period_levels is not None} if portfolio else None,
         "method": {
-            "selection": "rules on 3-month moves, 5-year percentiles, the FOMC calendar, the latest Fed statement's tone, the recession model (30% or more), CFTC positioning (3-year COT index ≥90 or ≤10) "
+            "selection": "rules on 3-month moves, 5-year percentiles, the FOMC calendar, the latest Fed statement's tone, the recession model (30% or more), central banks worldwide (raising minus cutting at least 25% of banks over 6 months), CFTC positioning (3-year COT index ≥90 or ≤10) "
                          "and USDA stocks-to-use (≤20th or ≥80th percentile of 20 years); custom scenarios always included",
             "effects": "historical sensitivity of each market to the scenario's driver: HAC OLS on period changes over 10 years; "
                        "95% range from the coefficient's standard error; 'significant' means p ≤ 0.05",

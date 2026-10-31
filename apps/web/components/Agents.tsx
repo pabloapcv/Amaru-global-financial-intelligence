@@ -11,7 +11,7 @@ type Agent = {
   agent_id: string; name: string; watch: string[]; triggers: Trigger[]; action: { template: string; query: string; engine?: string };
   cooldown_hours: number; notify_email: boolean; status: string; last_checked_at: string | null; last_fired_at: string | null; events: AgentEvent[];
 };
-type TriggerSpec = Record<string, { label: string; param: string; default: number | string; help: string; kind?: "text"; extra?: Record<string, number> }>;
+type TriggerSpec = Record<string, { label: string; param: string; default: number | string; help: string; kind?: "text"; placeholder?: string; extra?: Record<string, number> }>;
 
 export default function Agents({ instruments }: { instruments: Instrument[] }) {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -64,7 +64,7 @@ export default function Agents({ instruments }: { instruments: Instrument[] }) {
           <select multiple value={watch} onChange={(e) => setWatch([...e.target.selectedOptions].map((o) => o.value))} style={{ height: 120 }} aria-label="Watched instruments">
             {instruments.map((i) => <option key={i.dataset_id} value={i.dataset_id}>{i.name}</option>)}
           </select>
-          <p className="muted" style={{ fontSize: 11.5, margin: "4px 0 0" }}>⌘/Ctrl-click to select several. Agents with only an official-release trigger need no instruments.</p>
+          <p className="muted" style={{ fontSize: 11.5, margin: "4px 0 0" }}>⌘/Ctrl-click to select several. Agents with only official-release or central-bank triggers need no instruments.</p>
         </div>
         <label style={{ marginTop: 12 }}>Triggers (any fires the agent)</label>
         {triggers.map((t, i) => {
@@ -78,7 +78,7 @@ export default function Agents({ instruments }: { instruments: Instrument[] }) {
                 {Object.entries(specs).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
               {spec && spec.kind === "text" && <input type="text" style={{ minWidth: 0, flex: "1 1 180px" }} value={t[spec.param] as string} title={spec.help}
-                placeholder="FOMC statement, GDP" onChange={(e) => setTriggers(triggers.map((x, j) => (j === i ? { ...x, [spec.param]: e.target.value } : x)))} aria-label={spec.param} />}
+                placeholder={spec.placeholder ?? "FOMC statement, GDP"} onChange={(e) => setTriggers(triggers.map((x, j) => (j === i ? { ...x, [spec.param]: e.target.value } : x)))} aria-label={spec.param} />}
               {spec && spec.kind !== "text" && <input type="number" step="any" style={{ width: 64, flex: "none" }} value={t[spec.param] as number} title={spec.help}
                 onChange={(e) => setTriggers(triggers.map((x, j) => (j === i ? { ...x, [spec.param]: parseFloat(e.target.value) } : x)))} aria-label={spec.param} />}
               <button className="secondary" onClick={() => setTriggers(triggers.filter((_, j) => j !== i))} aria-label="Remove trigger">×</button>
