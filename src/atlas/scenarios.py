@@ -105,9 +105,9 @@ def _portfolio_levels(weights: dict[str, float], levels: dict[str, Any]) -> Any:
 
 def _portfolio_effect(sc: dict[str, Any], levels: Any, period_levels: Any, weights: dict[str, float], series: dict[str, Any],
                       freqs: dict[str, str], units: dict[str, str], episodes: list[dict[str, Any]]) -> dict[str, Any] | None:
+    with_book, book_freqs, book_units = {**series, PORTFOLIO: period_levels}, {**freqs, PORTFOLIO: "monthly"}, {**units, PORTFOLIO: "index"}
     try:
-        res = analytics.scenario(PORTFOLIO, sc["driver"], sc["shock"], {**series, PORTFOLIO: period_levels},
-                                 {**freqs, PORTFOLIO: "monthly"}, {**units, PORTFOLIO: "index"}, lookback_years=10)
+        res = analytics.scenario(PORTFOLIO, sc["driver"], sc["shock"], with_book, book_freqs, book_units, lookback_years=10)
     except (ValueError, KeyError, StopIteration):
         return None
     contributions = []
@@ -125,6 +125,7 @@ def _portfolio_effect(sc: dict[str, Any], levels: Any, period_levels: Any, weigh
     return {"implied_move": res["implied_asset_move"], "unit": "pct", "ci95": res["implied_asset_move_ci95"], "p_value": _r(p, 4),
             "significant": p is not None and p <= 0.05,
             "past": analytics.episode_response(levels, "log_return", episodes, res["implied_asset_move"]),
+            "tested": analytics.sensitivity_test(PORTFOLIO, sc["driver"], episodes, with_book, book_freqs, book_units, levels) if episodes else None,
             "largest": sorted(contributions, key=lambda c: -abs(c["contribution"]))[:3]}
 
 
@@ -356,7 +357,8 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
                     "the median across markets. Markets in one episode are not independent, so the episode count matters more than the number of moves; "
                     "history uses today's revised figures. A sensitivity needs 36 periods of history and is scored on at least 3 episodes",
             "portfolio": "the portfolio is treated as one monthly series at its current weights, so correlations between holdings are "
-                         "included; 'largest' shows each holding's weight times its own sensitivity",
+                         "included; 'largest' shows each holding's weight times its own sensitivity; "
+                         "its past test also uses current weights, so it shows how this mix would have behaved, not how a real portfolio did",
             "caveat": NOT_PROBABILITY + " Sensitivities measure how markets moved together, not what causes what.",
         },
     }
