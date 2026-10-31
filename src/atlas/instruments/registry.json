@@ -364,15 +364,15 @@
     },
     {
       "instrument_id": "CMD.GOLD",
-      "name": "Gold",
+      "name": "Gold (monthly average)",
       "asset_class": "commodity",
       "symbol": "GOLD",
       "exchange": null,
       "currency": "USD",
       "unit": "USD per troy ounce",
-      "frequency": "daily",
-      "price_basis": "unavailable",
-      "description": "Gold. No free, redistributable source is configured: LBMA benchmark prices were withdrawn from FRED. Connect a licensed vendor feed to enable.",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Gold, average of daily spot rates since June 2025; London afternoon fixing before that. Monthly average from the World Bank Pink Sheet, not a tradable quote.",
       "tags": [
         "precious_metals",
         "metals",
@@ -384,21 +384,31 @@
         "gc",
         "bullion"
       ],
-      "refresh": "none",
-      "sources": [],
-      "coverage_note": "COVERAGE GAP: no licensed gold price source configured."
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.GOLD"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (London Bullion Market, Bloomberg and others); confirm commercial redistribution rights."
+      }
     },
     {
       "instrument_id": "CMD.SILVER",
-      "name": "Silver",
+      "name": "Silver (monthly average)",
       "asset_class": "commodity",
       "symbol": "SILVER",
       "exchange": null,
       "currency": "USD",
       "unit": "USD per troy ounce",
-      "frequency": "daily",
-      "price_basis": "unavailable",
-      "description": "Silver. No free, redistributable source is configured. Connect a licensed vendor feed to enable.",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Silver, 99.9% refined, London afternoon fixing. Monthly average from the World Bank Pink Sheet, not a tradable quote.",
       "tags": [
         "precious_metals",
         "metals",
@@ -409,9 +419,618 @@
         "xag",
         "si"
       ],
-      "refresh": "none",
-      "sources": [],
-      "coverage_note": "COVERAGE GAP: no licensed silver price source configured."
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.SILVER"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (London Bullion Market, Bloomberg and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.PLATINUM",
+      "name": "Platinum",
+      "asset_class": "commodity",
+      "symbol": "PLATINUM",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per troy ounce",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Platinum, 99.9% refined. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "precious_metals",
+        "metals",
+        "platinum",
+        "south africa"
+      ],
+      "keywords": [
+        "platinum",
+        "xpt"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.PLATINUM"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (Bloomberg and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.ALUMINUM.LME",
+      "name": "Aluminum (LME settlement benchmark)",
+      "asset_class": "commodity",
+      "symbol": "ALUMINUM",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Aluminum, LME high-grade primary ingots, settlement price. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "base_metals",
+        "metals",
+        "aluminum",
+        "china"
+      ],
+      "keywords": [
+        "aluminum",
+        "aluminium"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.ALUMINUM"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (LME via Bloomberg and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.IRONORE",
+      "name": "Iron ore (62% Fe fines, CFR China)",
+      "asset_class": "commodity",
+      "symbol": "IRONORE",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per dry metric ton unit",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Iron ore fines, 62% Fe, spot, delivered China. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "metals",
+        "iron ore",
+        "china",
+        "brazil",
+        "australia"
+      ],
+      "keywords": [
+        "iron ore",
+        "mineral de hierro",
+        "minério de ferro"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.IRON_ORE"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (Bloomberg and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.TIN.LME",
+      "name": "Tin (LME settlement benchmark)",
+      "asset_class": "commodity",
+      "symbol": "TIN",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Tin, LME refined, settlement price. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "base_metals",
+        "metals",
+        "tin",
+        "bolivia",
+        "peru",
+        "indonesia"
+      ],
+      "keywords": [
+        "tin",
+        "estaño"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.TIN"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (LME via Bloomberg and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.ZINC.LME",
+      "name": "Zinc (LME settlement benchmark)",
+      "asset_class": "commodity",
+      "symbol": "ZINC",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Zinc, LME high grade, settlement price. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "base_metals",
+        "metals",
+        "zinc",
+        "peru",
+        "bolivia"
+      ],
+      "keywords": [
+        "zinc"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.ZINC"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (LME via Bloomberg and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.COFFEE.ROBUSTA",
+      "name": "Coffee (robusta)",
+      "asset_class": "commodity",
+      "symbol": "COFFEE-R",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per kilogram",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "International Coffee Organization robusta indicator price. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "softs",
+        "agriculture",
+        "coffee",
+        "brazil",
+        "vietnam"
+      ],
+      "keywords": [
+        "robusta",
+        "robusta coffee"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.ROBUSTA"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (International Coffee Organization, Bloomberg and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.SOYOIL",
+      "name": "Soybean oil (U.S. Gulf)",
+      "asset_class": "commodity",
+      "symbol": "SOYOIL",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Crude degummed soybean oil, FOB U.S. Gulf since January 2025; Dutch or NW Europe before that. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "oilseeds",
+        "agriculture",
+        "soybeans",
+        "vegetable oils",
+        "argentina",
+        "brazil"
+      ],
+      "keywords": [
+        "soybean oil",
+        "soyoil",
+        "soy oil",
+        "aceite de soja"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.SOYBEAN_OIL"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (S&P Global and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.SOYMEAL",
+      "name": "Soybean meal (48% protein, Rotterdam)",
+      "asset_class": "commodity",
+      "symbol": "SOYMEAL",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Soybean meal, 48% protein, FOB Rotterdam since January 2025; Brazilian pellets CIF Rotterdam before that. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "oilseeds",
+        "agriculture",
+        "soybeans",
+        "animal feed",
+        "argentina",
+        "brazil"
+      ],
+      "keywords": [
+        "soybean meal",
+        "soymeal",
+        "soy meal",
+        "harina de soja"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.SOYBEAN_MEAL"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (S&P Global and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.PALMOIL",
+      "name": "Palm oil (Malaysia)",
+      "asset_class": "commodity",
+      "symbol": "PALMOIL",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Palm oil, Malaysia. The grade and delivery terms have changed several times, most recently in January 2026. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "vegetable oils",
+        "agriculture",
+        "palm oil",
+        "malaysia",
+        "indonesia",
+        "colombia"
+      ],
+      "keywords": [
+        "palm oil",
+        "aceite de palma"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.PALM_OIL"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (S&P Global and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.RICE.THAI",
+      "name": "Rice (Thai 5% broken)",
+      "asset_class": "commodity",
+      "symbol": "RICE",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Thai white rice, 5% broken, indicative export price, FOB Bangkok. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "grains",
+        "agriculture",
+        "rice",
+        "thailand",
+        "india"
+      ],
+      "keywords": [
+        "rice",
+        "thai rice",
+        "arroz"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.RICE"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (Bloomberg, USDA and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.COTTON.A",
+      "name": "Cotton (A Index)",
+      "asset_class": "commodity",
+      "symbol": "COTTON",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per kilogram",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Cotton Outlook A Index, middling 1-3/32 inch, Far East. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "softs",
+        "agriculture",
+        "cotton",
+        "brazil",
+        "india"
+      ],
+      "keywords": [
+        "cotton",
+        "algodón",
+        "algodão"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.COTTON"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (Cotton Outlook, Bloomberg and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.BEEF",
+      "name": "Beef (New Zealand, U.S. import)",
+      "asset_class": "commodity",
+      "symbol": "BEEF",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per kilogram",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "New Zealand beef, 90% lean, U.S. import price since January 2024; Australian beef before that. A world benchmark, not a South American price. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "livestock",
+        "agriculture",
+        "beef",
+        "brazil",
+        "argentina",
+        "uruguay"
+      ],
+      "keywords": [
+        "beef",
+        "carne de res",
+        "carne bovina"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.BEEF"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (USDA, Bloomberg and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.BANANA.US",
+      "name": "Bananas (U.S. import)",
+      "asset_class": "commodity",
+      "symbol": "BANANA",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per kilogram",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Central and South American bananas, major brands, U.S. import price. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "softs",
+        "agriculture",
+        "bananas",
+        "ecuador",
+        "colombia",
+        "costa rica",
+        "guatemala"
+      ],
+      "keywords": [
+        "banana",
+        "bananas",
+        "plátano",
+        "banano"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.BANANA"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (FAO, U.S. Bureau of Labor Statistics and others); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.UREA",
+      "name": "Urea (Middle East)",
+      "asset_class": "commodity",
+      "symbol": "UREA",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Urea, prill spot, FOB Middle East since March 2022; Black Sea before that. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "fertilizers",
+        "agriculture",
+        "urea",
+        "nitrogen",
+        "natural gas"
+      ],
+      "keywords": [
+        "urea",
+        "fertilizer",
+        "fertiliser",
+        "fertilizante",
+        "nitrogen fertilizer"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.UREA"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (Green Markets via Bloomberg); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.DAP",
+      "name": "DAP (diammonium phosphate, U.S. Gulf)",
+      "asset_class": "commodity",
+      "symbol": "DAP",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Diammonium phosphate, spot, FOB U.S. Gulf. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "fertilizers",
+        "agriculture",
+        "phosphate"
+      ],
+      "keywords": [
+        "dap",
+        "diammonium phosphate",
+        "phosphate fertilizer",
+        "fertilizer",
+        "fertiliser",
+        "fertilizante"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.DAP"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (Green Markets via Bloomberg); confirm commercial redistribution rights."
+      }
+    },
+    {
+      "instrument_id": "CMD.POTASH",
+      "name": "Potash (muriate of potash, CFR Brazil)",
+      "asset_class": "commodity",
+      "symbol": "POTASH",
+      "exchange": null,
+      "currency": "USD",
+      "unit": "USD per metric ton",
+      "frequency": "monthly",
+      "price_basis": "monthly_average_spot_benchmark",
+      "description": "Potassium chloride, granular spot, delivered Brazil since January 2020; FOB Vancouver before that. Monthly average from the World Bank Pink Sheet.",
+      "tags": [
+        "fertilizers",
+        "agriculture",
+        "potash",
+        "brazil"
+      ],
+      "keywords": [
+        "potash",
+        "potassium chloride",
+        "muriate of potash",
+        "potasio",
+        "fertilizer",
+        "fertiliser",
+        "fertilizante"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "worldbank_cmo",
+          "provider_symbol": "CMO.POTASH"
+        }
+      ],
+      "coverage_note": "Monthly average, not a tradable quote. Daily prices, futures curves and open interest require a licensed exchange or vendor feed.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "World Bank Commodity Price Data (The Pink Sheet)",
+        "note": "World Bank data is generally CC BY 4.0, but this price comes from third parties (Green Markets via Bloomberg); confirm commercial redistribution rights."
+      }
     },
     {
       "instrument_id": "FX.USDBRL",

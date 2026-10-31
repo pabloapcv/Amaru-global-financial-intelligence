@@ -146,9 +146,18 @@ class FakeFred:
         lines = ["DATAFLOW,FREQ,REF_AREA,TIME_PERIOD,OBS_VALUE"] + [f"BIS:WS_CBPOL(1.0),D,{area},{d.date().isoformat()},{v:.2f}" for d, v in zip(dates, 4 + np.cumsum(steps))]
         return ("\n".join(lines) + "\n").encode()
 
+    def _pink_sheet(self, symbol: str) -> bytes:
+        rng = np.random.default_rng(abs(hash(symbol)) % 2**32)
+        end = pd.Timestamp.today().normalize()
+        dates = pd.date_range(end - pd.DateOffset(years=15), end - pd.DateOffset(months=1), freq="MS")
+        values = 100 * np.exp(np.cumsum(rng.normal(0.002, 0.04, len(dates))))
+        return ("\n".join(["month,value"] + [f"{d.date().isoformat()},{v:.3f}" for d, v in zip(dates, values)]) + "\n").encode()
+
     def _series(self, symbol: str) -> bytes:
         if symbol in self.overrides:
             return self.overrides[symbol]
+        if symbol.startswith("CMO."):
+            return self._pink_sheet(symbol)
         if symbol.startswith("CBPOL."):
             return self._policy_rate(symbol)
         if symbol.startswith("psd_"):
@@ -190,13 +199,14 @@ class FakeFred:
         from atlas.ingestion.bis import BisAdapter
         from atlas.ingestion.cftc import CftcAdapter
         from atlas.ingestion.fred import FredAdapter
+        from atlas.ingestion.pinksheet import PinkSheetAdapter
         from atlas.ingestion.worldbank import WorldBankAdapter
 
         from atlas.ingestion.comtrade import ComtradeAdapter
 
         from atlas.ingestion.psd import PsdAdapter
 
-        cls = (BisAdapter if symbol.startswith("CBPOL.") else PsdAdapter if symbol.startswith("psd_") else ComtradeAdapter if _is_trade(symbol)
+        cls = (BisAdapter if symbol.startswith("CBPOL.") else PinkSheetAdapter if symbol.startswith("CMO.") else PsdAdapter if symbol.startswith("psd_") else ComtradeAdapter if _is_trade(symbol)
                else WorldBankAdapter if ":" in symbol else CftcAdapter if symbol.isdigit() else FredAdapter)
         return cls.parse(cls.__new__(cls), symbol, payload)
 
@@ -205,6 +215,18 @@ class FakeFred:
 
     def source_url(self, symbol):
         return f"https://example.invalid/{symbol}"
+
+
+@pytest.fixture
+def no_source(monkeypatch):
+    """A registered instrument with no price source: commercial mode switches off restricted data."""
+    from atlas import instruments
+
+    monkeypatch.setenv("ATLAS_COMMERCIAL_MODE", "true")
+    instruments.datasets.cache_clear()
+    yield "EQ.US.SP500"
+    monkeypatch.delenv("ATLAS_COMMERCIAL_MODE")
+    instruments.datasets.cache_clear()
 
 
 @pytest.fixture(scope="session")

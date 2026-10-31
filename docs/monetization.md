@@ -27,6 +27,7 @@ You can sell it: it is your software, built on permissively licensed open-source
 | BIS policy rates | Must cite the BIS, and including them must not add to what users pay. Confirm the current terms before selling |
 | FRED | Mixed. Some series belong to third parties (S&P 500, VIX, ICE benchmarks) and redistributing them can need the owner's permission. Check each series' notes. |
 | IMF commodity prices (via FRED) | Check the IMF's terms for commercial redistribution |
+| World Bank Pink Sheet prices (gold, silver, fertilizers and others) | World Bank data is generally CC BY 4.0, but it excludes third-party data that needs the provider's consent, and these prices come from Bloomberg, the London Bullion Market and others. Check before selling access |
 | UN Comtrade | The free API tier may not allow commercial use; there is a paid tier |
 | Exchange data (CME, ICE): futures, real-time | Not connected. Licences cost thousands per month and would change the pricing completely |
 

@@ -415,7 +415,7 @@ def test_activity_log_is_scoped_paginated_and_manager_only(secured):
     assert secured.get("/api/v1/activity").status_code == 403
 
 
-def test_watchlist_is_per_workspace_validated_and_capped(secured, monkeypatch):
+def test_watchlist_is_per_workspace_validated_and_capped(secured, monkeypatch, no_source):
     from atlas import watchlist
 
     _signup(secured, "watcher@wl.test", "Watchers")
@@ -426,7 +426,7 @@ def test_watchlist_is_per_workspace_validated_and_capped(secured, monkeypatch):
     assert r.json()["dataset_ids"] == ["US.CPI.HEADLINE", "CMD.SUGAR.ISA"]
     assert secured.post("/api/v1/watchlist/FUND.SUGAR").status_code == 422  # not a quotable series
     assert secured.post("/api/v1/watchlist/NOPE").status_code == 422
-    assert secured.put("/api/v1/watchlist", json={"dataset_ids": ["CMD.SUGAR.ISA", "CMD.GOLD"]}).status_code == 422  # no source
+    assert secured.put("/api/v1/watchlist", json={"dataset_ids": ["CMD.SUGAR.ISA", no_source]}).status_code == 422  # no source
     monkeypatch.setattr(watchlist, "MAX_ITEMS", 2)
     assert secured.post("/api/v1/watchlist/FX.USDBRL").status_code == 422
     # Another workspace has its own (empty) list.
