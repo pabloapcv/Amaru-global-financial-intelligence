@@ -238,6 +238,17 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
         lines += [f"No policy rate for {n['country']}: {n['reason']}." for n in r["not_covered"]]
         lines += [f"{r['caveat']} [{e['label']}]", ""]
 
+    # Fertilizer ------------------------------------------------------------------
+    for e in by_tool.get("get_fertilizer_affordability", []):
+        r = e["result"]
+        lines += ["## Fertilizer affordability", "",
+                  f"Of {len(r['pairs'])} crop and fertilizer pairs, fertilizer is expensive against the crop in {r['expensive']}, typical in {r['typical']} and cheap in {r['cheap']}, "
+                  f"judged against each pair's own history [{e['label']}].", "",
+                  "| Crop | Fertilizer | Tons of crop per ton | 12 months earlier | Historical median | Percentile | Reading | Month |", "|---|---|---|---|---|---|---|---|"]
+        for p in r["pairs"]:
+            lines.append(f"| {p['crop']} | {p['fertilizer']} | {_fmt(p['tons_of_crop'], 3)} | {_fmt(p['tons_12m_ago'], 3)} | {_fmt(p['median'], 3)} | {p['percentile']} | {p['reading']} | {p['as_of'][:7]} |")
+        lines += ["", f"{r['caveat']} [{e['label']}]", ""]
+
     # Central banks ---------------------------------------------------------------
     for e in by_tool.get("get_central_bank_tone", []):
         r = e["result"]

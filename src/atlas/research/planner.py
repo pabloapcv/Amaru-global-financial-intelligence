@@ -35,6 +35,21 @@ DRIVERS: dict[str, list[str]] = {
     "CMD.NATGAS.HH": ["CMD.CRUDE.WTI"],
     "CMD.GOLD": ["RATE.UST.10Y.REAL", "FX.USD.BROAD"],
     "CMD.SILVER": ["RATE.UST.10Y.REAL", "FX.USD.BROAD", "CMD.COPPER.LME"],
+    "CMD.PLATINUM": ["FX.USD.BROAD", "CMD.GOLD"],
+    "CMD.ALUMINUM.LME": ["FX.USDCNY", "FX.USD.BROAD", "CMD.COPPER.LME"],
+    "CMD.IRONORE": ["FX.USDCNY", "FX.USD.BROAD", "CMD.COPPER.LME"],
+    "CMD.TIN.LME": ["FX.USDCNY", "FX.USD.BROAD", "CMD.COPPER.LME"],
+    "CMD.ZINC.LME": ["FX.USDCNY", "FX.USD.BROAD", "CMD.COPPER.LME"],
+    "CMD.COFFEE.ROBUSTA": ["CMD.COFFEE.ARABICA", "FX.USDBRL", "FX.USD.BROAD"],
+    "CMD.SOYOIL": ["CMD.SOYBEANS.US", "CMD.PALMOIL", "CMD.CRUDE.BRENT"],
+    "CMD.SOYMEAL": ["CMD.SOYBEANS.US", "CMD.CORN.US", "FX.USD.BROAD"],
+    "CMD.PALMOIL": ["CMD.SOYOIL", "CMD.CRUDE.BRENT", "FX.USD.BROAD"],
+    "CMD.RICE.THAI": ["CMD.WHEAT.USHRW", "FX.USDINR", "FX.USD.BROAD"],
+    "CMD.COTTON.A": ["FX.USDCNY", "FX.USDINR", "FX.USD.BROAD"],
+    "CMD.BEEF": ["CMD.CORN.US", "FX.USD.BROAD"],
+    "CMD.UREA": ["CMD.NATGAS.HH", "CMD.CRUDE.BRENT", "CMD.CORN.US"],
+    "CMD.DAP": ["CMD.UREA", "CMD.CORN.US", "CMD.SOYBEANS.US"],
+    "CMD.POTASH": ["CMD.UREA", "FX.USDBRL", "CMD.SOYBEANS.US"],
     "FX.USDBRL": ["FX.USD.BROAD", "RATE.UST.10Y", "VOL.US.VIX"],
     "FX.USDMXN": ["FX.USD.BROAD", "RATE.UST.10Y", "VOL.US.VIX"],
 }
@@ -171,6 +186,8 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
             add("compare_countries", countries=country_codes[:20], indicators=indicators[:5])
     if re.search(r"policy rate|central bank|rate (cut|hike|decision)|interest rates? (around|across|in )|monetary policy|selic|banxico", q):
         add("get_policy_rates", **({"countries": country_codes[:20]} if country_codes else {}))
+    if re.search(r"fertili[sz]er|fertilizante|\burea\b|\bpotash\b|\bdap\b|input costs?", q):
+        add("get_fertilizer_affordability")
     us_focus = not country_codes or "USA" in country_codes
     if "macro_overview" in intents and us_focus:
         for e in MACRO_DASHBOARD:
