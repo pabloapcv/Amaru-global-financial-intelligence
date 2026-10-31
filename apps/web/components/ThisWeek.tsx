@@ -10,6 +10,7 @@ type Briefing = {
   series_due: { name: string; next_period_due: string | null; official_release_date: string | null }[];
   calendar_window: { from: string; to: string };
   releases: { title: string; publisher: string; published: string | null; url: string }[];
+  policy_moves: { area: string; name: string; date: string; change_bp: number; rate: number }[];
   usda: { name: string; instrument_id: string | null; usda_release: string; market_year: string; stocks_to_use_pct: number | null;
     stocks_to_use_percentile: number | null; stocks_to_use_change_pp: number | null;
     largest_revision: { market_year: string; attribute: string; change_pct: number | null } | null }[];
@@ -38,6 +39,11 @@ export default function ThisWeek() {
         {due.length > 0 && (
           <p className="muted" style={{ ...small, marginTop: 8 }}>
             U.S. data due: {due.map((d) => `${d.name.replace(/^U\.S\. /, "").split(" (")[0]} (${d.next_period_due}${d.official_release_date ? `, ${day(d.official_release_date)}` : ""})`).join(" · ")}
+          </p>
+        )}
+        {b.policy_moves.length > 0 && (
+          <p className="muted" style={{ ...small, marginTop: 8 }}>
+            Central bank moves: {b.policy_moves.map((m) => `${m.name} ${m.change_bp > 0 ? "+" : ""}${m.change_bp} bp to ${m.rate}% (${day(m.date)})`).join(" · ")}
           </p>
         )}
       </Card>

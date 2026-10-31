@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from atlas import analytics, calendar, documents
+from atlas import analytics, calendar, documents, policy_rates
 from atlas.data.access import DataUnavailable, get_fundamentals, series_meta
 from atlas.instruments import load_registry
 
@@ -48,4 +48,5 @@ def week(days: int = 14) -> dict[str, Any]:
         "calendar_window": {"from": cal["from"], "to": cal["to"]},
         "releases": [{k: d[k] for k in ("title", "publisher", "published", "url")} for d in docs["results"]],
         "usda": usda,
+        "policy_moves": policy_rates.recent_moves(days=30)[:6],
     }

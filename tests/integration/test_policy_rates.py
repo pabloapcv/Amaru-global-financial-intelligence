@@ -111,3 +111,62 @@ def test_policy_rates_reach_the_api_and_a_verified_report(seeded):
     ev = next(e for e in res["evidence"] if e["tool"] == "get_policy_rates")
     assert "path" not in ev["result"]["direction"]  # the chart carries it
     assert any(ch["title"].startswith("Central banks raising") for ch in res["charts"])
+
+
+def rate_rows(area: str, moved_on: date, before: float, after: float) -> bytes:
+    days = pd.date_range(end=pd.Timestamp(date.today()), periods=60)
+    return bis_csv(area, [(d.date().isoformat(), f"{before if d.date() < moved_on else after:.2f}") for d in days])
+
+
+def test_a_central_bank_move_fires_an_agent_once_even_if_reported_late(seeded):
+    from datetime import timedelta
+
+    from atlas import agents
+    from atlas.ingestion import pipeline
+    from atlas.instruments import get_dataset
+
+    with pytest.raises(agents.AgentError, match="no policy rate for atlantis"):
+        agents.validate([], [{"type": "policy_rate_move", "banks": "Brazil, Atlantis"}], {"query": "why?"})
+    a = agents.create("Latin America rates", [], [{"type": "policy_rate_move", "banks": "Mexico, Peru"}],
+                      {"query": "What does this decision mean?", "engine": "deterministic"}, 1, False, "local", "local")
+    assert agents.check_agent(a["agent_id"], background=False)["fired"] is False  # moves stored before the agent existed don't count
+
+    # A decision from three weeks ago reaches ATLAS only now, as the BIS's late reporting would.
+    moved_on = date.today() - timedelta(days=21)
+    ds = get_dataset("BIS.POLICY.PE")
+    res = pipeline.ingest_dataset(ds, adapter=type(seeded)(overrides={"CBPOL.PE": rate_rows("PE", moved_on, 7.25, 7.0)}))
+    assert res.status == "success" and agents.evaluate_agents({"FX.USD.BROAD"}) == []
+    r = agents.check_agent(a["agent_id"], background=False)
+    assert r["fired"], r
+    f = next(x for x in r["findings"] if x["dataset_id"] == "BIS.POLICY.PE")
+    assert f["message"] == f"Peru: policy rate cut 25 bp to 7% on {moved_on.isoformat()}" and f["value"] == -25.0
+    assert not agents.check_agent(a["agent_id"], background=False, force=True)["fired"]  # same decision, no second report
+    # "Check now" looks back further, but not past a decision already reported.
+    assert not any(x["dataset_id"] == "BIS.POLICY.PE" for x in agents.check_agent(a["agent_id"], background=False, force=True, manual=True)["findings"])
+
+    other = agents.create("Asia rates", [], [{"type": "policy_rate_move", "banks": "Japan"}],
+                          {"query": "What does this decision mean?", "engine": "deterministic"}, 1, False, "local", "local")
+    pipeline.ingest_dataset(ds, adapter=type(seeded)(overrides={"CBPOL.PE": rate_rows("PE", moved_on + timedelta(days=7), 7.0, 6.75)}))
+    assert not any(f["dataset_id"] == "BIS.POLICY.PE" for f in agents.check_agent(other["agent_id"], background=False)["findings"])
+
+
+def test_a_global_lean_counts_as_a_rate_signal(seeded, monkeypatch):
+    from atlas import policy_rates, scenarios
+
+    real = policy_rates.overview
+
+    def leaning(hiking: int, cutting: int):
+        def fake(*a, **k):
+            out = real(*a, **k)
+            return {**out, "direction": {**out["direction"], "banks": 19, "hiking": hiking, "cutting": cutting, "on_hold": 19 - hiking - cutting}}
+        monkeypatch.setattr(policy_rates, "overview", fake)
+
+    def signals(sid: str) -> list[str]:
+        scan, _ = scenarios.scan(["CMD.CRUDE.BRENT"], max_scenarios=8)
+        return [g["text"] for s in scan["scenarios"] if s["id"] == sid for g in s["signals"]]
+
+    leaning(10, 4)
+    assert "Over 6 months, 10 of 19 central banks raised rates and 4 cut" in signals("rates_up")
+    assert not any("central banks" in t for t in signals("rates_down"))
+    leaning(9, 5)  # 21% of banks: not enough of a lean
+    assert not any("central banks" in t for t in signals("rates_up"))

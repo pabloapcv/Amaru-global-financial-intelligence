@@ -17,7 +17,7 @@ from sqlalchemy import select
 from atlas import analytics
 from atlas.data.access import DataUnavailable, get_positioning, get_series
 from atlas.data.db import LOCAL_WORKSPACE, AgentEvent, MonitorAgent, session_scope, utcnow
-from atlas.instruments import get_dataset, positioning_for
+from atlas.instruments import get_dataset, load_registry, positioning_for
 
 log = logging.getLogger("atlas.agents")
 
@@ -33,8 +33,12 @@ TRIGGERS: dict[str, dict[str, Any]] = {
                       "help": "a new USDA report revises world production or ending stocks of the commodity by ≥ abs_pct %"},
     "official_release": {"label": "Official release", "param": "keywords", "default": "FOMC statement", "kind": "text",
                          "help": "a new official press release (Fed, BEA, CFTC, USDA AMS, ECB, Bank of England) mentions any of these comma-separated keywords"},
+    "policy_rate_move": {"label": "Central bank move", "param": "banks", "default": "all", "kind": "text", "placeholder": "Brazil, Mexico (or all)",
+                         "help": "the BIS data shows a new policy rate change by any of these comma-separated banks, or by any of the 19 covered for 'all'"},
 }
 RELEASE_TRIGGERS = {"official_release"}
+POLICY_TRIGGER = "policy_rate_move"
+NO_WATCH_TRIGGERS = RELEASE_TRIGGERS | {POLICY_TRIGGER}
 MANUAL_RELEASE_LOOKBACK = timedelta(days=7)
 MAX_WATCH = 20
 
@@ -43,12 +47,22 @@ class AgentError(ValueError):
     pass
 
 
+def _bank_names() -> set[str]:
+    return {a["name"].lower() for a in load_registry()["policy_rates"]["areas"]}
+
+
+def _wanted_banks(value: str) -> set[str]:
+    """Lower-case bank names in a trigger; empty for 'all'."""
+    names = {w.strip().lower() for w in value.split(",") if w.strip()}
+    return set() if names == {"all"} else names
+
+
 def validate(watch: list[str], triggers: list[dict[str, Any]], action: dict[str, Any]) -> None:
     from atlas.research.templates import TEMPLATES
 
     if not triggers:
         raise AgentError("add at least one trigger")
-    market_triggers = [t for t in triggers if t.get("type") not in RELEASE_TRIGGERS]
+    market_triggers = [t for t in triggers if t.get("type") not in NO_WATCH_TRIGGERS]
     if (market_triggers and not watch) or len(watch) > MAX_WATCH:
         raise AgentError(f"watch 1–{MAX_WATCH} datasets")
     for d in watch:
@@ -64,6 +78,8 @@ def validate(watch: list[str], triggers: list[dict[str, Any]], action: dict[str,
             words = [w for w in str(value).split(",") if w.strip()] if isinstance(value, str) else []
             if not words or len(words) > 10 or any(len(w.strip()) < 2 for w in words):
                 raise AgentError(f"{t['type']}.{spec['param']}: 1–10 comma-separated keywords")
+            if t["type"] == POLICY_TRIGGER and (unknown := _wanted_banks(value) - _bank_names()):
+                raise AgentError(f"no policy rate for {', '.join(sorted(unknown))}. Use 'all' or: {', '.join(sorted(_bank_names()))}")
         elif not isinstance(value, (int, float)) or isinstance(value, bool):
             raise AgentError(f"{t['type']}.{spec['param']} must be a number")
     if action.get("template", "research_report") not in TEMPLATES:
@@ -142,6 +158,17 @@ def _release_findings(trigger: dict[str, Any], since, by_published: bool = False
             for d in documents.new_since(since, keywords, trigger.get("sources"), by_published=by_published)]
 
 
+def _policy_findings(trigger: dict[str, Any], since) -> list[dict[str, Any]]:
+    from atlas import policy_rates
+
+    wanted = _wanted_banks(str(trigger.get("banks", TRIGGERS[POLICY_TRIGGER]["default"])))
+    return [{"dataset_id": m["dataset_id"], "trigger": POLICY_TRIGGER, "value": m["change_bp"],
+             # One decision fires an agent once, however often it is checked afterwards.
+             "dedupe_key": f"{m['dataset_id']}:{m['date']}",
+             "message": f"{m['name']}: policy rate {'raised' if m['change_bp'] > 0 else 'cut'} {abs(m['change_bp']):g} bp to {m['rate']:g}% on {m['date']}"}
+            for m in policy_rates.recent_moves(stored_since=since) if not wanted or m["name"].lower() in wanted]
+
+
 def check_agent(agent_id: str, *, force: bool = False, background: bool = True, manual: bool = False) -> dict[str, Any]:
     """Evaluate one agent. Starts research if a trigger fires and the cooldown has passed (or force).
     `manual` (a user's "Check now") makes release triggers look at the past week's releases."""
@@ -163,9 +190,11 @@ def check_agent(agent_id: str, *, force: bool = False, background: bool = True, 
             # Automatic checks: releases indexed since the last check. A manual check: the past week's releases.
             findings += _release_findings(trig, now - MANUAL_RELEASE_LOOKBACK, by_published=True) if manual \
                 else _release_findings(trig, since)
+        elif trig["type"] == POLICY_TRIGGER:
+            findings += _policy_findings(trig, None if manual else since)
     for dsid in watch:
         for trig in triggers:
-            if trig["type"] in RELEASE_TRIGGERS:
+            if trig["type"] in NO_WATCH_TRIGGERS:
                 continue
             try:
                 f = _evaluate_trigger(trig, dsid)
@@ -241,10 +270,12 @@ def evaluate_agents(changed_datasets: Iterable[str] | None = None, workspace_id:
         from atlas.data.db import suspended_workspace_ids
 
         suspended = suspended_workspace_ids()
-        agents = [(a.agent_id, list(a.watch)) for a in s.execute(q).scalars() if a.workspace_id not in suspended]
+        agents = [(a.agent_id, list(a.watch), any(t.get("type") == POLICY_TRIGGER for t in a.triggers))
+                  for a in s.execute(q).scalars() if a.workspace_id not in suspended]
+    rates_changed = changed is not None and any(d.startswith("BIS.POLICY.") for d in changed)
     results = []
-    for agent_id, watch in agents:
-        if changed is not None and not changed.intersection(watch):
+    for agent_id, watch, on_rates in agents:
+        if changed is not None and not changed.intersection(watch) and not (on_rates and rates_changed):
             continue
         try:
             results.append(check_agent(agent_id))

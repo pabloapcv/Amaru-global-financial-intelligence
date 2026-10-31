@@ -7,16 +7,19 @@ raised minus the share that cut, counting every bank once whatever the size of i
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
+from sqlalchemy import func, select
 
 from atlas.data.access import DataUnavailable, get_series
+from atlas.data.db import MacroObservation, session_scope
 from atlas.instruments import STALE_POLICY_RATE_DAYS, load_registry, policy_rate_id
 
 DIRECTION_MONTHS = 6
 MIN_BANKS = 10
+RECENT_DAYS = 45  # long enough for a bank the BIS reports late
 NOT_COVERED = {"ARG": "the BIS series stopped in June 2025", "BOL": "not in the BIS data", "ECU": "not in the BIS data",
                "URY": "not in the BIS data", "PRY": "not in the BIS data"}
 CAVEAT = ("Rates are as the BIS reports them and arrive about a week late, so a decision in the past few days may be missing. "
@@ -62,6 +65,35 @@ def _net_path(series: dict[str, pd.Series]) -> list[dict[str, Any]]:
     known = change.notna().sum(axis=1)
     net = 100 * (change.gt(1e-9).sum(axis=1) - change.lt(-1e-9).sum(axis=1)) / known.where(known >= MIN_BANKS)
     return [{"date": d.date().isoformat(), "value": round(float(v), 1)} for d, v in net.dropna().items()]
+
+
+def recent_moves(days: int = RECENT_DAYS, stored_since: datetime | None = None, today: date | None = None) -> list[dict[str, Any]]:
+    """Moves dated in the past `days`, newest first.
+
+    `stored_since` keeps only moves ATLAS stored or corrected after that time: the date of a move can't say
+    what is new, because the BIS reports some banks weeks late.
+    """
+    cutoff = (today or date.today()) - timedelta(days=days)
+    out = []
+    for a in load_registry()["policy_rates"]["areas"]:
+        sid = policy_rate_id(a["code"])
+        try:
+            s, _ = get_series(sid, start=cutoff - timedelta(days=120))
+        except DataUnavailable:
+            continue
+        moves = s.diff().dropna()
+        moves = moves[(moves.abs() > 1e-9) & (moves.index.date >= cutoff)]
+        if moves.empty:
+            continue
+        if stored_since is not None:
+            with session_scope() as db:
+                stored = dict(db.execute(select(MacroObservation.period, func.max(MacroObservation.vintage_at))
+                                         .where(MacroObservation.series_id == sid, MacroObservation.period >= cutoff)
+                                         .group_by(MacroObservation.period)).all())
+            moves = moves[[stored[d.date()] >= stored_since for d in moves.index]]
+        out += [{"area": a["code"], "name": a["name"], "dataset_id": sid, "date": d.date().isoformat(), "change_bp": _bp(v),
+                 "rate": round(float(s[d]), 3)} for d, v in moves.items()]
+    return sorted(out, key=lambda m: m["date"], reverse=True)
 
 
 def overview(countries: list[str] | None = None, today: date | None = None) -> dict[str, Any]:
