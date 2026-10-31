@@ -47,6 +47,7 @@ HORIZON = 12
 LABEL_LAG = 12  # NBER dates a recession long after it starts
 FIRST_SCORED = "1995-01-01"
 MIN_POSITIVE = 6
+HIGH_ESTIMATE = 0.5  # the record counts how often an estimate this high was followed by no recession
 EXCLUDE_RECENT = 24  # months this close to today are neighbours, not precedents
 MIN_GAP = 12  # one episode can't fill every slot
 ANALOGS = 5
@@ -137,10 +138,12 @@ def walk_forward(x: pd.DataFrame, recession: pd.Series, columns: list[str], firs
         raise CycleUnavailable("too little history to score the model")
     y = scored["y"].to_numpy()
     area = auc(scored["p"].to_numpy(), y)
+    high = scored["p"] >= HIGH_ESTIMATE
     return {"inputs": columns, "months_scored": len(scored), "months_before_recession": int(y.sum()),
             "first_month": scored.index[0].date().isoformat(), "last_month": scored.index[-1].date().isoformat(),
             "auc": None if area is None else round(area, 3), "brier": round(float(((scored["p"] - y) ** 2).mean()), 4),
-            "brier_average_only": round(float(((scored["base"] - y) ** 2).mean()), 4)}, frame["p"]
+            "brier_average_only": round(float(((scored["base"] - y) ** 2).mean()), 4),
+            "months_high": int(high.sum()), "months_high_no_recession": int((high & (scored["y"] == 0)).sum())}, frame["p"]
 
 
 def _recessions(recession: pd.Series, since: pd.Timestamp) -> int:
