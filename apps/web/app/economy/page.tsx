@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import BusinessCycle from "@/components/BusinessCycle";
+import PolicyRates from "@/components/PolicyRates";
 import Chart from "@/components/Chart";
 import InstrumentDetail from "@/components/InstrumentDetail";
 import TradeFlows from "@/components/TradeFlows";
@@ -187,6 +188,7 @@ export default function Economy() {
       <div className="stack">
         <EconomicCalendar />
         <BusinessCycle />
+        <PolicyRates />
         <CountryComparison />
         <TradeFlows />
         <div className="split">

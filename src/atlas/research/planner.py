@@ -169,6 +169,8 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
             add("get_country_profile", country=country_codes[0])
         else:
             add("compare_countries", countries=country_codes[:20], indicators=indicators[:5])
+    if re.search(r"policy rate|central bank|rate (cut|hike|decision)|interest rates? (around|across|in )|monetary policy|selic|banxico", q):
+        add("get_policy_rates", **({"countries": country_codes[:20]} if country_codes else {}))
     us_focus = not country_codes or "USA" in country_codes
     if "macro_overview" in intents and us_focus:
         for e in MACRO_DASHBOARD:

@@ -8,7 +8,7 @@ const LICENCES: Record<string, [string, string]> = {
   public_domain: ["Public domain", "current"], cc_by: ["CC BY 4.0", "current"], check_terms: ["Check terms", "delayed"],
   third_party_restricted: ["Restricted", "stale"],
 };
-const PROVIDERS: Record<string, string> = { fred: "FRED", cftc: "CFTC", worldbank: "WB", comtrade: "Comtrade", usda_psd: "USDA" };
+const PROVIDERS: Record<string, string> = { fred: "FRED", cftc: "CFTC", worldbank: "WB", comtrade: "Comtrade", usda_psd: "USDA", bis: "BIS" };
 
 type Status = {
   dataset_id: string; name: string; kind: string; asset_class: string; frequency: string; provider_id: string | null; provider_symbol: string | null;
@@ -30,7 +30,7 @@ export default function DataExplorer() {
   const [kind, setKind] = useState("market");
   const [filter, setFilter] = useState("");
   const shown = status.filter((s) =>
-    (kind === "all" || (kind === "country" ? s.dataset_id.startsWith("WB.") : s.kind === kind && !s.dataset_id.startsWith("WB."))) &&
+    (kind === "all" || (kind === "country" ? /^(WB|BIS)\./.test(s.dataset_id) : s.kind === kind && !/^(WB|BIS)\./.test(s.dataset_id))) &&
     (!filter || `${s.name} ${s.dataset_id}`.toLowerCase().includes(filter.toLowerCase())));
 
   const load = useCallback(() => {

@@ -138,9 +138,19 @@ class FakeFred:
                     lines.append(f"{y},{code},{name},{attr},{v:.1f},{last}-0{min(9, 1 + y % 9)}")
         return ("\n".join(lines) + "\n").encode()
 
+    def _policy_rate(self, symbol: str) -> bytes:
+        area = symbol.split(".")[1]
+        rng = np.random.default_rng(abs(hash(symbol)) % 2**32)
+        dates = pd.date_range(pd.Timestamp.today().normalize() - pd.DateOffset(years=5), pd.Timestamp.today().normalize() - pd.Timedelta(days=5))
+        steps = rng.choice([-0.25, 0.0, 0.25], len(dates), p=[0.01, 0.98, 0.01])
+        lines = ["DATAFLOW,FREQ,REF_AREA,TIME_PERIOD,OBS_VALUE"] + [f"BIS:WS_CBPOL(1.0),D,{area},{d.date().isoformat()},{v:.2f}" for d, v in zip(dates, 4 + np.cumsum(steps))]
+        return ("\n".join(lines) + "\n").encode()
+
     def _series(self, symbol: str) -> bytes:
         if symbol in self.overrides:
             return self.overrides[symbol]
+        if symbol.startswith("CBPOL."):
+            return self._policy_rate(symbol)
         if symbol.startswith("psd_"):
             return self._psd(symbol)
         if _is_trade(symbol):
@@ -169,7 +179,7 @@ class FakeFred:
 
         self.calls.append((symbol, since))
         payload = self._series(symbol)
-        if since and (":" in symbol or symbol.isdigit() or symbol.startswith("psd_")):
+        if since and (":" in symbol or symbol.isdigit() or symbol.startswith(("psd_", "CBPOL."))):
             pass  # JSON fakes return full history; idempotent publish handles the overlap
         elif since:
             lines = payload.decode().splitlines()
@@ -177,6 +187,7 @@ class FakeFred:
         return FetchResult(request=f"fake://{symbol}", payload=payload, content_type="text/csv")
 
     def parse(self, symbol, payload):
+        from atlas.ingestion.bis import BisAdapter
         from atlas.ingestion.cftc import CftcAdapter
         from atlas.ingestion.fred import FredAdapter
         from atlas.ingestion.worldbank import WorldBankAdapter
@@ -185,7 +196,7 @@ class FakeFred:
 
         from atlas.ingestion.psd import PsdAdapter
 
-        cls = (PsdAdapter if symbol.startswith("psd_") else ComtradeAdapter if _is_trade(symbol)
+        cls = (BisAdapter if symbol.startswith("CBPOL.") else PsdAdapter if symbol.startswith("psd_") else ComtradeAdapter if _is_trade(symbol)
                else WorldBankAdapter if ":" in symbol else CftcAdapter if symbol.isdigit() else FredAdapter)
         return cls.parse(cls.__new__(cls), symbol, payload)
 

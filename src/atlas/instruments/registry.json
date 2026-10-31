@@ -2090,5 +2090,236 @@
       "owner": "U.S. Department of Agriculture (FAS PSD)",
       "note": "U.S. government data."
     }
+  },
+  "policy_rates": {
+    "_comment": "Daily central bank policy rates from the BIS, one per currency area. Germany, France and Italy share the euro area's rate.",
+    "provider_id": "bis",
+    "areas": [
+      {
+        "code": "US",
+        "name": "United States",
+        "countries": [
+          "USA"
+        ],
+        "keywords": [
+          "united states policy rate",
+          "united states interest rate",
+          "fed policy rate"
+        ]
+      },
+      {
+        "code": "XM",
+        "name": "Euro area",
+        "countries": [
+          "DEU",
+          "FRA",
+          "ITA"
+        ],
+        "keywords": [
+          "euro area policy rate",
+          "euro area interest rate",
+          "ecb policy rate",
+          "ecb deposit rate"
+        ]
+      },
+      {
+        "code": "JP",
+        "name": "Japan",
+        "countries": [
+          "JPN"
+        ],
+        "keywords": [
+          "japan policy rate",
+          "japan interest rate",
+          "boj policy rate"
+        ]
+      },
+      {
+        "code": "GB",
+        "name": "United Kingdom",
+        "countries": [
+          "GBR"
+        ],
+        "keywords": [
+          "united kingdom policy rate",
+          "united kingdom interest rate",
+          "bank rate",
+          "boe policy rate"
+        ]
+      },
+      {
+        "code": "CA",
+        "name": "Canada",
+        "countries": [
+          "CAN"
+        ],
+        "keywords": [
+          "canada policy rate",
+          "canada interest rate"
+        ]
+      },
+      {
+        "code": "CN",
+        "name": "China",
+        "countries": [
+          "CHN"
+        ],
+        "keywords": [
+          "china policy rate",
+          "china interest rate"
+        ]
+      },
+      {
+        "code": "KR",
+        "name": "South Korea",
+        "countries": [
+          "KOR"
+        ],
+        "keywords": [
+          "south korea policy rate",
+          "south korea interest rate"
+        ]
+      },
+      {
+        "code": "AU",
+        "name": "Australia",
+        "countries": [
+          "AUS"
+        ],
+        "keywords": [
+          "australia policy rate",
+          "australia interest rate"
+        ]
+      },
+      {
+        "code": "IN",
+        "name": "India",
+        "countries": [
+          "IND"
+        ],
+        "keywords": [
+          "india policy rate",
+          "india interest rate",
+          "rbi repo rate"
+        ]
+      },
+      {
+        "code": "ID",
+        "name": "Indonesia",
+        "countries": [
+          "IDN"
+        ],
+        "keywords": [
+          "indonesia policy rate",
+          "indonesia interest rate"
+        ]
+      },
+      {
+        "code": "TR",
+        "name": "Turkey",
+        "countries": [
+          "TUR"
+        ],
+        "keywords": [
+          "turkey policy rate",
+          "turkey interest rate"
+        ]
+      },
+      {
+        "code": "SA",
+        "name": "Saudi Arabia",
+        "countries": [
+          "SAU"
+        ],
+        "keywords": [
+          "saudi arabia policy rate",
+          "saudi arabia interest rate"
+        ]
+      },
+      {
+        "code": "ZA",
+        "name": "South Africa",
+        "countries": [
+          "ZAF"
+        ],
+        "keywords": [
+          "south africa policy rate",
+          "south africa interest rate"
+        ]
+      },
+      {
+        "code": "RU",
+        "name": "Russia",
+        "countries": [
+          "RUS"
+        ],
+        "keywords": [
+          "russia policy rate",
+          "russia interest rate"
+        ]
+      },
+      {
+        "code": "BR",
+        "name": "Brazil",
+        "countries": [
+          "BRA"
+        ],
+        "keywords": [
+          "brazil policy rate",
+          "brazil interest rate",
+          "selic"
+        ]
+      },
+      {
+        "code": "MX",
+        "name": "Mexico",
+        "countries": [
+          "MEX"
+        ],
+        "keywords": [
+          "mexico policy rate",
+          "mexico interest rate",
+          "banxico rate"
+        ]
+      },
+      {
+        "code": "CL",
+        "name": "Chile",
+        "countries": [
+          "CHL"
+        ],
+        "keywords": [
+          "chile policy rate",
+          "chile interest rate"
+        ]
+      },
+      {
+        "code": "CO",
+        "name": "Colombia",
+        "countries": [
+          "COL"
+        ],
+        "keywords": [
+          "colombia policy rate",
+          "colombia interest rate"
+        ]
+      },
+      {
+        "code": "PE",
+        "name": "Peru",
+        "countries": [
+          "PER"
+        ],
+        "keywords": [
+          "peru policy rate",
+          "peru interest rate"
+        ]
+      }
+    ],
+    "licence": {
+      "class": "check_terms",
+      "owner": "Bank for International Settlements",
+      "note": "The BIS must be cited as the source, and including its statistics in a commercial product must not add to what users are charged. Confirm the current terms with the BIS before selling access."
+    }
   }
 }
