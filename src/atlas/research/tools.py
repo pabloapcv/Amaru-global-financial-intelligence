@@ -822,6 +822,19 @@ def t_get_policy_rates(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
     return {"evidence_id": label, **full}
 
 
+def t_get_fertilizer_affordability(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import fertilizer
+
+    try:
+        full = fertilizer.overview()
+    except fertilizer.FertilizerUnavailable as exc:
+        raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap.") from exc
+    metas = full.pop("sources")
+    chart = {"type": "line", "title": "Tons of crop to buy a ton of fertilizer", "unit": "tons", "series": full.pop("chart")}
+    label = ctx.add("get_fertilizer_affordability", args, full, "ATLAS ratio of fertilizer and crop prices: " + _cite(metas), [_source(m) for m in metas], chart)
+    return {"evidence_id": label, **full}
+
+
 def t_get_central_bank_tone(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     from atlas import tone
 
@@ -973,6 +986,11 @@ TOOLS: dict[str, dict[str, Any]] = {
     "get_business_cycle": {
         "fn": t_get_business_cycle,
         "description": "U.S. business cycle: a 12-month recession probability from a probit on the yield spread, financial conditions and unemployment, with its walk-forward record (AUC, Brier score against always guessing the average) and a simpler model for comparison; plus the past months most like today and what markets did in the next 12 months. State the limits: very few recessions were tested, unemployment history is revised, and similar periods are a lookup, not a tested signal.",
+        "schema": {"type": "object", "properties": {}},
+    },
+    "get_fertilizer_affordability": {
+        "fn": t_get_fertilizer_affordability,
+        "description": "How many tons of corn, wheat, rice, soybeans, sugar or coffee it takes to buy a ton of urea, DAP or potash, ranked against each pair's history. Uses world benchmark prices, not farm-gate costs; say so, and don't call a high reading a forecast.",
         "schema": {"type": "object", "properties": {}},
     },
     "get_policy_rates": {
