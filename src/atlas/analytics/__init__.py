@@ -129,6 +129,16 @@ def performance(series: pd.Series, *, unit: str, frequency: str) -> dict[str, An
 # ---------------------------------------------------------------- relationships
 
 
+def _common_levels(series: dict[str, pd.Series], frequencies: dict[str, str]) -> tuple[pd.DataFrame, str]:
+    freq = coarsest(list(frequencies.values()))
+    levels = {k: resample(s, freq, how="mean") if frequencies[k] != freq else s for k, s in series.items()}
+    return pd.DataFrame(levels).dropna(), freq
+
+
+def _hac_lags(freq: str) -> int:
+    return {"daily": 5, "weekly": 4, "monthly": 3, "quarterly": 2}.get(freq, 3)
+
+
 def align(
     series: dict[str, pd.Series], frequencies: dict[str, str], units: dict[str, str], lookback_years: float | None = None
 ) -> tuple[pd.DataFrame, str, dict[str, str]]:
@@ -137,11 +147,7 @@ def align(
     Daily series are averaged within the period when the target frequency is coarser,
     which matches the monthly-average construction of the IMF commodity benchmarks.
     """
-    freq = coarsest(list(frequencies.values()))
-    levels = {}
-    for k, s in series.items():
-        levels[k] = resample(s, freq, how="mean") if frequencies[k] != freq else s
-    df = pd.DataFrame(levels).dropna()
+    df, freq = _common_levels(series, frequencies)
     if lookback_years and not df.empty:
         df = df[df.index > df.index[-1] - pd.DateOffset(months=int(lookback_years * 12))]
     kinds = {k: transform_kind(units[k]) for k in series}
@@ -223,7 +229,7 @@ def regression(
     if n < 12 + len(x_cols):
         raise ValueError(f"only {n} overlapping observations; too few for {len(x_cols)} regressors")
     X = sm.add_constant(changes[x_cols])
-    maxlags = {"daily": 5, "weekly": 4, "monthly": 3, "quarterly": 2}.get(freq, 3)
+    maxlags = _hac_lags(freq)
     model = sm.OLS(changes[y_name], X).fit(cov_type="HAC", cov_kwds={"maxlags": maxlags})
     coefs = []
     for name in model.params.index:
@@ -469,6 +475,14 @@ def forecast(series: pd.Series, *, unit: str, frequency: str, horizon_months: in
 # ---------------------------------------------------------------- scenarios
 
 
+def _shock_input(shock: float, kind: str) -> float:
+    return math.log1p(shock / 100.0) if kind == "log_return" else shock / 100.0
+
+
+def _shock_output(value: float, kind: str) -> float:
+    return (math.exp(value) - 1) * 100 if kind == "log_return" else value * 100
+
+
 def scenario(
     asset: str,
     driver: str,
@@ -487,11 +501,11 @@ def scenario(
     coef = next(c for c in reg["coefficients"] if c["variable"] == driver)
     kinds = reg["method"]["transforms"]
     # % shock → log-return units; bp shock → percentage points
-    x = math.log1p(shock / 100.0) if kinds[driver] == "log_return" else shock / 100.0
+    x = _shock_input(shock, kinds[driver])
     beta, se = coef["coefficient"], coef["std_error"]
     impact = beta * x
     lo, hi = (beta - 1.96 * se) * x, (beta + 1.96 * se) * x
-    to_out = (lambda v: (math.exp(v) - 1) * 100) if kinds[asset] == "log_return" else (lambda v: v * 100)
+    to_out = lambda v: _shock_output(v, kinds[asset])  # noqa: E731
     return {
         "label": "HYPOTHETICAL SCENARIO",
         "asset": asset,
@@ -516,6 +530,7 @@ def scenario(
 
 
 MIN_EPISODES = 3  # fewer past episodes than this are listed but not summarized
+MIN_TEST_OBSERVATIONS = 36  # periods of history a sensitivity needs before it is scored
 
 
 def monthly_levels(series: pd.Series) -> pd.Series | None:
@@ -553,14 +568,16 @@ def past_episodes(levels: pd.Series, shock: float, kind: str, horizon_months: in
             "since": moves.index[0].date().isoformat() if len(moves) else None, "episodes": episodes}
 
 
+def _episode_move(levels: pd.Series, kind: str, episode: dict[str, Any]) -> float | None:
+    a, b = levels.get(pd.Timestamp(episode["start"])), levels.get(pd.Timestamp(episode["end"]))
+    if a is None or b is None or pd.isna(a) or pd.isna(b) or (kind != "diff" and a <= 0):
+        return None
+    return float((b - a) * 100 if kind == "diff" else (b / a - 1) * 100)
+
+
 def episode_response(levels: pd.Series, kind: str, episodes: list[dict[str, Any]], implied: float | None = None) -> dict[str, Any]:
     """What a series did over the same windows, compared with the move its sensitivity implies."""
-    moved = []
-    for ep in episodes:
-        a, b = levels.get(pd.Timestamp(ep["start"])), levels.get(pd.Timestamp(ep["end"]))
-        if a is None or b is None or pd.isna(a) or pd.isna(b) or (kind != "diff" and a <= 0):
-            continue
-        moved.append(float((b - a) * 100 if kind == "diff" else (b / a - 1) * 100))
+    moved = [m for ep in episodes if (m := _episode_move(levels, kind, ep)) is not None]
     if len(moved) < MIN_EPISODES:
         return {"n": len(moved), "too_few": True}
     median = float(np.median(moved))
@@ -569,6 +586,42 @@ def episode_response(levels: pd.Series, kind: str, episodes: list[dict[str, Any]
         out["same_direction"] = sum(1 for v in moved if v * implied > 0)
         out["disagrees"] = len(moved) >= 5 and median * implied < 0
     return out
+
+
+def sensitivity_test(asset: str, driver: str, episodes: list[dict[str, Any]], series: dict[str, pd.Series], frequencies: dict[str, str],
+                     units: dict[str, str], levels: pd.Series, lookback_years: float = 10) -> dict[str, Any]:
+    """Would the sensitivity have helped in past episodes? Each is fitted only on data up to the episode's start.
+
+    The fitted effect of the driver's actual move is scored against what the asset did. The benchmark
+    is assuming no move: `error_ratio` below 1 means the sensitivity's errors were smaller than that.
+    """
+    import statsmodels.api as sm
+
+    levels_both, freq = _common_levels({asset: series[asset], driver: series[driver]}, frequencies)
+    kinds = {k: transform_kind(units[k]) for k in (asset, driver)}
+    changes = pd.DataFrame({k: transform(levels_both[k], kinds[k]) for k in (asset, driver)}, index=levels_both.index)
+    tests: list[tuple[float, float, bool]] = []
+    for ep in episodes:
+        actual = _episode_move(levels, kinds[asset], ep)
+        if actual is None:
+            continue
+        cut = pd.Timestamp(ep["start"])
+        known = levels_both.index[levels_both.index <= cut]
+        if not len(known):
+            continue
+        window = known[known > known[-1] - pd.DateOffset(months=int(lookback_years * 12))]
+        rows = changes.loc[window[1:]].dropna().to_numpy()
+        if len(rows) < MIN_TEST_OBSERVATIONS:
+            continue
+        model = sm.OLS(rows[:, 0], sm.add_constant(rows[:, 1], has_constant="add")).fit(cov_type="HAC", cov_kwds={"maxlags": _hac_lags(freq)})
+        fit = _shock_output(float(model.params[1]) * _shock_input(ep["driver_move"], kinds[driver]), kinds[asset])
+        tests.append((fit, actual, float(model.pvalues[1]) <= 0.05))
+    if len(tests) < MIN_EPISODES:
+        return {"n": len(tests), "too_few": True}
+    baseline = sum(abs(actual) for _, actual, _ in tests)
+    return {"n": len(tests), "too_few": False, "right_way": sum(1 for fit, actual, _ in tests if fit * actual > 0),
+            "error_ratio": _r(sum(abs(fit - actual) for fit, actual, _ in tests) / baseline, 2) if baseline else None,
+            "reliable_n": sum(1 for *_, sig in tests if sig), "reliable_right_way": sum(1 for fit, actual, sig in tests if sig and fit * actual > 0)}
 
 
 # ---------------------------------------------------------------- positioning

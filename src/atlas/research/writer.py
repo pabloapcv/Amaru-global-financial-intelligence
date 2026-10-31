@@ -168,6 +168,14 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             elif hist:
                 lines += [f"*Past episodes:* {s['driver_name']} has not moved this much within {hist['horizon_months']} months since {hist['since'][:7]}, "
                           f"so this scenario has no precedent in the stored data [{e['label']}].", ""]
+            test = s.get("test")
+            if test:
+                ratio = test["error_ratio"]
+                errors = f"; the median market's error was {_fmt(ratio)} times that of assuming no move" if ratio is not None else ""
+                reliable = (f"; {test['reliable_right_way']} of the {test['reliable_moves']} that looked reliable at the time went the right way"
+                            if test["reliable_moves"] else "")
+                lines += [f"*Test on past episodes:* fitted only on earlier data, the sensitivities pointed the right way on {test['right_way']} of "
+                          f"{test['moves']} market moves across {test['episodes']} episodes{reliable}{errors} [{e['label']}].", ""]
             if rows:
                 lines += ["| Market | Historical effect | 95% range | Reliable? | Past episodes (median) |", "|---|---|---|---|---|"]
                 for im in sorted(rows, key=lambda im: (not im["significant"], -abs(im["implied_move"]))):
@@ -182,7 +190,7 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
                 if big:
                     lines += ["Clearest effects (largest relative to their uncertainty): " + ", ".join(f"{im['name']} {_fmt(im['implied_move'])}{' bp' if im['unit'] == 'bp' else '%'}" for im in big)
                               + f" [{e['label']}].", ""]
-        lines += [f"*Method:* {r['method']['selection']}. Effects: {r['method']['effects']}. Past episodes: {r['method']['history']}. {r['method']['caveat']}", ""]
+        lines += [f"*Method:* {r['method']['selection']}. Effects: {r['method']['effects']}. Past episodes: {r['method']['history']}. Test: {r['method']['test']}. {r['method']['caveat']}", ""]
         if r.get("next_fomc"):
             lines += [f"The next FOMC meeting is on {r['next_fomc']} [{e['label']}].", ""]
 
