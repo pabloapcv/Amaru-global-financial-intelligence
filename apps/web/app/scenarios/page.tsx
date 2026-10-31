@@ -10,13 +10,15 @@ const DEFAULT_UNIVERSE = ["CMD.CRUDE.BRENT", "CMD.COPPER.LME", "CMD.SUGAR.ISA", 
   "FX.USD.BROAD", "FX.USDBRL", "FX.USDMXN", "RATE.UST.10Y", "EQ.US.SP500"];
 
 type Past = { n: number; too_few: boolean; median?: number; low?: number; high?: number; same_direction?: number; disagrees?: boolean };
-type Impact = { dataset_id: string; name: string; implied_move: number; unit: "pct" | "bp"; ci95: [number, number] | null; significant: boolean; is_driver: boolean; past?: Past | null };
+type Tested = { n: number; too_few: boolean; right_way?: number; error_ratio?: number | null };
+type Impact = { dataset_id: string; name: string; implied_move: number; unit: "pct" | "bp"; ci95: [number, number] | null; significant: boolean; is_driver: boolean; past?: Past | null; tested?: Tested | null };
+type TestRecord = { episodes: number; markets: number; moves: number; right_way: number; error_ratio: number | null; reliable_moves: number; reliable_right_way: number };
 type History = { n: number; horizon_months: number; since: string | null; episodes: { start: string; end: string; driver_move: number }[] };
 type PortfolioEffect = { implied_move: number; ci95: [number, number]; significant: boolean; past: Past;
   largest: { dataset_id: string; name: string; weight: number; contribution: number }[] };
 type Scenario = { id: string; name: string; kind: string; driver_name: string; shock: number; shock_unit: string; relevance: number | null;
   relevance_label?: string; signals: { text: string }[]; impacts: Impact[]; clearest_effects: string[]; is_new?: boolean;
-  history?: History | null; portfolio?: PortfolioEffect | null };
+  history?: History | null; test?: TestRecord | null; portfolio?: PortfolioEffect | null };
 type Brief = { id: string; name: string; relevance: number | null };
 type Changes = { previous_scan_at: string; previous_as_of: string | null; new: Brief[]; dropped: Brief[];
   stronger: { id: string; name: string; from: number; to: number }[]; weaker: { id: string; name: string; from: number; to: number }[] };
@@ -53,6 +55,21 @@ function HistoryLine({ h }: { h?: History | null }) {
   );
 }
 
+function TestLine({ t }: { t?: TestRecord | null }) {
+  if (!t) return null;
+  const ratio = t.error_ratio;
+  const change = ratio === null ? 0 : Math.round(Math.abs(1 - ratio) * 100);
+  return (
+    <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>
+      <strong>Tested on past episodes:</strong> fitted only on earlier data, these sensitivities pointed the right way on {t.right_way} of {t.moves} market moves across {t.episodes} episodes
+      {t.reliable_moves > 0 && ` (${t.reliable_right_way} of ${t.reliable_moves} for those that looked reliable at the time)`}.
+      {ratio !== null && <> The median market's errors were <span style={ratio >= 1.05 ? { color: "var(--down)" } : undefined}>{change < 5 ? "about the same as" : `${change}% ${ratio < 1 ? "smaller" : "larger"} than`}</span> assuming no move.</>}
+    </p>
+  );
+}
+
+const testTitle = (t?: Tested | null) => !t || t.too_few ? "" : ` · Past test: right way ${t.right_way}/${t.n}${t.error_ratio != null ? `, error ${t.error_ratio.toFixed(2)}× assuming no move` : ""}`;
+
 function ImpactBars({ s }: { s: Scenario }) {
   const rows = s.impacts.filter((i) => !i.is_driver).sort((a, b) => Number(b.significant) - Number(a.significant) || Math.abs(b.implied_move) - Math.abs(a.implied_move));
   const max = (unit: string) => Math.max(1e-9, ...rows.filter((r) => r.unit === unit).map((r) => Math.abs(r.implied_move)));
@@ -63,7 +80,7 @@ function ImpactBars({ s }: { s: Scenario }) {
         const w = (Math.abs(r.implied_move) / max(r.unit)) * 50;
         const up = r.implied_move >= 0;
         return (
-          <tr key={r.dataset_id} style={{ opacity: r.significant ? 1 : 0.5 }} title={r.significant ? "Statistically significant (p ≤ 0.05)" : "Not statistically significant"}>
+          <tr key={r.dataset_id} style={{ opacity: r.significant ? 1 : 0.5 }} title={(r.significant ? "Statistically significant (p ≤ 0.05)" : "Not statistically significant") + testTitle(r.tested)}>
             <td>{r.name}</td>
             <td style={{ width: "20%", minWidth: 80 }}>
               <div style={{ position: "relative", height: 8, background: "var(--panel-2)", borderRadius: 4 }}>
@@ -272,6 +289,7 @@ export default function Scenarios() {
                   {s.signals.length === 0 && <li className="muted">No current signal; included as a standard stress test.</li>}
                 </ul>
                 <HistoryLine h={s.history} />
+                <TestLine t={s.test} />
                 <div style={{ overflowX: "auto" }}><ImpactBars s={s} /></div>
               </Card>
             ))}

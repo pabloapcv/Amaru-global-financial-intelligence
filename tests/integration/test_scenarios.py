@@ -217,3 +217,70 @@ def test_scan_options_are_part_of_the_cache_key():
     keys = {engine.cache_key("Scenario outlook", {**base, **extra}) for extra in
             ({}, {"scenario_universe": ["EQ.US.SP500"]}, {"custom_scenarios": [{"driver": "FX.USDBRL", "shock": 10}]}, {"scenario_portfolio": "p1"})}
     assert len(keys) == 4
+
+
+def _flipping_pair():
+    """A market that follows its driver until 2018, then does the opposite."""
+    import numpy as np
+    import pandas as pd
+
+    idx = pd.date_range("2004-01-31", "2024-12-31", freq="ME")
+    rng = np.random.default_rng(7)
+    driver = pd.Series(np.exp(np.cumsum(rng.normal(0, 0.05, len(idx)))) * 100, index=idx)
+    sign = np.where(idx < pd.Timestamp("2018-01-01"), 1.0, -1.0)
+    asset = pd.Series(np.exp(np.cumsum(sign * np.log(driver).diff().fillna(0).to_numpy() + rng.normal(0, 0.005, len(idx)))) * 100, index=idx)
+    return driver, asset
+
+
+def _test(driver, asset, episodes):
+    from atlas import analytics
+
+    return analytics.sensitivity_test("A", "D", episodes, {"A": asset, "D": driver}, {"A": "monthly", "D": "monthly"},
+                                      {"A": "index", "D": "index"}, asset)
+
+
+def test_sensitivity_test_only_uses_data_from_before_each_episode():
+    import pandas as pd
+
+    from atlas import analytics
+
+    driver, asset = _flipping_pair()
+    found = analytics.past_episodes(driver, 6, "log_return")["episodes"]
+    before = [e for e in found if e["start"] < "2017-01-01" and e["start"] >= "2008-01-01"]
+    after = [e for e in found if "2018-02-01" <= e["start"] < "2020-06-01"]
+    assert len(before) >= 3 and len(after) >= 3
+
+    held = _test(driver, asset, before)
+    assert held["right_way"] == held["n"] and held["error_ratio"] < 0.3
+    # Just after the flip, a fit on earlier data must still expect the old relationship and be wrong.
+    broke = _test(driver, asset, after)
+    assert broke["right_way"] == 0 and broke["error_ratio"] > 1.5
+
+    # Rewriting everything after the last episode changes nothing.
+    later = pd.Timestamp(after[-1]["end"])
+    assert _test(driver.where(driver.index <= later, driver * 3), asset.where(asset.index <= later, 1.0), after) == broke
+
+    # The fast refit gives what the full scenario calculation gives on the same data.
+    pairs = []
+    for ep in before:
+        cut = pd.Timestamp(ep["start"])
+        full = analytics.scenario("A", "D", ep["driver_move"], {"A": asset[asset.index <= cut], "D": driver[driver.index <= cut]},
+                                  {"A": "monthly", "D": "monthly"}, {"A": "index", "D": "index"}, lookback_years=10)
+        pairs.append((full["implied_asset_move"], analytics._episode_move(asset, "log_return", ep)))
+    assert held["error_ratio"] == round(sum(abs(f - a) for f, a in pairs) / sum(abs(a) for _, a in pairs), 2)
+
+    assert _test(driver, asset, before[:2]) == {"n": 2, "too_few": True}
+    early = [{"start": "2005-01-31", "end": "2005-04-30", "driver_move": 9.0}] * 3  # under 36 months of history
+    assert _test(driver, asset, early)["too_few"]
+
+
+def test_scan_reports_the_walk_forward_test(seeded):
+    from atlas import scenarios
+
+    res, _ = scenarios.scan(universe=["CMD.CRUDE.BRENT", "CMD.COPPER.LME", "EQ.US.SP500"], custom=[{"driver": "FX.USD.BROAD", "shock": 1}])
+    sc = next(s for s in res["scenarios"] if s["test"])
+    t = sc["test"]
+    assert 0 <= t["right_way"] <= t["moves"] and t["episodes"] >= 3 and t["reliable_right_way"] <= t["reliable_moves"] <= t["moves"]
+    tested = [i["tested"] for i in sc["impacts"] if i.get("tested") and not i["tested"]["too_few"]]
+    assert t["markets"] == len(tested) and t["moves"] == sum(x["n"] for x in tested)
+    assert "refitted" in res["method"]["test"]

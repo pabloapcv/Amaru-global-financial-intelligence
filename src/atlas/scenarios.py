@@ -13,7 +13,8 @@ plus any scenario the user asks for. Each scenario's effect on every market in t
 its historical sensitivity (analytics.scenario: HAC OLS of period changes over 10 years), with a 95%
 range, and effects that are not statistically significant are marked as such. Next to each sensitivity
 is what actually happened: the market's move in the past episodes when the driver moved that much
-within 3 months. A saved portfolio can be tested too: its own monthly return series gets the same
+within 3 months, and how the sensitivity would have done in those episodes if fitted only on earlier
+data. A saved portfolio can be tested too: its own monthly return series gets the same
 treatment, so diversification between holdings is measured rather than assumed.
 
 "Relevance" counts the data signals behind a scenario. It is not a probability, and the output says so.
@@ -22,6 +23,7 @@ treatment, so diversification between holdings is measured rather than assumed.
 from __future__ import annotations
 
 import logging
+import statistics
 from datetime import date, timedelta
 from typing import Any
 
@@ -76,6 +78,18 @@ def _scenario(sid: str, name: str, driver: str, shock: float, signals: list[dict
     return {"id": sid, "name": name, "kind": kind, "driver": driver, "driver_name": ds.name, "shock": shock,
             "shock_unit": "bp" if analytics.transform_kind(ds.unit) != "log_return" else "pct",
             "signals": signals, "relevance": len(signals)}
+
+
+def _test_summary(tests: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """One scenario's walk-forward test across its markets. Markets in the same episode are not independent."""
+    scored = [t for t in tests if not t["too_few"]]
+    if not scored:
+        return None
+    ratios = [t["error_ratio"] for t in scored if t["error_ratio"] is not None]
+    moves, right = sum(t["n"] for t in scored), sum(t["right_way"] for t in scored)
+    return {"episodes": max(t["n"] for t in scored), "markets": len(scored), "moves": moves, "right_way": right,
+            "hit_pct": _r(100 * right / moves, 0), "error_ratio": _r(statistics.median(ratios), 2) if ratios else None,
+            "reliable_moves": sum(t["reliable_n"] for t in scored), "reliable_right_way": sum(t["reliable_right_way"] for t in scored)}
 
 
 def _portfolio_levels(weights: dict[str, float], levels: dict[str, Any]) -> Any:
@@ -270,8 +284,8 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
     portfolio_levels = _portfolio_levels(held, monthly) if held else None
     period_levels = None
     if portfolio_levels is not None:
-        averages = {d: series[d] if freqs[d] == "monthly" else analytics.resample(series[d], "monthly", how="mean") for d in held}
-        period_levels = _portfolio_levels(held, averages)
+        period_levels = _portfolio_levels(held, {d: series[d] if freqs[d] == "monthly" else analytics.resample(series[d], "monthly", how="mean") for d in held})
+
 
     for sc in chosen:
         driver_levels = monthly.get(sc["driver"])
@@ -297,12 +311,14 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
             except (ValueError, KeyError, StopIteration):
                 continue
             p = res["beta_p_value"]
+            tested = analytics.sensitivity_test(asset, sc["driver"], episodes, series, freqs, units, monthly[asset]) if asset in monthly and episodes else None
             impacts.append({"dataset_id": asset, "name": _name(asset), "implied_move": res["implied_asset_move"],
                             "unit": res["implied_unit"], "ci95": res["implied_asset_move_ci95"], "p_value": _r(p, 4),
                             "significant": p is not None and p <= 0.05, "r_squared": res["r_squared"], "is_driver": False,
-                            "past": past(asset, res["implied_asset_move"])})
+                            "past": past(asset, res["implied_asset_move"]), "tested": tested})
         reliable = [i for i in impacts if i["significant"] and not i["is_driver"]]
         sc["impacts"] = impacts
+        sc["test"] = _test_summary([i["tested"] for i in impacts if i.get("tested")])
         # Effects in % and bp are not comparable by size; rank by how clearly the data shows them
         # (effect relative to the half-width of its 95% range).
         def clarity(i: dict[str, Any]) -> float:
@@ -335,6 +351,10 @@ def scan(universe: list[str] | None = None, custom: list[dict[str, Any]] | None 
             "history": "past episodes are the non-overlapping 3-month windows, at month-ends, in which the driver moved at least the "
                        "scenario's shock, over up to 30 years; each market's move is measured over the same windows, and a median is shown "
                        "only with at least 3 episodes. Other things were also happening in those periods",
+            "test": "for each past episode the sensitivity is refitted on the 10 years before the episode began and applied to the driver's actual move, "
+                    "then compared with what the market did; 'error ratio' is its total error divided by that of assuming no move (below 1 is better), "
+                    "the median across markets. Markets in one episode are not independent, so the episode count matters more than the number of moves; "
+                    "history uses today's revised figures. A sensitivity needs 36 periods of history and is scored on at least 3 episodes",
             "portfolio": "the portfolio is treated as one monthly series at its current weights, so correlations between holdings are "
                          "included; 'largest' shows each holding's weight times its own sensitivity",
             "caveat": NOT_PROBABILITY + " Sensitivities measure how markets moved together, not what causes what.",
