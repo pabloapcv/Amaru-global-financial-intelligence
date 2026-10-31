@@ -68,6 +68,7 @@ def test_record_compares_with_the_same_training_average():
     res = cycle.recession_outlook(raw)
     assert 0 <= res["probability_pct"] <= 100 and res["as_of"] == raw["curve"].index[-1].date().isoformat()
     rec = res["record"]
+    assert 0 <= rec["months_high_no_recession"] <= rec["months_high"] <= rec["months_scored"]
     assert rec["auc"] > 0.8 and rec["recessions_covered"] >= 2 and rec["beats_average"] == (rec["brier"] < rec["brier_average_only"])
     assert rec["last_month"] < res["as_of"]  # months whose outcome isn't known aren't scored
     assert res["simple_model"]["inputs"] == cycle.SIMPLE and len(res["path"]) >= rec["months_scored"]

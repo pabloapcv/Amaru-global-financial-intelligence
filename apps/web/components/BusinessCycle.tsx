@@ -6,7 +6,7 @@ import { api, type ChartSpec } from "@/lib/api";
 import { Card, ErrorNote } from "@/components/ui";
 
 type Input = { input: string; name: string; reading: number; weight: number };
-type Record_ = { auc: number; brier: number; brier_average_only: number; first_month: string; last_month: string; months_scored: number; recessions_covered?: number; beats_average?: boolean };
+type Record_ = { auc: number; brier: number; brier_average_only: number; first_month: string; last_month: string; months_scored: number; months_high: number; months_high_no_recession: number; recessions_covered?: number; beats_average?: boolean };
 type Market = { dataset_id: string; name: string; unit: string; n: number; too_few: boolean; median?: number; low?: number; high?: number };
 type Cycle = {
   available: boolean; reason?: string; caveat?: string;
@@ -44,6 +44,7 @@ export default function BusinessCycle() {
           <p className="muted" style={{ fontSize: 12.5 }}>
             <strong>Track record:</strong> re-estimated monthly from {rec.first_month.slice(0, 4)} using only what was knowable then: AUC {rec.auc.toFixed(2)} (0.5 is a coin flip),
             Brier score {rec.brier.toFixed(3)} against {rec.brier_average_only.toFixed(3)} for always guessing the average. That covers only {rec.recessions_covered} recessions.
+            {rec.months_high > 0 && ` It said 50% or more in ${rec.months_high} months, and in ${rec.months_high_no_recession} of them no recession followed within 12 months.`}
             Without the labour inputs: AUC {simple.auc.toFixed(2)}, Brier {simple.brier.toFixed(3)}.
           </p>
         </div>
