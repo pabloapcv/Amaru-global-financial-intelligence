@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from atlas.data.db import Instrument, InstrumentAlias, MacroSeries
 
 REGISTRY_PATH = Path(__file__).with_name("registry.json")
+STALE_POLICY_RATE_DAYS = 60  # some banks reach the BIS weeks late (South Korea was 23 days behind); longer means the series has probably stopped
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,15 @@ def datasets() -> dict[str, Dataset]:
                           "indicator_key": ind["key"], "groups": c["groups"], "asset_class": "macro",
                           "description": f"{ind['name']} for {c['name']}, annual (World Bank WDI, code {ind['code']})."},
                 )
+    pol = reg.get("policy_rates", {})
+    for a in pol.get("areas", []):
+        sid = policy_rate_id(a["code"])
+        out[sid] = Dataset(
+            dataset_id=sid, kind="macro", name=f"{a['name']}: central bank policy rate", provider_id=pol["provider_id"],
+            provider_symbol=f"CBPOL.{a['code']}", frequency="daily", unit="percent", keywords=tuple(a["keywords"]), tags=("policy_rate",),
+            meta={"country": a["code"], "countries": a["countries"], "indicator": "policy_rate", "asset_class": "macro", "refresh": "weekly_poll",
+                  "expected_lag_days": STALE_POLICY_RATE_DAYS // 2, "licence": pol.get("licence"), "description": f"Central bank policy rate for {a['name']}, daily (BIS)."},
+        )
     names = {c["iso3"]: c["name"] for c in reg.get("country_macro", {}).get("countries", [])} | {"WLD": "World"}
     for rep, par in reg.get("trade_pairs", {}).get("pairs", []):
         tid = trade_dataset_id(rep, par)
@@ -176,6 +186,10 @@ def country_series_id(iso3: str, key: str) -> str:
     return f"WB.{iso3}.{key}"
 
 
+def policy_rate_id(area: str) -> str:
+    return f"BIS.POLICY.{area}"
+
+
 def countries() -> list[dict[str, Any]]:
     return load_registry().get("country_macro", {}).get("countries", [])
 
@@ -232,10 +246,10 @@ def sync_registry(session: Session) -> int:
             ))
         n += 1
     for ds in datasets().values():
-        if ds.dataset_id.startswith("WB."):
+        if ds.dataset_id.startswith(("WB.", "BIS.")):
             session.merge(MacroSeries(
                 series_id=ds.dataset_id, name=ds.name, country=ds.meta["country"], indicator=ds.meta["indicator"],
-                frequency="annual", unit=ds.unit, seasonal_adjustment=None, provider_id=ds.provider_id,
+                frequency=ds.frequency, unit=ds.unit, seasonal_adjustment=None, provider_id=ds.provider_id,
                 provider_symbol=ds.provider_symbol, description=ds.meta["description"], tags=list(ds.tags),
             ))
             n += 1

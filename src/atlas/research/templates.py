@@ -50,6 +50,7 @@ def _macro(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     steps.append(("compare_performance", {"dataset_ids": ["RATE.US.FEDFUNDS", "RATE.UST.2Y", "RATE.UST.10Y", "RATE.UST.10Y.REAL", "FX.USD.BROAD", "EQ.US.SP500"]}))
     steps += [("detect_regime", {"dataset_id": d}) for d in ("FX.USD.BROAD", "RATE.UST.10Y")]
     steps.append(("get_business_cycle", {}))
+    steps.append(("get_policy_rates", {}))
     steps.append(("get_economic_calendar", {"days": 60}))
     return steps
 
@@ -65,6 +66,7 @@ def _country(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         ("compare_countries", {"group": peers_group, "indicators": ["GDP_GROWTH", "INFLATION", "UNEMPLOYMENT", "CURRENT_ACCOUNT", "RESERVES"]}),
     ]
     steps += [("get_trade_flows", {"reporter": a, "partner": b}) for a, b in trade_pairs() if a == iso][:3]
+    steps.append(("get_policy_rates", {"countries": [iso]}))
     return steps
 
 

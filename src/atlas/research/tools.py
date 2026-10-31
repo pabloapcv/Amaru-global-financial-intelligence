@@ -807,6 +807,21 @@ def t_get_business_cycle(ctx: ToolContext, args: dict[str, Any]) -> dict[str, An
     return {"evidence_id": label, **res}
 
 
+def t_get_policy_rates(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import policy_rates
+
+    try:
+        full = policy_rates.overview(args.get("countries") or None)
+    except policy_rates.PolicyRatesUnavailable as exc:
+        raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap.") from exc
+    metas = full.pop("sources")
+    path = full["direction"].pop("path")
+    chart = {"type": "line", "title": "Central banks raising minus cutting over 6 months", "unit": "% of banks",
+             "series": [{"name": "Raising minus cutting", "points": path}]}
+    label = ctx.add("get_policy_rates", args, full, "ATLAS summary of BIS central bank policy rates: " + _cite(metas), [_source(m) for m in metas], chart)
+    return {"evidence_id": label, **full}
+
+
 def t_get_central_bank_tone(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     from atlas import tone
 
@@ -959,6 +974,13 @@ TOOLS: dict[str, dict[str, Any]] = {
         "fn": t_get_business_cycle,
         "description": "U.S. business cycle: a 12-month recession probability from a probit on the yield spread, financial conditions and unemployment, with its walk-forward record (AUC, Brier score against always guessing the average) and a simpler model for comparison; plus the past months most like today and what markets did in the next 12 months. State the limits: very few recessions were tested, unemployment history is revised, and similar periods are a lookup, not a tested signal.",
         "schema": {"type": "object", "properties": {}},
+    },
+    "get_policy_rates": {
+        "fn": t_get_policy_rates,
+        "description": "Central bank policy rates from the BIS for 19 currency areas (daily): each bank's rate, its latest move with the date, changes over 3 and 12 months, and whether it has been cutting, hiking or on hold over 6 months, plus how many banks are doing each worldwide. The euro area stands for Germany, France and Italy. Argentina, Bolivia, Ecuador, Uruguay and Paraguay are not covered.",
+        "schema": {"type": "object", "properties": {
+            "countries": {"type": "array", "items": {"type": "string"}, "description": "ISO3 codes to show (default: every bank). The worldwide count always covers every bank."},
+        }},
     },
     "get_central_bank_tone": {
         "fn": t_get_central_bank_tone,

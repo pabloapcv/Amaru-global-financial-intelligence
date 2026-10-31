@@ -91,6 +91,7 @@ def with_retries(
 
 
 def get_adapter(provider_id: str) -> ProviderAdapter:
+    from atlas.ingestion.bis import BisAdapter
     from atlas.ingestion.cftc import CftcAdapter
     from atlas.ingestion.comtrade import ComtradeAdapter
     from atlas.ingestion.fred import FredAdapter
@@ -99,7 +100,7 @@ def get_adapter(provider_id: str) -> ProviderAdapter:
 
     adapters: dict[str, Callable[[], ProviderAdapter]] = {
         "fred": FredAdapter, "cftc": CftcAdapter, "worldbank": WorldBankAdapter, "comtrade": ComtradeAdapter,
-        "usda_psd": PsdAdapter,
+        "usda_psd": PsdAdapter, "bis": BisAdapter,
     }
     if provider_id not in adapters:
         raise ProviderError(f"no adapter registered for provider '{provider_id}'")

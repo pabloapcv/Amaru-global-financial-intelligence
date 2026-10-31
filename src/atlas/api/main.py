@@ -853,6 +853,17 @@ def search_documents(q: str = "", days: int = Query(30, ge=1, le=730), limit: in
     return documents.search(q, days=days, limit=limit)
 
 
+@api.get("/macro/policy-rates")
+def policy_rates(countries: str | None = Query(None, description="Comma-separated ISO3 codes; the global direction always covers every bank.")) -> dict[str, Any]:
+    from atlas import policy_rates as rates
+
+    try:
+        res = rates.overview([c.strip().upper() for c in countries.split(",") if c.strip()] if countries else None)
+    except rates.PolicyRatesUnavailable as exc:
+        return {"available": False, "reason": str(exc)}
+    return {"available": True, **{k: v for k, v in res.items() if k != "sources"}}
+
+
 @api.get("/macro/cycle")
 def business_cycle() -> dict[str, Any]:
     from atlas import cycle

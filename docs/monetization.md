@@ -24,6 +24,7 @@ You can sell it: it is your software, built on permissively licensed open-source
 |---|---|
 | USDA, CFTC, Federal Reserve, BEA | U.S. government data: generally fine |
 | World Bank | CC BY 4.0: fine with attribution |
+| BIS policy rates | Must cite the BIS, and including them must not add to what users pay. Confirm the current terms before selling |
 | FRED | Mixed. Some series belong to third parties (S&P 500, VIX, ICE benchmarks) and redistributing them can need the owner's permission. Check each series' notes. |
 | IMF commodity prices (via FRED) | Check the IMF's terms for commercial redistribution |
 | UN Comtrade | The free API tier may not allow commercial use; there is a paid tier |

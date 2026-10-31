@@ -222,6 +222,22 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             lines.append(f"| {m['name']} | too few periods | n/a |" if m["too_few"] else f"| {m['name']} | {_fmt(m['median'])}{u} | {_fmt(m['low'])} to {_fmt(m['high'])}{u} |")
         lines += ["", f"{e['result']['caveat']} [{e['label']}]", ""]
 
+    # Policy rates ----------------------------------------------------------------
+    for e in by_tool.get("get_policy_rates", []):
+        r, d = e["result"], e["result"]["direction"]
+        lines += ["## Central bank policy rates", "",
+                  f"Compared with {d['months']} months earlier, {d['cutting']} of {d['banks']} central banks have lower rates, {d['hiking']} higher and {d['on_hold']} unchanged, "
+                  f"on data through {r['as_of']} [{e['label']}].", ""]
+        if r["banks"]:
+            lines += ["| Central bank | Rate | Data through | Latest move | 12-month change | Direction |", "|---|---|---|---|---|---|"]
+            for b in r["banks"]:
+                m = b["last_move"]
+                lines.append(f"| {b['name']} | {_fmt(b['rate'])}% | {b['as_of']}{' (stale)' if b['stale'] else ''} | {f'{_fmt(m['change_bp'], 1)} bp on {m['date']}' if m else 'none'} | "
+                             f"{_fmt(b['change_12m_bp'], 1)} bp | {b['direction'] or 'n/a'} |")
+            lines.append("")
+        lines += [f"No policy rate for {n['country']}: {n['reason']}." for n in r["not_covered"]]
+        lines += [f"{r['caveat']} [{e['label']}]", ""]
+
     # Central banks ---------------------------------------------------------------
     for e in by_tool.get("get_central_bank_tone", []):
         r = e["result"]
