@@ -90,10 +90,10 @@ def test_raw_payload_replay_is_idempotent(seeded):
     assert res.status == "success" and res.rows_inserted == 0
 
 
-def test_no_source_dataset_is_disclosed(seeded):
-    res = pipeline.ingest_dataset(get_dataset("CMD.GOLD"))
+def test_no_source_dataset_is_disclosed(seeded, no_source):
+    res = pipeline.ingest_dataset(get_dataset(no_source))
     assert res.status == "no_source"
-    assert series_meta("CMD.GOLD").freshness == "no_source"
+    assert series_meta(no_source).freshness == "no_source"
 
 
 def test_failed_datasets_retry_before_normal_cadence(seeded):

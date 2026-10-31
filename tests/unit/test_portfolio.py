@@ -37,13 +37,13 @@ def test_stress_window_uses_current_weights_and_reports_coverage():
     assert gfc["portfolio_return_pct"] is None and set(gfc["missing_holdings"]) == {"A", "B"}
 
 
-def test_holdings_validation():
+def test_holdings_validation(no_source):
     from atlas.portfolios import PortfolioError, validate_holdings
 
     with pytest.raises(PortfolioError, match="not a price"):
         validate_holdings([{"dataset_id": "RATE.UST.10Y", "weight": 0.5}])
     with pytest.raises(PortfolioError, match="no price source"):
-        validate_holdings([{"dataset_id": "CMD.GOLD", "weight": 0.5}])
+        validate_holdings([{"dataset_id": no_source, "weight": 0.5}])
     with pytest.raises(PortfolioError, match="twice"):
         validate_holdings([{"dataset_id": "CMD.CRUDE.WTI", "weight": 0.5}, {"dataset_id": "CMD.CRUDE.WTI", "weight": 0.2}])
 

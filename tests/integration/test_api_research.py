@@ -12,17 +12,17 @@ def client(seeded):
         yield c
 
 
-def test_instruments_and_quotes(client):
+def test_instruments_and_quotes(client, no_source):
     inst = client.get("/api/v1/instruments").json()
     assert any(i["dataset_id"] == "CMD.SUGAR.ISA" for i in inst)
-    quotes = client.get("/api/v1/markets/quotes?ids=CMD.SUGAR.ISA,CMD.GOLD").json()
-    sugar, gold = quotes
+    quotes = client.get(f"/api/v1/markets/quotes?ids=CMD.SUGAR.ISA,{no_source}").json()
+    sugar, restricted = quotes
     assert sugar["value"] > 0 and sugar["is_tradable_quote"] is False and sugar["observation_date"]
-    assert gold["error"] == "data_unavailable" and gold["freshness"] == "no_source"
+    assert restricted["error"] == "data_unavailable" and restricted["freshness"] == "no_source"
 
 
-def test_history_unavailable_is_409(client):
-    r = client.get("/api/v1/markets/history?id=CMD.GOLD")
+def test_history_unavailable_is_409(client, no_source):
+    r = client.get(f"/api/v1/markets/history?id={no_source}")
     assert r.status_code == 409
 
 
@@ -32,11 +32,11 @@ def test_data_status_shows_freshness_fields(client):
     assert {"observation_date", "ingested_at", "checked_at", "freshness"} <= set(row)
 
 
-def test_quant_endpoint(client):
+def test_quant_endpoint(client, no_source):
     r = client.post("/api/v1/quant/analyze", json={"analysis": "correlation", "dataset_ids": ["CMD.SUGAR.ISA", "FX.USDBRL"]})
     assert r.status_code == 200, r.text
     assert r.json()["result"]["pairs"][0]["pearson"] is not None
-    bad = client.post("/api/v1/quant/analyze", json={"analysis": "forecast", "dataset_ids": ["CMD.GOLD"]})
+    bad = client.post("/api/v1/quant/analyze", json={"analysis": "forecast", "dataset_ids": [no_source]})
     assert bad.status_code == 422 and "DATA UNAVAILABLE" in bad.text
 
 

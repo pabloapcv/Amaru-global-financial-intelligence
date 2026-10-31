@@ -94,7 +94,7 @@ def test_rate_cut_scenario_plan():
     plan = build_plan("What happens to copper, gold, and emerging-market currencies if the Federal Reserve cuts interest rates?")
     scen = [s for s in plan["steps"] if s["tool"] == "run_scenario"]
     assert scen and all(s["args"]["driver"] == "RATE.UST.2Y" and s["args"]["shock"] < 0 for s in scen)
-    assert "CMD.GOLD" in plan["coverage_gaps"]
+    assert not plan["coverage_gaps"] and "CMD.GOLD" in plan["entities"]
     assert {"FX.USDBRL", "FX.USDMXN"} <= set(plan["entities"])
 
 
@@ -117,6 +117,12 @@ def test_dotenv_parsing_tolerates_common_formats():
     assert env["ATLAS_LLM"] == "auto"
     assert env["EMPTY"] == ""
     assert env["QUOTED"] == "x y"
+
+
+def test_significance_levels_are_not_claims_but_other_5s_are():
+    ev = [{"label": "E1", "result": {"a": 1.25}}]
+    assert verify.verify("No variable is significant at 5% [E1].", ev)["passed"]
+    assert not verify.verify("Prices rose 5% [E1].", ev)["passed"]
 
 
 def test_confidence_levels_are_not_claims_but_other_95s_are():
