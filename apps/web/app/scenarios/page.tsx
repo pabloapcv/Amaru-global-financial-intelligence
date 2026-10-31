@@ -14,7 +14,7 @@ type Tested = { n: number; too_few: boolean; right_way?: number; error_ratio?: n
 type Impact = { dataset_id: string; name: string; implied_move: number; unit: "pct" | "bp"; ci95: [number, number] | null; significant: boolean; is_driver: boolean; past?: Past | null; tested?: Tested | null };
 type TestRecord = { episodes: number; markets: number; moves: number; right_way: number; error_ratio: number | null; reliable_moves: number; reliable_right_way: number };
 type History = { n: number; horizon_months: number; since: string | null; episodes: { start: string; end: string; driver_move: number }[] };
-type PortfolioEffect = { implied_move: number; ci95: [number, number]; significant: boolean; past: Past;
+type PortfolioEffect = { implied_move: number; ci95: [number, number]; significant: boolean; past: Past; tested?: Tested | null;
   largest: { dataset_id: string; name: string; weight: number; contribution: number }[] };
 type Scenario = { id: string; name: string; kind: string; driver_name: string; shock: number; shock_unit: string; relevance: number | null;
   relevance_label?: string; signals: { text: string }[]; impacts: Impact[]; clearest_effects: string[]; is_new?: boolean;
@@ -68,6 +68,7 @@ function TestLine({ t }: { t?: TestRecord | null }) {
   );
 }
 
+const testCell = (t?: Tested | null) => !t ? "n/a" : t.too_few ? "too few" : `${t.right_way}/${t.n}${t.error_ratio != null ? ` · ${t.error_ratio.toFixed(2)}×` : ""}`;
 const testTitle = (t?: Tested | null) => !t || t.too_few ? "" : ` · Past test: right way ${t.right_way}/${t.n}${t.error_ratio != null ? `, error ${t.error_ratio.toFixed(2)}× assuming no move` : ""}`;
 
 function ImpactBars({ s }: { s: Scenario }) {
@@ -257,7 +258,7 @@ export default function Scenarios() {
               <Card title={`Effect on ${scan.portfolio!.name}`}>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ fontSize: 12.5 }}>
-                    <thead><tr><th>Scenario</th><th className="num">Effect</th><th className="num">95% range</th><th className="num">Past median</th><th>Largest contributors</th></tr></thead>
+                    <thead><tr><th>Scenario</th><th className="num">Effect</th><th className="num">95% range</th><th className="num">Past median</th><th className="num" title="Fitted only on data from before each past episode">Past test</th><th>Largest contributors</th></tr></thead>
                     <tbody>{tested.map((s) => {
                       const f = s.portfolio!;
                       return (
@@ -266,6 +267,7 @@ export default function Scenarios() {
                           <td className="num" style={{ whiteSpace: "nowrap", color: f.significant ? (f.implied_move < 0 ? "var(--down)" : "var(--up)") : undefined }}>{signed(f.implied_move, "pct", 2)}</td>
                           <td className="num muted" style={{ whiteSpace: "nowrap" }}>{f.ci95[0].toFixed(1)} to {f.ci95[1].toFixed(1)}{f.significant ? "" : " · not reliable"}</td>
                           <td className="num muted"><PastCell past={f.past} unit="pct" /></td>
+                          <td className="num muted" style={{ whiteSpace: "nowrap" }} title="Right direction, and errors compared with assuming no move">{testCell(f.tested)}</td>
                           <td className="muted">{f.largest.map((c) => `${c.name} ${signed(c.contribution, "pct")}`).join(", ")}</td>
                         </tr>
                       );
@@ -273,7 +275,7 @@ export default function Scenarios() {
                   </table>
                 </div>
                 <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
-                  {scan.portfolio!.holdings} holdings, measured as one monthly series at current weights, so diversification between them is included.
+                  {scan.portfolio!.holdings} holdings, measured as one monthly series at current weights, so diversification between them is included. Past test: how often an effect fitted on earlier data pointed the right way, and its errors as a multiple of assuming no move (below 1× is better). It uses today's weights, so it shows how this mix would have behaved, not a real track record.
                   {scan.portfolio!.excluded.length > 0 && ` Excluded (no usable history): ${scan.portfolio!.excluded.join(", ")}.`}
                 </p>
               </Card>

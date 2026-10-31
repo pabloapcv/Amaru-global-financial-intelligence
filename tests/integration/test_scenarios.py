@@ -177,6 +177,10 @@ def test_scan_shows_past_episodes_and_tests_a_portfolio(seeded):
         if not i["is_driver"]:
             assert i["past"]["n"] <= hist["n"]
     pf = sc["portfolio"]
+    if sc["history"]["n"]:
+        assert pf["tested"] and (pf["tested"]["too_few"] or 0 <= pf["tested"]["right_way"] <= pf["tested"]["n"])
+    else:
+        assert pf["tested"] is None
     assert pf["unit"] == "pct" and pf["ci95"][0] <= pf["implied_move"] <= pf["ci95"][1]
     assert pf["significant"] == (pf["p_value"] is not None and pf["p_value"] <= 0.05)
     # Each holding's contribution is its weight times its own sensitivity.

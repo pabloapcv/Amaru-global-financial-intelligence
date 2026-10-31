@@ -41,6 +41,15 @@ def _strength(r: float) -> str:
     return "negligible" if a < 0.1 else "weak" if a < 0.3 else "moderate" if a < 0.6 else "strong"
 
 
+def _tested(test: dict[str, Any] | None) -> str:
+    if not test:
+        return "n/a"
+    if test["too_few"]:
+        return "too few episodes"
+    errors = f"; errors {_fmt(test['error_ratio'])} times assuming no move" if test["error_ratio"] is not None else ""
+    return f"{test['right_way']} of {test['n']} right way{errors}"
+
+
 def _past(past: dict[str, Any] | None, unit: str) -> str:
     if not past:
         return "n/a"
@@ -147,12 +156,12 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             lines += [f"### Effect on {port['name']}", "",
                       f"{port['holdings']} holdings, treated as one monthly series at current weights [{e['label']}]."
                       + (f" Excluded (no usable history): {', '.join(port['excluded'])}." if port["excluded"] else ""), "",
-                      "| Scenario | Historical effect | 95% range | Reliable? | Past episodes (median) | Largest contributors |", "|---|---|---|---|---|---|"]
+                      "| Scenario | Historical effect | 95% range | Reliable? | Past episodes (median) | Past test | Largest contributors |", "|---|---|---|---|---|---|---|"]
             for s in sorted(tested, key=lambda s: s["portfolio"]["implied_move"]):
                 pf = s["portfolio"]
                 who = ", ".join(f"{c['name']} {_fmt(c['contribution'])}" for c in pf["largest"]) or "n/a"
                 lines.append(f"| {s['name']} | {_fmt(pf['implied_move'])}% | {_fmt(pf['ci95'][0])} to {_fmt(pf['ci95'][1])}% | "
-                             f"{'yes' if pf['significant'] else 'no (p > 0.05)'} | {_past(pf['past'], '%')} | {who} |")
+                             f"{'yes' if pf['significant'] else 'no (p > 0.05)'} | {_past(pf['past'], '%')} | {_tested(pf.get('tested'))} | {who} |")
             lines.append("")
         for i, s in enumerate(r["scenarios"], 1):
             unit = "bp" if s["shock_unit"] == "bp" else "%"
