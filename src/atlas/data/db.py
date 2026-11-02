@@ -660,6 +660,16 @@ class SchedulerLease(Base):
     last_result: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
 
+class RateLimitWindow(Base):
+    """Requests counted per key and minute, shared by every API replica (ATLAS_RATE_LIMIT_STORE=database)."""
+
+    __tablename__ = "rate_limit_windows"
+
+    key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    window: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)  # unix minute
+    count: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class StripeEvent(Base):
     """Stripe webhook events already processed (Stripe retries deliveries; each is applied once)."""
 

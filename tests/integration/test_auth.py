@@ -1024,3 +1024,29 @@ def test_legal_links_are_published_only_when_safe(secured, monkeypatch):
     assert h["terms_url"] == "https://example.com/terms" and h["privacy_url"] is None
     p = secured.get("/api/v1/public/plans").json()
     assert p["terms_url"] == "https://example.com/terms" and p["privacy_url"] is None
+
+
+def test_shared_rate_limit_store_counts_across_replicas(isolated_env, monkeypatch):
+    """With the database store every API process sees the same count; rejected requests aren't counted."""
+    from atlas import ratelimit
+    from atlas.data.db import RateLimitWindow, session_scope
+
+    monkeypatch.setenv("ATLAS_RATE_LIMIT_STORE", "database")
+    ratelimit.reset()
+    now = [6_000_000.0]  # the start of a minute
+    monkeypatch.setattr(ratelimit, "wall_clock", lambda: now[0])
+    # The in-process buckets are what a second replica would not share: clear them between calls to prove they aren't used.
+    results = []
+    for _ in range(4):
+        results.append(ratelimit.take("ws|user|api_key", 3))
+        ratelimit._buckets.clear()
+    assert [r[0] for r in results] == [True, True, True, False] and results[0][1] == 2
+    assert results[3][2] == 60  # nothing in the previous minute, so wait for the next one
+    with session_scope() as s:
+        assert s.get(RateLimitWindow, ("ws|user|api_key", 100_000)).count == 3
+    now[0] += 60  # next minute: last minute's 3 still weigh fully at its start...
+    assert ratelimit.take("ws|user|api_key", 3)[0] is False
+    now[0] += 30  # ...and half as much halfway through
+    assert ratelimit.take("ws|user|api_key", 3)[:2] == (True, 0)
+    assert ratelimit.take("other|user|api_key", 3)[0] is True
+    ratelimit.reset()
