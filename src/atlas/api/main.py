@@ -864,6 +864,17 @@ def fertilizer_affordability() -> dict[str, Any]:
     return {"available": True, **{k: v for k, v in res.items() if k != "sources"}}
 
 
+@api.get("/macro/countries/monitor")
+def country_monitor(countries: str | None = Query(None, description="Comma-separated ISO3 codes; default every covered country.")) -> dict[str, Any]:
+    from atlas import country_monitor as monitor
+
+    try:
+        res = monitor.overview([c.strip().upper() for c in countries.split(",") if c.strip()] if countries else None)
+    except monitor.MonitorUnavailable as exc:
+        return {"available": False, "reason": str(exc)}
+    return {"available": True, **{k: v for k, v in res.items() if k != "sources"}}
+
+
 @api.get("/macro/energy")
 def energy_inventories(kind: str | None = Query(None, pattern="^(oil|gas)$")) -> dict[str, Any]:
     from atlas import energy

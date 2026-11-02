@@ -2388,7 +2388,8 @@
           "us economy",
           "america"
         ],
-        "m49": 842
+        "m49": 842,
+        "iso2": "US"
       },
       {
         "iso3": "CHN",
@@ -2400,7 +2401,8 @@
           "china",
           "chinese"
         ],
-        "m49": 156
+        "m49": 156,
+        "iso2": "CN"
       },
       {
         "iso3": "JPN",
@@ -2411,7 +2413,8 @@
         "aliases": [
           "japan"
         ],
-        "m49": 392
+        "m49": 392,
+        "iso2": "JP"
       },
       {
         "iso3": "DEU",
@@ -2422,7 +2425,8 @@
         "aliases": [
           "germany"
         ],
-        "m49": 276
+        "m49": 276,
+        "iso2": "DE"
       },
       {
         "iso3": "GBR",
@@ -2435,7 +2439,8 @@
           "uk",
           "britain"
         ],
-        "m49": 826
+        "m49": 826,
+        "iso2": "GB"
       },
       {
         "iso3": "FRA",
@@ -2446,7 +2451,8 @@
         "aliases": [
           "france"
         ],
-        "m49": 251
+        "m49": 251,
+        "iso2": "FR"
       },
       {
         "iso3": "ITA",
@@ -2457,7 +2463,8 @@
         "aliases": [
           "italy"
         ],
-        "m49": 380
+        "m49": 380,
+        "iso2": "IT"
       },
       {
         "iso3": "CAN",
@@ -2468,7 +2475,8 @@
         "aliases": [
           "canada"
         ],
-        "m49": 124
+        "m49": 124,
+        "iso2": "CA"
       },
       {
         "iso3": "KOR",
@@ -2480,7 +2488,8 @@
           "south korea",
           "korea"
         ],
-        "m49": 410
+        "m49": 410,
+        "iso2": "KR"
       },
       {
         "iso3": "AUS",
@@ -2491,7 +2500,8 @@
         "aliases": [
           "australia"
         ],
-        "m49": 36
+        "m49": 36,
+        "iso2": "AU"
       },
       {
         "iso3": "IND",
@@ -2502,7 +2512,8 @@
         "aliases": [
           "india"
         ],
-        "m49": 699
+        "m49": 699,
+        "iso2": "IN"
       },
       {
         "iso3": "IDN",
@@ -2513,7 +2524,8 @@
         "aliases": [
           "indonesia"
         ],
-        "m49": 360
+        "m49": 360,
+        "iso2": "ID"
       },
       {
         "iso3": "TUR",
@@ -2525,7 +2537,8 @@
           "turkey",
           "turkiye"
         ],
-        "m49": 792
+        "m49": 792,
+        "iso2": "TR"
       },
       {
         "iso3": "SAU",
@@ -2536,7 +2549,8 @@
         "aliases": [
           "saudi arabia"
         ],
-        "m49": 682
+        "m49": 682,
+        "iso2": "SA"
       },
       {
         "iso3": "ZAF",
@@ -2547,7 +2561,8 @@
         "aliases": [
           "south africa"
         ],
-        "m49": 710
+        "m49": 710,
+        "iso2": "ZA"
       },
       {
         "iso3": "RUS",
@@ -2558,7 +2573,8 @@
         "aliases": [
           "russia"
         ],
-        "m49": 643
+        "m49": 643,
+        "iso2": "RU"
       },
       {
         "iso3": "BRA",
@@ -2570,7 +2586,8 @@
         "aliases": [
           "brazil"
         ],
-        "m49": 76
+        "m49": 76,
+        "iso2": "BR"
       },
       {
         "iso3": "MEX",
@@ -2582,7 +2599,8 @@
         "aliases": [
           "mexico"
         ],
-        "m49": 484
+        "m49": 484,
+        "iso2": "MX"
       },
       {
         "iso3": "ARG",
@@ -2594,7 +2612,8 @@
         "aliases": [
           "argentina"
         ],
-        "m49": 32
+        "m49": 32,
+        "iso2": "AR"
       },
       {
         "iso3": "CHL",
@@ -2605,7 +2624,8 @@
         "aliases": [
           "chile"
         ],
-        "m49": 152
+        "m49": 152,
+        "iso2": "CL"
       },
       {
         "iso3": "PER",
@@ -2616,7 +2636,8 @@
         "aliases": [
           "peru"
         ],
-        "m49": 604
+        "m49": 604,
+        "iso2": "PE"
       },
       {
         "iso3": "COL",
@@ -2627,7 +2648,8 @@
         "aliases": [
           "colombia"
         ],
-        "m49": 170
+        "m49": 170,
+        "iso2": "CO"
       },
       {
         "iso3": "BOL",
@@ -2638,7 +2660,8 @@
         "aliases": [
           "bolivia"
         ],
-        "m49": 68
+        "m49": 68,
+        "iso2": "BO"
       },
       {
         "iso3": "ECU",
@@ -2649,7 +2672,8 @@
         "aliases": [
           "ecuador"
         ],
-        "m49": 218
+        "m49": 218,
+        "iso2": "EC"
       },
       {
         "iso3": "URY",
@@ -2660,7 +2684,8 @@
         "aliases": [
           "uruguay"
         ],
-        "m49": 858
+        "m49": 858,
+        "iso2": "UY"
       },
       {
         "iso3": "PRY",
@@ -2671,7 +2696,8 @@
         "aliases": [
           "paraguay"
         ],
-        "m49": 600
+        "m49": 600,
+        "iso2": "PY"
       }
     ],
     "indicators": [
@@ -3166,5 +3192,389 @@
       "owner": "Bank for International Settlements",
       "note": "The BIS must be cited as the source, and including its statistics in a commercial product must not add to what users are charged. Confirm the current terms with the BIS before selling access."
     }
+  },
+  "country_series": {
+    "_comment": "Higher-frequency and forecast series per country. 'symbol' is formatted with the country's iso3/iso2; 'countries' lists where the source has data (checked November 2026).",
+    "series": [
+      {
+        "key": "CPI_YOY",
+        "prefix": "IMF",
+        "name": "consumer price inflation, year on year (monthly)",
+        "provider_id": "imf",
+        "symbol": "CPI.{iso3}",
+        "frequency": "monthly",
+        "unit": "percent, year on year",
+        "countries": [
+          "USA",
+          "CHN",
+          "JPN",
+          "DEU",
+          "GBR",
+          "FRA",
+          "ITA",
+          "CAN",
+          "KOR",
+          "AUS",
+          "IND",
+          "IDN",
+          "TUR",
+          "SAU",
+          "ZAF",
+          "RUS",
+          "BRA",
+          "MEX",
+          "ARG",
+          "CHL",
+          "PER",
+          "COL",
+          "BOL",
+          "ECU",
+          "URY",
+          "PRY"
+        ],
+        "licence": {
+          "class": "check_terms",
+          "owner": "International Monetary Fund",
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+        },
+        "description": "Consumer price index, % change from the same month a year earlier, as computed by the IMF from national CPIs (IMF.STA:CPI)."
+      },
+      {
+        "key": "REER",
+        "prefix": "BIS",
+        "name": "real effective exchange rate (broad, monthly)",
+        "provider_id": "bis",
+        "symbol": "EER.{iso2}",
+        "frequency": "monthly",
+        "unit": "Index 2020=100",
+        "countries": [
+          "USA",
+          "CHN",
+          "JPN",
+          "DEU",
+          "GBR",
+          "FRA",
+          "ITA",
+          "CAN",
+          "KOR",
+          "AUS",
+          "IND",
+          "IDN",
+          "TUR",
+          "SAU",
+          "ZAF",
+          "RUS",
+          "BRA",
+          "MEX",
+          "ARG",
+          "CHL",
+          "PER",
+          "COL"
+        ],
+        "licence": {
+          "class": "check_terms",
+          "owner": "Bank for International Settlements",
+          "note": "The BIS must be cited as the source, and including its statistics in a commercial product must not add to what users are charged. Confirm the current terms with the BIS before selling access."
+        },
+        "description": "BIS real effective exchange rate against a broad basket of 64 economies, monthly average, 2020 = 100. A rise means the currency got stronger after adjusting for inflation."
+      },
+      {
+        "key": "CREDIT_GAP",
+        "prefix": "BIS",
+        "name": "credit-to-GDP gap (quarterly)",
+        "provider_id": "bis",
+        "symbol": "CREDITGAP.{iso2}",
+        "frequency": "quarterly",
+        "unit": "percentage points of GDP",
+        "countries": [
+          "USA",
+          "CHN",
+          "JPN",
+          "DEU",
+          "GBR",
+          "FRA",
+          "ITA",
+          "CAN",
+          "KOR",
+          "AUS",
+          "IND",
+          "IDN",
+          "TUR",
+          "SAU",
+          "ZAF",
+          "RUS",
+          "BRA",
+          "MEX",
+          "ARG",
+          "CHL",
+          "COL"
+        ],
+        "licence": {
+          "class": "check_terms",
+          "owner": "Bank for International Settlements",
+          "note": "The BIS must be cited as the source, and including its statistics in a commercial product must not add to what users are charged. Confirm the current terms with the BIS before selling access."
+        },
+        "expected_lag_days": 420,
+        "description": "BIS credit-to-GDP gap: credit to the private non-financial sector as a share of GDP minus its long-run (HP-filter) trend, in percentage points. Above 10 is the Basel III warning level for a credit boom; the trend is re-estimated as data arrive, so recent values get revised."
+      },
+      {
+        "key": "HOUSE_PRICES",
+        "prefix": "BIS",
+        "name": "real residential property prices (quarterly)",
+        "provider_id": "bis",
+        "symbol": "SPP.{iso2}",
+        "frequency": "quarterly",
+        "unit": "Index 2010=100 (real)",
+        "countries": [
+          "USA",
+          "CHN",
+          "JPN",
+          "DEU",
+          "GBR",
+          "FRA",
+          "ITA",
+          "CAN",
+          "KOR",
+          "AUS",
+          "IND",
+          "IDN",
+          "TUR",
+          "ZAF",
+          "RUS",
+          "BRA",
+          "MEX",
+          "CHL",
+          "PER",
+          "COL"
+        ],
+        "licence": {
+          "class": "check_terms",
+          "owner": "Bank for International Settlements",
+          "note": "The BIS must be cited as the source, and including its statistics in a commercial product must not add to what users are charged. Confirm the current terms with the BIS before selling access."
+        },
+        "expected_lag_days": 300,
+        "description": "BIS selected residential property prices, deflated by consumer prices, 2010 = 100. National sources differ in coverage (some cover only the capital or new homes)."
+      },
+      {
+        "key": "WEO_GDP_GROWTH",
+        "prefix": "WEO",
+        "name": "IMF forecast: real GDP growth",
+        "provider_id": "imf_weo",
+        "symbol": "NGDP_RPCH.{iso3}",
+        "frequency": "annual",
+        "unit": "percent",
+        "countries": [
+          "USA",
+          "CHN",
+          "JPN",
+          "DEU",
+          "GBR",
+          "FRA",
+          "ITA",
+          "CAN",
+          "KOR",
+          "AUS",
+          "IND",
+          "IDN",
+          "TUR",
+          "SAU",
+          "ZAF",
+          "RUS",
+          "BRA",
+          "MEX",
+          "ARG",
+          "CHL",
+          "PER",
+          "COL",
+          "BOL",
+          "ECU",
+          "URY",
+          "PRY"
+        ],
+        "licence": {
+          "class": "check_terms",
+          "owner": "International Monetary Fund",
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+        },
+        "forecast": true,
+        "description": "IMF World Economic Outlook: real GDP growth, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."
+      },
+      {
+        "key": "WEO_INFLATION",
+        "prefix": "WEO",
+        "name": "IMF forecast: average consumer price inflation",
+        "provider_id": "imf_weo",
+        "symbol": "PCPIPCH.{iso3}",
+        "frequency": "annual",
+        "unit": "percent",
+        "countries": [
+          "USA",
+          "CHN",
+          "JPN",
+          "DEU",
+          "GBR",
+          "FRA",
+          "ITA",
+          "CAN",
+          "KOR",
+          "AUS",
+          "IND",
+          "IDN",
+          "TUR",
+          "SAU",
+          "ZAF",
+          "RUS",
+          "BRA",
+          "MEX",
+          "ARG",
+          "CHL",
+          "PER",
+          "COL",
+          "BOL",
+          "ECU",
+          "URY",
+          "PRY"
+        ],
+        "licence": {
+          "class": "check_terms",
+          "owner": "International Monetary Fund",
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+        },
+        "forecast": true,
+        "description": "IMF World Economic Outlook: average consumer price inflation, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."
+      },
+      {
+        "key": "WEO_UNEMPLOYMENT",
+        "prefix": "WEO",
+        "name": "IMF forecast: unemployment rate",
+        "provider_id": "imf_weo",
+        "symbol": "LUR.{iso3}",
+        "frequency": "annual",
+        "unit": "percent of labour force",
+        "countries": [
+          "USA",
+          "CHN",
+          "JPN",
+          "DEU",
+          "GBR",
+          "FRA",
+          "ITA",
+          "CAN",
+          "KOR",
+          "AUS",
+          "IND",
+          "IDN",
+          "TUR",
+          "SAU",
+          "ZAF",
+          "RUS",
+          "BRA",
+          "MEX",
+          "ARG",
+          "CHL",
+          "PER",
+          "COL",
+          "BOL",
+          "ECU",
+          "URY",
+          "PRY"
+        ],
+        "licence": {
+          "class": "check_terms",
+          "owner": "International Monetary Fund",
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+        },
+        "forecast": true,
+        "description": "IMF World Economic Outlook: unemployment rate, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."
+      },
+      {
+        "key": "WEO_DEBT",
+        "prefix": "WEO",
+        "name": "IMF forecast: general government gross debt",
+        "provider_id": "imf_weo",
+        "symbol": "GGXWDG_NGDP.{iso3}",
+        "frequency": "annual",
+        "unit": "percent of GDP",
+        "countries": [
+          "USA",
+          "CHN",
+          "JPN",
+          "DEU",
+          "GBR",
+          "FRA",
+          "ITA",
+          "CAN",
+          "KOR",
+          "AUS",
+          "IND",
+          "IDN",
+          "TUR",
+          "SAU",
+          "ZAF",
+          "RUS",
+          "BRA",
+          "MEX",
+          "ARG",
+          "CHL",
+          "PER",
+          "COL",
+          "BOL",
+          "ECU",
+          "URY",
+          "PRY"
+        ],
+        "licence": {
+          "class": "check_terms",
+          "owner": "International Monetary Fund",
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+        },
+        "forecast": true,
+        "description": "IMF World Economic Outlook: general government gross debt, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."
+      },
+      {
+        "key": "WEO_CURRENT_ACCOUNT",
+        "prefix": "WEO",
+        "name": "IMF forecast: current account balance",
+        "provider_id": "imf_weo",
+        "symbol": "BCA_NGDPD.{iso3}",
+        "frequency": "annual",
+        "unit": "percent of GDP",
+        "countries": [
+          "USA",
+          "CHN",
+          "JPN",
+          "DEU",
+          "GBR",
+          "FRA",
+          "ITA",
+          "CAN",
+          "KOR",
+          "AUS",
+          "IND",
+          "IDN",
+          "TUR",
+          "SAU",
+          "ZAF",
+          "RUS",
+          "BRA",
+          "MEX",
+          "ARG",
+          "CHL",
+          "PER",
+          "COL",
+          "BOL",
+          "ECU",
+          "URY",
+          "PRY"
+        ],
+        "licence": {
+          "class": "check_terms",
+          "owner": "International Monetary Fund",
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+        },
+        "forecast": true,
+        "description": "IMF World Economic Outlook: current account balance, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."
+      }
+    ]
   }
 }

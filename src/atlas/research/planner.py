@@ -184,6 +184,7 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
             add("get_country_profile", country=country_codes[0])
         else:
             add("compare_countries", countries=country_codes[:20], indicators=indicators[:5])
+        add("get_country_monitor", countries=country_codes[:20])
     if re.search(r"policy rate|central bank|rate (cut|hike|decision)|interest rates? (around|across|in )|monetary policy|selic|banxico", q):
         add("get_policy_rates", **({"countries": country_codes[:20]} if country_codes else {}))
     if re.search(r"fertili[sz]er|fertilizante|\burea\b|\bpotash\b|\bdap\b|input costs?", q):

@@ -65,6 +65,9 @@ def make_csv(symbol: str, dates: pd.DatetimeIndex, values: np.ndarray) -> bytes:
     return ("\n".join(lines) + "\n").encode()
 
 
+WEO_CODES = {"NGDP_RPCH", "PCPIPCH", "LUR", "GGXWDG_NGDP", "BCA_NGDPD"}
+
+
 def _is_trade(symbol: str) -> bool:
     parts = symbol.split(":")
     return len(parts) == 2 and len(parts[1]) == 3 and parts[1].isalpha()
@@ -167,9 +170,54 @@ class FakeFred:
         rows = [{"period": d.date().isoformat(), "series": code, "units": UNITS[code], "value": round(float(v), 1)} for d, v in zip(dates, values)]
         return json.dumps({"response": {"total": len(rows), "data": rows}}).encode()
 
+    def _bis_other(self, symbol: str) -> bytes:
+        from atlas.ingestion.bis import FLOWS
+
+        dataset, area = symbol.split(".")
+        flow, _, column, freq = FLOWS[dataset]
+        rng = np.random.default_rng(abs(hash(symbol)) % 2**32)
+        end = pd.Timestamp.today().normalize()
+        if freq == "monthly":
+            dates = pd.date_range(end - pd.DateOffset(years=20), end - pd.DateOffset(months=1), freq="MS")
+            periods = [d.strftime("%Y-%m") for d in dates]
+        else:
+            dates = pd.date_range(end - pd.DateOffset(years=25), end - pd.DateOffset(months=6), freq="QS")
+            periods = [f"{d.year}-Q{(d.month - 1) // 3 + 1}" for d in dates]
+        values = (np.cumsum(rng.normal(0, 1.5, len(dates))) if dataset == "CREDITGAP"
+                  else 100 * np.exp(np.cumsum(rng.normal(0.001, 0.02, len(dates)))))
+        lines = [f"DATAFLOW,FREQ,{column},TIME_PERIOD,OBS_VALUE"] + [f"BIS:{flow}(1.0),X,{area},{p},{v:.4f}" for p, v in zip(periods, values)]
+        return ("\n".join(lines) + "\n").encode()
+
+    def _imf_cpi(self, symbol: str) -> bytes:
+        iso3 = symbol.split(".")[1]
+        rng = np.random.default_rng(abs(hash(symbol)) % 2**32)
+        end = pd.Timestamp.today().normalize()
+        dates = pd.date_range(end - pd.DateOffset(years=12), end - pd.DateOffset(months=2), freq="MS")
+        values = np.clip(4 + np.cumsum(rng.normal(0, 0.3, len(dates))), -2, None)
+        obs = "".join(f'<Obs TIME_PERIOD="{d.year}-M{d.month:02d}" OBS_VALUE="{v:.4f}"/>' for d, v in zip(dates, values))
+        return (f'<?xml version="1.0"?><message:StructureSpecificData xmlns:message="urn:m"><message:DataSet>'
+                f'<Series COUNTRY="{iso3}" INDEX_TYPE="CPI" TYPE_OF_TRANSFORMATION="YOY_PCH_PA_PT" FREQUENCY="M">{obs}</Series>'
+                f'</message:DataSet></message:StructureSpecificData>').encode()
+
+    def _weo(self, symbol: str) -> bytes:
+        import json
+
+        indicator, iso3 = symbol.split(".")
+        rng = np.random.default_rng(abs(hash(symbol)) % 2**32)
+        this_year = pd.Timestamp.today().year
+        base = {"GGXWDG_NGDP": 60.0, "LUR": 6.0}.get(indicator, 2.5)
+        values = {str(y): round(base + float(rng.normal(0, 1.5)), 2) for y in range(1990, this_year + 6)}
+        return json.dumps({"indicator": indicator, "country": iso3, "values": values}).encode()
+
     def _series(self, symbol: str) -> bytes:
         if symbol in self.overrides:
             return self.overrides[symbol]
+        if symbol.startswith(("EER.", "CREDITGAP.", "SPP.")):
+            return self._bis_other(symbol)
+        if symbol.startswith("CPI."):
+            return self._imf_cpi(symbol)
+        if symbol.split(".")[0] in WEO_CODES:
+            return self._weo(symbol)
         if symbol.startswith(("PET.", "NG.")):
             return self._eia(symbol)
         if symbol.startswith("CMO."):
@@ -204,7 +252,7 @@ class FakeFred:
 
         self.calls.append((symbol, since))
         payload = self._series(symbol)
-        if since and (":" in symbol or symbol.isdigit() or symbol.startswith(("psd_", "CBPOL.", "PET.", "NG."))):
+        if since and (":" in symbol or symbol.isdigit() or symbol.startswith(("psd_", "CBPOL.", "PET.", "NG.", "EER.", "CREDITGAP.", "SPP.", "CPI.")) or symbol.split(".")[0] in WEO_CODES):
             pass  # JSON fakes return full history; idempotent publish handles the overlap
         elif since:
             lines = payload.decode().splitlines()
@@ -216,6 +264,7 @@ class FakeFred:
         from atlas.ingestion.cftc import CftcAdapter
         from atlas.ingestion.eia import EiaAdapter
         from atlas.ingestion.fred import FredAdapter
+        from atlas.ingestion.imf import ImfCpiAdapter, WeoAdapter
         from atlas.ingestion.pinksheet import PinkSheetAdapter
         from atlas.ingestion.worldbank import WorldBankAdapter
 
@@ -223,7 +272,8 @@ class FakeFred:
 
         from atlas.ingestion.psd import PsdAdapter
 
-        cls = (EiaAdapter if symbol.startswith(("PET.", "NG.")) else BisAdapter if symbol.startswith("CBPOL.") else PinkSheetAdapter if symbol.startswith("CMO.") else PsdAdapter if symbol.startswith("psd_") else ComtradeAdapter if _is_trade(symbol)
+        cls = (EiaAdapter if symbol.startswith(("PET.", "NG.")) else BisAdapter if symbol.startswith(("CBPOL.", "EER.", "CREDITGAP.", "SPP."))
+               else ImfCpiAdapter if symbol.startswith("CPI.") else WeoAdapter if symbol.split(".")[0] in WEO_CODES else PinkSheetAdapter if symbol.startswith("CMO.") else PsdAdapter if symbol.startswith("psd_") else ComtradeAdapter if _is_trade(symbol)
                else WorldBankAdapter if ":" in symbol else CftcAdapter if symbol.isdigit() else FredAdapter)
         return cls.parse(cls.__new__(cls), symbol, payload)
 

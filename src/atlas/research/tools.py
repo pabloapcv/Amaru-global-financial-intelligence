@@ -536,6 +536,31 @@ def t_get_country_profile(ctx: ToolContext, args: dict[str, Any]) -> dict[str, A
     return {"evidence_id": label, **result}
 
 
+def t_get_country_monitor(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import country_monitor
+
+    codes = _country_codes(args) if args.get("countries") or args.get("group") else None
+    try:
+        full = country_monitor.overview(codes)
+    except country_monitor.MonitorUnavailable as exc:
+        raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap.") from exc
+    metas = list({m.dataset_id: m for m in full.pop("sources")}.values())
+    chart = None
+    with_cpi = [r for r in full["countries"] if r["inflation"]][:8]
+    if with_cpi:
+        series = []
+        for r in with_cpi:
+            try:
+                s, _ = get_series(f"IMF.{r['country']}.CPI_YOY")
+            except DataUnavailable:
+                continue
+            s = s.dropna()
+            series.append({"name": r["name"], "points": _downsample(s[s.index > s.index[-1] - pd.DateOffset(years=5)])})
+        chart = {"type": "line", "title": "Consumer price inflation, year on year (IMF)", "unit": "percent", "series": series}
+    label = ctx.add("get_country_monitor", args, full, "ATLAS summary of IMF and BIS country data: " + _cite(metas), [_source(m) for m in metas], chart)
+    return {"evidence_id": label, **full}
+
+
 def t_get_trade_flows(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     rep, par = str(args["reporter"]).upper(), str(args.get("partner") or "WLD").upper()
     tid = trade_dataset_id(rep, par)
@@ -1046,6 +1071,14 @@ TOOLS: dict[str, dict[str, Any]] = {
             "group": {"type": "string", "enum": ["latam", "g20"]},
             "indicators": {"type": "array", "items": {"type": "string"}},
         }, "required": []},
+    },
+    "get_country_monitor": {
+        "fn": t_get_country_monitor,
+        "description": "Faster country data than the World Bank's annual figures: latest monthly consumer price inflation (IMF), the BIS real effective exchange rate (12-month change and versus its 10-year average; up means a stronger currency), the BIS credit-to-GDP gap (above 10 points is the Basel III credit-boom warning), real house prices over 12 months (BIS), and IMF World Economic Outlook forecasts for growth, inflation, unemployment, government debt and the current account for last year, this year and next. Each figure has its own date; say which are IMF projections.",
+        "schema": {"type": "object", "properties": {
+            "countries": {"type": "array", "items": {"type": "string"}, "description": "ISO3 codes; default every covered country."},
+            "group": {"type": "string", "enum": ["latam", "g20"]},
+        }},
     },
     "get_country_profile": {
         "fn": t_get_country_profile,
