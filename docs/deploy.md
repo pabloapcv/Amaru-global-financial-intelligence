@@ -102,5 +102,5 @@ Schema changes apply automatically on start.
 ## Scaling notes
 
 - **Scheduler:** one scheduler runs at a time (a database lease enforces this), so extra replicas wait.
-- **API rate limits:** these are per process. If you run several API replicas, put a shared limiter in front, for example at the load balancer.
+- **API rate limits:** by default each API process counts on its own. With several API replicas, set `ATLAS_RATE_LIMIT_STORE=database` so they share one count in the database (one or two small writes per request).
 - **Reports and raw files:** these live in the `atlas-objects` volume. With several servers, use shared storage.
