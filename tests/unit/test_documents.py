@@ -108,3 +108,19 @@ def test_release_agent_fires_once_per_new_release_and_cites_it(monkeypatch):
     assert agents.check_agent(a["agent_id"], background=False)["fired"] is False
     # A manual check looks back a week by publication date.
     assert agents.check_agent(a["agent_id"], background=False, manual=True)["findings"]
+
+
+def test_parse_feed_reads_atom_entries():
+    bcb = next(f for f in documents.FEEDS if f["source"] == "bcb")
+    atom = """<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title type="text">RSS - Feeds</title>
+<entry><id>sitefeeds_21306</id><title type="text">Copom mantém a taxa Selic</title>
+<updated>2026-10-29T14:03:09-03:00</updated><link rel="alternate" href="https://www.bcb.gov.br/detalhenoticia/21306/nota" />
+<category term="Política monetária"/>
+<content type="html">&lt;p&gt;O Copom decidiu manter a taxa Selic em 10,50%.&lt;/p&gt;</content></entry>
+<entry><title>No link</title></entry>
+</feed>""".encode()
+    [doc] = documents.parse_feed(atom, bcb)
+    assert doc["url"] == "https://www.bcb.gov.br/detalhenoticia/21306/nota" and doc["title"] == "Copom mantém a taxa Selic"
+    assert doc["published_at"].isoformat() == "2026-10-29T17:03:09" and doc["category"] == "Política monetária"
+    assert doc["summary"] == "O Copom decidiu manter a taxa Selic em 10,50%." and doc["publisher"] == "Banco Central do Brasil"
