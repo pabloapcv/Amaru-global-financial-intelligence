@@ -146,6 +146,14 @@ def run(production: bool | None = None, *, check_database: bool = True) -> dict[
             "Publish terms of service and a privacy policy (have a lawyer review them) and set both URLs.")
     if not config.settings.fred_api_key:
         add("info", "FRED key", "not set: the calendar lacks official U.S. release dates", "Optional: set FRED_API_KEY (free).")
+    from atlas import offsite
+
+    try:
+        if offsite.Target.from_env() is None:
+            add("warning" if prod else "info", "Off-server backups", "ATLAS_BACKUP_S3_URL is not set, so backups stay on this server",
+                "Set ATLAS_BACKUP_S3_URL and its keys plus ATLAS_BACKUP_ENCRYPTION_KEY (see docs/deploy.md), or copy the backups volume off yourself.")
+    except offsite.OffsiteError as exc:
+        add("error", "Off-server backups", str(exc), "Fix the ATLAS_BACKUP_* settings; the daily backup fails until then.")
     if not config.settings.eia_api_key:
         add("info", "EIA key", "not set: weekly energy inventories use the public demo key (about ten calls an hour)",
             "Optional: set EIA_API_KEY (free at eia.gov/opendata).")

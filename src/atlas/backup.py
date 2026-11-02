@@ -124,12 +124,29 @@ def _safe_members(tar: tarfile.TarFile) -> list[tarfile.TarInfo]:
     return members
 
 
+def _decrypted(archive: Path, tmp: Path) -> Path:
+    """An off-server copy (.enc) is decrypted with ATLAS_BACKUP_ENCRYPTION_KEY into `tmp` first."""
+    import os
+
+    from atlas import offsite
+
+    if not offsite.is_encrypted(archive):
+        return archive
+    key = os.getenv("ATLAS_BACKUP_ENCRYPTION_KEY")
+    if not key:
+        raise ValueError("this backup is encrypted: set ATLAS_BACKUP_ENCRYPTION_KEY to the key it was made with")
+    out = tmp / "decrypted.tar.gz"
+    offsite.decrypt_file(archive, out, key)
+    return out
+
+
 def restore(archive: str | Path, database_url: str | None = None, *, object_store: str | Path | None = None) -> dict[str, Any]:
     """Restore a backup into an empty database (and object store). Returns a summary."""
     url = database_url or _config.settings.database_url
     store = Path(object_store or _config.settings.object_store)
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
+        archive = _decrypted(Path(archive), root)
         with tarfile.open(archive, "r:gz") as tar:
             tar.extractall(root, members=_safe_members(tar), filter="data")  # members also validated above
         manifest = json.loads((root / "manifest.json").read_text())

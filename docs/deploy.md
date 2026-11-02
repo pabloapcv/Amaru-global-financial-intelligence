@@ -72,13 +72,29 @@ To sell, see [monetization.md](monetization.md). The Stripe webhook endpoint is 
 
 The `backup` service writes a portable archive every day into the `atlas-backups` volume and keeps the newest 14 (`ATLAS_BACKUP_KEEP`).
 
-**Copy them off the server.** A backup on the same disk doesn't survive losing the server. First, find the folder on the server where the volume lives:
+**Copy them off the server.** A backup on the same disk doesn't survive losing the server. ATLAS can do this itself: it encrypts each backup on the server (AES-256-GCM) and uploads it to any S3-compatible storage (AWS S3, Cloudflare R2, Backblaze B2, MinIO), so the storage provider never sees your data.
+
+1. Create a bucket and an access key that can only write objects (`PutObject`) and read their metadata. ATLAS never deletes, so add a lifecycle rule to the bucket that expires copies after, say, 90 days.
+2. Create the encryption key with `atlas backup-key` and store a copy somewhere other than the bucket and this server, such as a password manager. Without it the copies can't be restored.
+3. Set these in `.env` and restart the `backup` service:
+
+```bash
+ATLAS_BACKUP_S3_URL=https://s3.us-east-1.amazonaws.com/my-atlas-backups
+ATLAS_BACKUP_S3_REGION=us-east-1
+ATLAS_BACKUP_S3_ACCESS_KEY_ID=...
+ATLAS_BACKUP_S3_SECRET_ACCESS_KEY=...
+ATLAS_BACKUP_ENCRYPTION_KEY=...
+```
+
+The URL is path-style: the endpoint, then the bucket, then an optional folder. For Cloudflare R2 use `https://<account id>.r2.cloudflarestorage.com/<bucket>` with region `auto`. Each upload is confirmed by checking the stored size. A failed upload shows in the backup service's log as "Off-server copy FAILED", and `atlas doctor` flags missing or broken settings.
+
+To restore from a copy, download the `.enc` file with your storage provider's tools, set `ATLAS_BACKUP_ENCRYPTION_KEY`, and pass the file to `atlas restore` as below. It is decrypted and checked before anything is written.
+
+If you'd rather copy the files yourself, find the folder where the volume lives and pull it from another machine with a nightly cron job, for example `rsync -a server:<that folder>/ ~/atlas-backups/`:
 
 ```bash
 docker volume inspect $(docker volume ls -q | grep atlas-backups) --format '{{ .Mountpoint }}'
 ```
-
-Then copy that folder from another machine with a nightly cron job, for example `rsync -a server:<that folder>/ ~/atlas-backups/`.
 
 Restore into a fresh deployment's empty database:
 

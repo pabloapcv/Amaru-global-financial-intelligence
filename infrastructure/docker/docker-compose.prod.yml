@@ -45,13 +45,18 @@ services:
 
   backup:
     # Daily portable backup into the atlas-backups volume, keeping the newest ATLAS_BACKUP_KEEP (default 14).
-    # Copy that volume off this server too: a backup on the same disk does not survive losing the server.
+    # With ATLAS_BACKUP_S3_URL set, each one is also encrypted and copied to S3-compatible storage off this server.
     build: { context: ../.., dockerfile: infrastructure/docker/api.Dockerfile }
     environment:
       ATLAS_DATABASE_URL: postgresql+psycopg://atlas:${POSTGRES_PASSWORD:-atlas}@db:5432/atlas
       ATLAS_OBJECT_STORE: /data/objects
       ATLAS_SECRET_KEY: ${ATLAS_SECRET_KEY:-}
       ATLAS_SECRET_KEY_FILE: /data/secret.key
+      ATLAS_BACKUP_S3_URL: ${ATLAS_BACKUP_S3_URL:-}
+      ATLAS_BACKUP_S3_REGION: ${ATLAS_BACKUP_S3_REGION:-us-east-1}
+      ATLAS_BACKUP_S3_ACCESS_KEY_ID: ${ATLAS_BACKUP_S3_ACCESS_KEY_ID:-}
+      ATLAS_BACKUP_S3_SECRET_ACCESS_KEY: ${ATLAS_BACKUP_S3_SECRET_ACCESS_KEY:-}
+      ATLAS_BACKUP_ENCRYPTION_KEY: ${ATLAS_BACKUP_ENCRYPTION_KEY:-}
     command: ["sh", "-c", "while true; do atlas backup --out /backups --keep ${ATLAS_BACKUP_KEEP:-14} || echo 'backup failed'; sleep 86400; done"]
     volumes: [atlas-objects:/data, atlas-backups:/backups]
     depends_on: { api: { condition: service_healthy } }
