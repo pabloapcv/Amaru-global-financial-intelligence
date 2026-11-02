@@ -49,7 +49,7 @@ export function ErrorNote({ error }: { error: unknown }) {
   const msg = error instanceof Error ? error.message : String(error);
   return (
     <div className="note note-error">
-      {msg.includes("Failed to fetch") ? "Cannot reach the ATLAS API. Start it with `atlas serve`." : msg}
+      {msg.includes("Failed to fetch") ? "Cannot reach the Amaru API. Start it with `atlas serve`." : msg}
     </div>
   );
 }

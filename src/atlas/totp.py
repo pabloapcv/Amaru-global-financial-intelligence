@@ -44,6 +44,6 @@ def verify(secret: str, code: str, last_step: int | None = None, now: float | No
     return None
 
 
-def provisioning_uri(secret: str, account: str, issuer: str = "ATLAS") -> str:
+def provisioning_uri(secret: str, account: str, issuer: str = "Amaru") -> str:
     return (f"otpauth://totp/{quote(issuer)}:{quote(account)}?secret={secret}&issuer={quote(issuer)}"
             f"&algorithm=SHA1&digits={DIGITS}&period={STEP}")

@@ -12,7 +12,7 @@ type Lang = "en" | "es" | "pt";
 const T = {
   en: {
     title: "Financial research you can check",
-    lead: "Ask about commodities, currencies and the economy. ATLAS researches with Claude, then traces every number back to official data or a calculation before you see it.",
+    lead: "Ask about commodities, currencies and the economy. Amaru researches with Claude, then traces every number back to official data or a calculation before you see it.",
     start: "Create a free account", signin: "Sign in", invite: "Ask for access",
     features: [
       ["Verified answers", "Every figure is matched to a stored observation or a calculation and every citation must resolve. Figures that can't be traced are flagged, not hidden."],
@@ -27,11 +27,11 @@ const T = {
       schedules: "Scheduled reports", alerts: "Alerts", agents: "Monitoring agents", newsletter_subscribers: "Newsletter subscribers", api_keys: "API keys", requests_per_minute: "API requests per minute" },
     names: { explorer: "Explorer", investor: "Investor", research_pro: "Research Pro", pro: "Pro" },
     terms: "Terms of Service", privacy: "Privacy Policy",
-    disclaimer: "ATLAS provides general research and decision support, not personalised investment advice. Prices are public reference series published with a lag, not live quotes.",
+    disclaimer: "Amaru provides general research and decision support, not personalised investment advice. Prices are public reference series published with a lag, not live quotes.",
   },
   es: {
     title: "Investigación financiera que puedes comprobar",
-    lead: "Pregunta sobre materias primas, divisas y economía. ATLAS investiga con Claude y luego rastrea cada cifra hasta datos oficiales o un cálculo antes de mostrártela.",
+    lead: "Pregunta sobre materias primas, divisas y economía. Amaru investiga con Claude y luego rastrea cada cifra hasta datos oficiales o un cálculo antes de mostrártela.",
     start: "Crear una cuenta gratis", signin: "Iniciar sesión", invite: "Solicitar acceso",
     features: [
       ["Respuestas verificadas", "Cada cifra se compara con una observación almacenada o un cálculo, y cada cita debe ser válida. Las cifras que no se pueden rastrear se señalan, no se ocultan."],
@@ -46,11 +46,11 @@ const T = {
       schedules: "Informes programados", alerts: "Alertas", agents: "Agentes de monitoreo", newsletter_subscribers: "Suscriptores del boletín", api_keys: "Claves de API", requests_per_minute: "Solicitudes a la API por minuto" },
     names: { explorer: "Explorer", investor: "Investor", research_pro: "Research Pro", pro: "Pro" },
     terms: "Términos del servicio", privacy: "Política de privacidad",
-    disclaimer: "ATLAS ofrece investigación general y apoyo a decisiones, no asesoramiento de inversión personalizado. Los precios son series públicas de referencia publicadas con rezago, no cotizaciones en tiempo real.",
+    disclaimer: "Amaru ofrece investigación general y apoyo a decisiones, no asesoramiento de inversión personalizado. Los precios son series públicas de referencia publicadas con rezago, no cotizaciones en tiempo real.",
   },
   pt: {
     title: "Pesquisa financeira que você pode conferir",
-    lead: "Pergunte sobre commodities, câmbio e economia. O ATLAS pesquisa com o Claude e depois rastreia cada número até dados oficiais ou um cálculo antes de mostrá-lo a você.",
+    lead: "Pergunte sobre commodities, câmbio e economia. O Amaru pesquisa com o Claude e depois rastreia cada número até dados oficiais ou um cálculo antes de mostrá-lo a você.",
     start: "Criar uma conta grátis", signin: "Entrar", invite: "Solicitar acesso",
     features: [
       ["Respostas verificadas", "Cada número é comparado a uma observação armazenada ou a um cálculo, e cada citação precisa ser válida. Números que não podem ser rastreados são sinalizados, não escondidos."],
@@ -65,7 +65,7 @@ const T = {
       schedules: "Relatórios agendados", alerts: "Alertas", agents: "Agentes de monitoramento", newsletter_subscribers: "Inscritos na newsletter", api_keys: "Chaves de API", requests_per_minute: "Requisições à API por minuto" },
     names: { explorer: "Explorer", investor: "Investor", research_pro: "Research Pro", pro: "Pro" },
     terms: "Termos de serviço", privacy: "Política de privacidade",
-    disclaimer: "O ATLAS oferece pesquisa geral e apoio à decisão, não recomendação de investimento personalizada. Os preços são séries públicas de referência publicadas com defasagem, não cotações em tempo real.",
+    disclaimer: "O Amaru oferece pesquisa geral e apoio à decisão, não recomendação de investimento personalizada. Os preços são séries públicas de referência publicadas com defasagem, não cotações em tempo real.",
   },
 } as const;
 
@@ -96,7 +96,7 @@ export default function Welcome() {
   return (
     <div className="landing">
       <header className="row" style={{ justifyContent: "space-between", marginBottom: 40 }}>
-        <div className="brand" style={{ padding: 0 }}><span className="brand-mark">◆</span> ATLAS</div>
+        <div className="brand" style={{ padding: 0 }}><span className="brand-mark">◆</span> Amaru</div>
         <div className="row" style={{ gap: 10 }}>
           <div className="seg" role="group" aria-label="Language">
             {LANGS.map(([k, label]) => <button key={k} type="button" className={lang === k ? "on" : ""} onClick={() => choose(k)}>{label}</button>)}

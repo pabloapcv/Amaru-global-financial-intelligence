@@ -1,6 +1,6 @@
-# Deploying ATLAS
+# Deploying Amaru
 
-This guide puts ATLAS on one Linux server with HTTPS, PostgreSQL (TimescaleDB), the scheduler and daily backups. It works with any provider that gives you a virtual machine: Hetzner, DigitalOcean, AWS Lightsail, a Google Cloud VM, and so on.
+This guide puts Amaru on one Linux server with HTTPS, PostgreSQL (TimescaleDB), the scheduler and daily backups. It works with any provider that gives you a virtual machine: Hetzner, DigitalOcean, AWS Lightsail, a Google Cloud VM, and so on.
 
 ## What you need
 
@@ -72,9 +72,9 @@ To sell, see [monetization.md](monetization.md). The Stripe webhook endpoint is 
 
 The `backup` service writes a portable archive every day into the `atlas-backups` volume and keeps the newest 14 (`ATLAS_BACKUP_KEEP`).
 
-**Copy them off the server.** A backup on the same disk doesn't survive losing the server. ATLAS can do this itself: it encrypts each backup on the server (AES-256-GCM) and uploads it to any S3-compatible storage (AWS S3, Cloudflare R2, Backblaze B2, MinIO), so the storage provider never sees your data.
+**Copy them off the server.** A backup on the same disk doesn't survive losing the server. Amaru can do this itself: it encrypts each backup on the server (AES-256-GCM) and uploads it to any S3-compatible storage (AWS S3, Cloudflare R2, Backblaze B2, MinIO), so the storage provider never sees your data.
 
-1. Create a bucket and an access key that can only write objects (`PutObject`) and read their metadata. ATLAS never deletes, so add a lifecycle rule to the bucket that expires copies after, say, 90 days.
+1. Create a bucket and an access key that can only write objects (`PutObject`) and read their metadata. Amaru never deletes, so add a lifecycle rule to the bucket that expires copies after, say, 90 days.
 2. Create the encryption key with `atlas backup-key` and store a copy somewhere other than the bucket and this server, such as a password manager. Without it the copies can't be restored.
 3. Set these in `.env` and restart the `backup` service:
 

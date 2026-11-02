@@ -453,7 +453,7 @@ def notify_changes(run_id: str) -> bool:
                                             "dropped": changes["dropped"], "research_url": f"{base}/research?run={run_id}"})
     if to:
         try:
-            mailer.send(to, "ATLAS scenario agent: new scenarios", "Since the last scan:\n\n" + "\n".join(f"- {m}" for m in summary)
+            mailer.send(to, "Amaru scenario agent: new scenarios", "Since the last scan:\n\n" + "\n".join(f"- {m}" for m in summary)
                         + f"\n\nSee the scenarios: {base}/scenarios\n\n{NOT_PROBABILITY}\n")
         except Exception:
             log.exception("could not email scenario changes for %s", run_id)

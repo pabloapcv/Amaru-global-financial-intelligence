@@ -22,7 +22,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[postgres,pdf]" pip-audit
       - name: Audit
-        # Fails on any published advisory for an installed package (ATLAS itself is skipped).
+        # Fails on any published advisory for an installed package (Amaru itself is skipped).
         run: pip-audit --progress-spinner off --skip-editable
 
   npm-dependencies:

@@ -48,7 +48,7 @@ export default function Webhooks() {
   return (
     <Card title="Webhooks">
       <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
-        Send alerts, agent firings and finished research to your own systems or a Slack channel. ATLAS deliveries are JSON signed with the webhook&apos;s secret (<code>X-Atlas-Signature</code>); failed deliveries are retried for about 9 hours.
+        Send alerts, agent firings and finished research to your own systems or a Slack channel. Amaru deliveries are JSON signed with the webhook&apos;s secret (<code>X-Atlas-Signature</code>); failed deliveries are retried for about 9 hours.
       </p>
       {hooks.length > 0 && (
         <div style={{ overflowX: "auto", marginBottom: 12 }}>

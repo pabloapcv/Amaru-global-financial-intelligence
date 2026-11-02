@@ -149,7 +149,7 @@ def _email(f: dict[str, Any]) -> None:
         return
     base = os.getenv("ATLAS_PUBLIC_URL", "http://localhost:3010").rstrip("/")
     try:
-        mailer.send(to, f"ATLAS alert: {f['name']}", f"{f['message']}\n\nManage alerts: {base}/intelligence\n"
+        mailer.send(to, f"Amaru alert: {f['name']}", f"{f['message']}\n\nManage alerts: {base}/intelligence\n"
                     "Reference data published with a lag; not a live quote. Not investment advice.")
     except Exception:
         log.exception("alert email for %s failed", f["alert_id"])

@@ -1,4 +1,4 @@
-"""ATLAS REST API (spec §14). Run with `atlas serve` or `uvicorn atlas.api.main:app`."""
+"""Amaru REST API (spec §14). Run with `atlas serve` or `uvicorn atlas.api.main:app`."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ alerts, schedules and portfolios are private to it. Market and macro data are sh
 published with a lag, not live tradable quotes. Research and decision support only, not investment advice.
 """
 
-app = FastAPI(title="ATLAS API", version=__version__, lifespan=lifespan, description=API_DESCRIPTION)
+app = FastAPI(title="Amaru API", version=__version__, lifespan=lifespan, description=API_DESCRIPTION)
 app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"], allow_headers=["*"],
                    allow_credentials=True)
 V1 = "/api/v1"
@@ -697,7 +697,7 @@ def onboarding(p: Principal = Depends(principal)) -> dict[str, Any]:
         {"key": "agent", "title": "Set up a monitoring agent", "done": bool(agents.list_agents(p.workspace_id)), "href": "/intelligence",
          "help": "Get a research report automatically when a market does something unusual."},
         {"key": "api_key", "title": "Create an API key", "done": bool(auth.list_api_keys(p)) or p.via == "local", "href": "/account",
-         "help": "Use ATLAS from scripts and notebooks."},
+         "help": "Use Amaru from scripts and notebooks."},
     ]
     return {"steps": steps, "complete": all(s["done"] for s in steps)}
 
@@ -1184,10 +1184,10 @@ def digest_unsubscribe(u: str, w: str, s: str) -> Response:
     ok = digest.unsubscribe(u[:64], w[:64], s[:64])
     if ok:
         auth.audit("digest.unsubscribed", u[:64], w[:64], via="email link")
-    msg = "You will no longer receive the ATLAS weekly email for this workspace." if ok else "This unsubscribe link is not valid."
-    page = (f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>ATLAS</title>"
+    msg = "You will no longer receive the Amaru weekly email for this workspace." if ok else "This unsubscribe link is not valid."
+    page = (f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Amaru</title>"
             f"<body style='font-family:system-ui;max-width:32rem;margin:15vh auto;padding:0 1rem'>"
-            f"<h1 style='font-size:1.2rem'>ATLAS</h1><p>{_html.escape(msg)}</p></body>")
+            f"<h1 style='font-size:1.2rem'>Amaru</h1><p>{_html.escape(msg)}</p></body>")
     return Response(page, status_code=200 if ok else 400, media_type="text/html",
                     headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Robots-Tag": "noindex"})
 
@@ -1195,9 +1195,9 @@ def digest_unsubscribe(u: str, w: str, s: str) -> Response:
 def _plain_page(msg: str, status: int = 200, lang: str = "en") -> Response:
     import html as _html
 
-    page = (f"<!doctype html><html lang={lang}><meta charset=utf-8><meta name=viewport content='width=device-width'><title>ATLAS</title>"
+    page = (f"<!doctype html><html lang={lang}><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Amaru</title>"
             f"<body style='font-family:system-ui;max-width:32rem;margin:15vh auto;padding:0 1rem'>"
-            f"<h1 style='font-size:1.2rem'>ATLAS</h1><p>{_html.escape(msg)}</p></body>")
+            f"<h1 style='font-size:1.2rem'>Amaru</h1><p>{_html.escape(msg)}</p></body>")
     return Response(page, status_code=status, media_type="text/html",
                     headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Robots-Tag": "noindex"})
 
@@ -1282,7 +1282,7 @@ def newsletter_unsubscribe(s: str, sig: str, request: Request) -> Response:
     done = newsletters.unsubscribe(s[:32], sig[:64])
     if done is None:
         return _plain_page(i18n.newsletter_text(_page_lang(request), "unsubscribe_invalid"), 400, _page_lang(request))
-    return _plain_page(i18n.newsletter_text(done["language"], "unsubscribed", name=done["name"] or "ATLAS"), lang=i18n.lang(done["language"]))
+    return _plain_page(i18n.newsletter_text(done["language"], "unsubscribed", name=done["name"] or "Amaru"), lang=i18n.lang(done["language"]))
 
 
 # ---------------------------------------------------------------- billing

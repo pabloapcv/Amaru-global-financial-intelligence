@@ -21,7 +21,7 @@ def send(to: str, subject: str, body: str, *, html: str | None = None, headers: 
         log.warning("SMTP not configured; email to %s not sent. Subject: %s\n%s", to, subject, body)
         return False
     msg = EmailMessage()
-    sender = os.getenv("ATLAS_SMTP_FROM", "ATLAS <no-reply@localhost>")
+    sender = os.getenv("ATLAS_SMTP_FROM", "Amaru <no-reply@localhost>")
     if from_name:  # keep the configured address, show the publication's name
         from email.utils import formataddr, parseaddr
 

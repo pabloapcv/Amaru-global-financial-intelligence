@@ -443,7 +443,7 @@ def test_alerts_fire_once_per_episode_and_email_their_creator(secured, monkeypat
     from atlas.data.access import get_series
 
     sent = []
-    monkeypatch.setattr(mailer, "send", lambda to, subject, body: (subject.startswith("ATLAS alert") and sent.append((to, subject))) or True)
+    monkeypatch.setattr(mailer, "send", lambda to, subject, body: (subject.startswith("Amaru alert") and sent.append((to, subject))) or True)
     owner = _signup(secured, "alerter@al.test", "Alerting")
     ws = owner["workspace"]["workspace_id"]
     last = float(get_series("CMD.SUGAR.ISA")[0].iloc[-1])
@@ -453,7 +453,7 @@ def test_alerts_fire_once_per_episode_and_email_their_creator(secured, monkeypat
     alert_id = r.json()["alert_id"]
 
     first = intelligence.evaluate_alerts({"CMD.SUGAR.ISA"}, workspace_id=ws)
-    assert [f["alert_id"] for f in first] == [alert_id] and sent == [("alerter@al.test", "ATLAS alert: Sugar above")]
+    assert [f["alert_id"] for f in first] == [alert_id] and sent == [("alerter@al.test", "Amaru alert: Sugar above")]
     assert intelligence.evaluate_alerts({"CMD.SUGAR.ISA"}, workspace_id=ws) == []  # still holding: no repeat
     assert len(sent) == 1
 
@@ -543,7 +543,7 @@ def test_two_factor_authentication(secured, monkeypatch):
 
     setup = secured.post("/api/v1/account/2fa/setup").json()
     secret = setup["secret"]
-    assert setup["otpauth_uri"].startswith("otpauth://totp/ATLAS:careful%40twofa.test?secret=")
+    assert setup["otpauth_uri"].startswith("otpauth://totp/Amaru:careful%40twofa.test?secret=")
     with session_scope() as s:
         stored = s.get(User, acct["user"]["user_id"]).totp_secret_enc
     assert secret not in stored and secretbox.decrypt(stored) == secret  # encrypted at rest
@@ -811,14 +811,14 @@ def test_weekly_digest_opt_in_schedule_and_unsubscribe(secured, monkeypatch):
 
     secretbox.reset()
     sent = []
-    monkeypatch.setattr(mailer, "send", lambda to, subject, body: (subject.startswith("ATLAS weekly") and sent.append((to, body))) or True)
+    monkeypatch.setattr(mailer, "send", lambda to, subject, body: (subject.startswith("Amaru weekly") and sent.append((to, body))) or True)
     me = _signup(secured, "reader@digest.test", "Digest desk")
     ws = me["workspace"]["workspace_id"]
     secured.post("/api/v1/watchlist/CMD.CRUDE.BRENT")
     assert secured.get("/api/v1/account/digest").json()["weekly"] is False  # opt-in, off by default
 
     preview = secured.get("/api/v1/account/digest/preview").json()
-    assert preview["subject"] == "ATLAS weekly: Digest desk"
+    assert preview["subject"] == "Amaru weekly: Digest desk"
     for section in ("WATCHLIST", "THIS WEEK", "Unsubscribe from this weekly email"):
         assert section in preview["body"]
     assert "Crude oil (Brent, Europe spot): " in preview["body"] and "over the week" in preview["body"]
@@ -944,7 +944,7 @@ def test_research_feedback_reaches_operators_and_is_private_and_deletable(secure
 
     secretbox.reset()
     sent = []
-    monkeypatch.setattr(mailer, "send", lambda to, subject, body, **kw: (subject.startswith("ATLAS feedback") and sent.append((to, body))) or True)
+    monkeypatch.setattr(mailer, "send", lambda to, subject, body, **kw: (subject.startswith("Amaru feedback") and sent.append((to, body))) or True)
     monkeypatch.setenv("ATLAS_OPERATOR_EMAILS", "ops@fb.test")
     reader = TestClient(secured.app)
     acct = _signup(reader, "reader@fb.test", "Readers")

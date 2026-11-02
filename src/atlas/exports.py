@@ -2,7 +2,7 @@
 
 CSV files start with `#` comment lines (dataset, source, citation, observation and ingestion
 dates, freshness, licence note, point-in-time cut-off) unless `header=False`. Values are exactly
-what ATLAS stores; nothing is filled, interpolated or adjusted.
+what Amaru stores; nothing is filled, interpolated or adjusted.
 """
 
 from __future__ import annotations

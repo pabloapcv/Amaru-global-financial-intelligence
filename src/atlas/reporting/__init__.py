@@ -202,7 +202,7 @@ def render_xlsx(run: dict[str, Any], path: Path) -> None:
 
     ws = wb.active
     ws.title = "Summary"
-    ws.append(["ATLAS research report"])
+    ws.append(["Amaru research report"])
     ws["A1"].font = Font(bold=True, size=14)
     for k, v in [("Title", res["title"]), ("Question", run["query"]), ("Run ID", run["run_id"]),
                  ("Engine", f"{res['engine']} {res.get('model') or ''}".strip()), ("Created", run["created_at"]),

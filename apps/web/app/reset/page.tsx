@@ -24,7 +24,7 @@ function Reset() {
 
   return (
     <div className="login-page" style={{ maxWidth: 400, margin: "8vh auto" }}>
-      <div className="brand" style={{ padding: "0 0 12px" }}><span className="brand-mark">◆</span> ATLAS</div>
+      <div className="brand" style={{ padding: "0 0 12px" }}><span className="brand-mark">◆</span> Amaru</div>
       <div className="card">
         <h3 style={{ marginBottom: 12 }}>Choose a new password</h3>
         {done ? (

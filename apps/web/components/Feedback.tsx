@@ -35,7 +35,7 @@ export default function Feedback({ runId }: { runId: string }) {
           onClick={() => setDraft({ reasons: mine?.rating === "down" ? mine.reasons : [], comment: mine?.rating === "down" ? mine.comment : "" })}>Something&apos;s wrong</button>
         {mine && !draft && <span className="muted" style={{ fontSize: 12 }}>Thanks, your feedback was sent{mine.rating === "down" && mine.status === "resolved" ? " and has been reviewed" : ""}.</span>}
       </div>
-      {mine?.operator_note && <div className="note" style={{ marginTop: 8, fontSize: 12.5 }}>Reply from the ATLAS team: {mine.operator_note}</div>}
+      {mine?.operator_note && <div className="note" style={{ marginTop: 8, fontSize: 12.5 }}>Reply from the Amaru team: {mine.operator_note}</div>}
       {draft && (
         <div style={{ marginTop: 10 }}>
           <div className="row" style={{ flexWrap: "wrap", gap: 12 }}>
@@ -47,7 +47,7 @@ export default function Feedback({ runId }: { runId: string }) {
           </div>
           <textarea rows={3} value={draft.comment} onChange={(e) => setDraft({ ...draft, comment: e.target.value })} maxLength={2000}
             placeholder="What was wrong? For example, which number, and what you expected." aria-label="Feedback comment" style={{ marginTop: 8 }} />
-          <p className="muted" style={{ fontSize: 11.5 }}>Sent to the people who run ATLAS with your question and the answer&apos;s title, so they can look into it.</p>
+          <p className="muted" style={{ fontSize: 11.5 }}>Sent to the people who run Amaru with your question and the answer&apos;s title, so they can look into it.</p>
           <div className="row" style={{ gap: 8 }}>
             <button onClick={() => send("down", draft)}>Send</button>
             <button className="secondary" onClick={() => setDraft(null)}>Cancel</button>

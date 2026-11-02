@@ -10,7 +10,7 @@ The key (ATLAS_BACKUP_ENCRYPTION_KEY, 32 random bytes, base64) must be kept some
 the bucket: without it the copies can't be restored.
 
 Only PUT and HEAD are needed, so the access key can be write-only. Expire old copies with the
-bucket's own lifecycle rule rather than giving ATLAS permission to delete.
+bucket's own lifecycle rule rather than giving Amaru permission to delete.
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ def decrypt_file(src: Path, dst: Path, key_text: str) -> None:
     aes = AESGCM(_key(key_text))
     with src.open("rb") as fin, dst.open("wb") as fout:
         if fin.read(len(MAGIC)) != MAGIC:
-            raise OffsiteError(f"{src} is not an encrypted ATLAS backup")
+            raise OffsiteError(f"{src} is not an encrypted Amaru backup")
         index, done = 0, False
         while header := fin.read(16):
             if done:

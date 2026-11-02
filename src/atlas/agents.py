@@ -255,7 +255,7 @@ def _notify(workspace_id: str, agent_name: str, findings: list[dict[str, Any]], 
     body = "\n".join(f"- {f['message']}" for f in findings) + f"\n\nResearch report: {base}/research?run={run_id}\n"
     for email in owners:
         try:
-            mailer.send(email, f"ATLAS agent fired: {agent_name}", body)
+            mailer.send(email, f"Amaru agent fired: {agent_name}", body)
         except Exception:
             log.exception("agent notification to %s failed", email)
 

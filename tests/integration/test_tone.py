@@ -25,7 +25,7 @@ def ecb_page(decision: str) -> str:
 
 
 class Sites:
-    """The Fed's and ECB's sites, as far as ATLAS can tell."""
+    """The Fed's and ECB's sites, as far as Amaru can tell."""
 
     def __init__(self, today):
         self.fed = [(today - timedelta(days=50), fed_page("4 to 4-1/4")), (today - timedelta(days=2), fed_page("3-3/4 to 4"))]

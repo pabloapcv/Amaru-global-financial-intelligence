@@ -4,7 +4,7 @@
 
 Please report suspected vulnerabilities privately to the maintainer (pabloapcv on GitHub, or the contact address published with your deployment), not in a public issue. Include steps to reproduce and the impact you expect. We aim to acknowledge reports within 3 business days and to tell you how we will handle them.
 
-## What ATLAS already does
+## What Amaru already does
 
 **Accounts and sessions**
 - Passwords are hashed with scrypt.
@@ -55,7 +55,7 @@ Please report suspected vulnerabilities privately to the maintainer (pabloapcv o
 **Dependencies**
 - The Security workflow audits Python and npm dependencies on every push and weekly.
 
-## Operating ATLAS securely
+## Operating Amaru securely
 
 - Set a long random `ATLAS_SECRET_KEY` and keep it stable and out of backups.
 - Serve over HTTPS and set `ATLAS_COOKIE_SECURE=true`.

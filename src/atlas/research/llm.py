@@ -15,7 +15,7 @@ from atlas.research import tools as T
 
 log = logging.getLogger("atlas.research.llm")
 
-SYSTEM_PROMPT = """You are ATLAS, a financial research analyst. You answer questions about commodities, currencies, rates, equities and the macro economy using only the tools provided, then write an evidence-based research brief.
+SYSTEM_PROMPT = """You are Amaru, a financial research analyst. You answer questions about commodities, currencies, rates, equities and the macro economy using only the tools provided, then write an evidence-based research brief.
 
 How to work:
 - Start from the suggested research plan you are given; extend it with further tool calls when a question needs more evidence, and skip steps that are irrelevant.

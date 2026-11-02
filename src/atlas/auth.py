@@ -477,8 +477,8 @@ def request_password_reset(email: str, client: str = "") -> str | None:
         s.add(PasswordReset(token_hash=_token_hash(token), user_id=user.user_id, expires_at=utcnow() + RESET_TTL))
         uid = user.user_id
     base = os.getenv("ATLAS_PUBLIC_URL", "http://localhost:3010").rstrip("/")
-    mailer.send(email, "Reset your ATLAS password",
-                f"Someone requested a password reset for your ATLAS account.\n\n"
+    mailer.send(email, "Reset your Amaru password",
+                f"Someone requested a password reset for your Amaru account.\n\n"
                 f"Reset it within {int(RESET_TTL.total_seconds() // 60)} minutes: {base}/reset?token={token}\n\n"
                 f"If this wasn't you, ignore this email; your password is unchanged.")
     audit("password.reset_requested", uid, None)
@@ -541,8 +541,8 @@ def send_verification(user_id: str) -> str | None:
         s.add(EmailVerification(token_hash=_token_hash(token), user_id=user_id, expires_at=utcnow() + VERIFY_TTL))
         email = user.email
     base = os.getenv("ATLAS_PUBLIC_URL", "http://localhost:3010").rstrip("/")
-    mailer.send(email, "Verify your ATLAS email",
-                f"Confirm this email address for your ATLAS account: {base}/verify?token={token}\n\n"
+    mailer.send(email, "Verify your Amaru email",
+                f"Confirm this email address for your Amaru account: {base}/verify?token={token}\n\n"
                 f"The link is valid for {int(VERIFY_TTL.total_seconds() // 3600)} hours.")
     audit("email.verification_sent", user_id, None)
     return token

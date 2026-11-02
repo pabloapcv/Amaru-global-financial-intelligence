@@ -66,7 +66,7 @@ def compose(user_id: str, workspace_id: str) -> dict[str, str]:
                                                      AgentEvent.at >= since,
                                                      AgentEvent.status == "fired").order_by(AgentEvent.at.desc()).limit(10)).all()]
     week = briefing.week(days=7)
-    lines = [f"ATLAS weekly digest for {name}", f"Week to {utcnow().date().isoformat()}", ""]
+    lines = [f"Amaru weekly digest for {name}", f"Week to {utcnow().date().isoformat()}", ""]
 
     ids = watchlist.items(workspace_id)
     lines.append("WATCHLIST")
@@ -114,10 +114,10 @@ def compose(user_id: str, workspace_id: str) -> dict[str, str]:
     api = os.getenv("ATLAS_API_PUBLIC_URL", os.getenv("NEXT_PUBLIC_API_URL", "http://localhost:8010")).rstrip("/")
     lines += [
         "Prices are public reference series published with a lag, not live quotes. Research and decision support only; not investment advice.",
-        f"Open ATLAS: {base}/",
+        f"Open Amaru: {base}/",
         f"Unsubscribe from this weekly email: {api}/digest/unsubscribe?u={quote(user_id)}&w={quote(workspace_id)}&s={secretbox.sign(f'{user_id}|{workspace_id}')}",
     ]
-    return {"to": user.email if user else "", "subject": f"ATLAS weekly: {name}", "body": "\n".join(lines)}
+    return {"to": user.email if user else "", "subject": f"Amaru weekly: {name}", "body": "\n".join(lines)}
 
 
 def set_opt_in(user_id: str, workspace_id: str, on: bool) -> None:

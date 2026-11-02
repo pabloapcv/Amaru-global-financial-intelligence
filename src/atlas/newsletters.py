@@ -281,7 +281,7 @@ def _snapshot(result: dict[str, Any], language: str = "en") -> str:
     sources = result.get("sources") or []
     if sources:
         narrative += f"\n\n**{t['sources']}:**\n\n" + "\n".join(
-            f"- {src.get('name') or src.get('dataset_id')}: {src.get('citation') or src.get('url') or 'ATLAS'}" for src in sources[:12])
+            f"- {src.get('name') or src.get('dataset_id')}: {src.get('citation') or src.get('url') or 'Amaru'}" for src in sources[:12])
     return narrative
 
 

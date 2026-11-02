@@ -18,11 +18,11 @@ function Verify() {
 
   return (
     <div className="login-page" style={{ maxWidth: 400, margin: "8vh auto" }}>
-      <div className="brand" style={{ padding: "0 0 12px" }}><span className="brand-mark">◆</span> ATLAS</div>
+      <div className="brand" style={{ padding: "0 0 12px" }}><span className="brand-mark">◆</span> Amaru</div>
       <div className="card">
         <h3 style={{ marginBottom: 12 }}>Email verification</h3>
         {state === "pending" && <p className="muted">Verifying…</p>}
-        {state === "ok" && <div className="note note-ok">Your email is verified. <a href="/">Continue to ATLAS</a></div>}
+        {state === "ok" && <div className="note note-ok">Your email is verified. <a href="/">Continue to Amaru</a></div>}
         {state === "error" && <div className="note note-error">{message || "This link is invalid or has expired."} You can request a new link from the Account page.</div>}
       </div>
     </div>

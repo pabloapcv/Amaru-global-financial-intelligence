@@ -3,7 +3,7 @@ import Nav from "@/components/Nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ATLAS — Financial Intelligence",
+  title: "Amaru — Financial Intelligence",
   description: "Evidence-grounded market and macro research",
 };
 

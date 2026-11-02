@@ -149,7 +149,7 @@ def t_search_instruments(ctx: ToolContext, args: dict[str, Any]) -> dict[str, An
 def t_get_data_status(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     ids = args.get("dataset_ids") or []
     rows = [r for r in data_status() if not ids or r["dataset_id"] in ids]
-    label = ctx.add("get_data_status", args, {"datasets": rows}, "ATLAS data status registry (dataset_state, pipeline_runs)", [])
+    label = ctx.add("get_data_status", args, {"datasets": rows}, "Amaru data status registry (dataset_state, pipeline_runs)", [])
     return {"evidence_id": label, "datasets": rows}
 
 
@@ -274,7 +274,7 @@ def t_calculate_correlation(ctx: ToolContext, args: dict[str, Any]) -> dict[str,
                    for p in res["pairs"] if ids[0] in (p["a"], p["b"])],
     }
     view = {**res, "pairs": [{k: v for k, v in p.items() if k != "rolling_series"} for p in res["pairs"]]}
-    label = ctx.add("calculate_correlation", args, view, "ATLAS quant engine (correlation) on: " + _cite(metas),
+    label = ctx.add("calculate_correlation", args, view, "Amaru quant engine (correlation) on: " + _cite(metas),
                     [_source(m) for m in metas], chart)
     return {"evidence_id": label, **view}
 
@@ -292,7 +292,7 @@ def t_run_regression(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         res = analytics.regression(y, series, freqs, units, lookback_years=lb)
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
-    label = ctx.add("run_regression", args, res, "ATLAS quant engine (HAC OLS) on: " + _cite(metas), [_source(m) for m in metas])
+    label = ctx.add("run_regression", args, res, "Amaru quant engine (HAC OLS) on: " + _cite(metas), [_source(m) for m in metas])
     return {"evidence_id": label, **res}
 
 
@@ -304,7 +304,7 @@ def t_detect_anomalies(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
         res = analytics.anomalies(series[dsid], unit=ds.unit, frequency=ds.frequency, threshold=float(args.get("threshold", 3.5)))
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
-    label = ctx.add("detect_anomalies", args, {"dataset_id": dsid, **res}, "ATLAS quant engine (robust z) on: " + _cite(metas), [_source(m) for m in metas])
+    label = ctx.add("detect_anomalies", args, {"dataset_id": dsid, **res}, "Amaru quant engine (robust z) on: " + _cite(metas), [_source(m) for m in metas])
     return {"evidence_id": label, "dataset_id": dsid, **res}
 
 
@@ -326,7 +326,7 @@ def t_screen_anomalies(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
     rows.sort(key=lambda r: -abs(r["robust_z"] or 0))
     result = {"threshold": thr, "flagged": [r for r in rows if r["is_anomalous"]], "all_latest": rows, "skipped": skipped,
               "method": {"statistic": "robust z of latest period change vs trailing median/MAD"}}
-    label = ctx.add("screen_anomalies", args, result, "ATLAS quant engine (anomaly screen) on: " + _cite(metas), [_source(m) for m in metas])
+    label = ctx.add("screen_anomalies", args, result, "Amaru quant engine (anomaly screen) on: " + _cite(metas), [_source(m) for m in metas])
     return {"evidence_id": label, **result}
 
 
@@ -335,7 +335,7 @@ def t_get_seasonality(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     ds = _ds(dsid)
     series, metas = _load([dsid])
     res = analytics.seasonality(series[dsid], unit=ds.unit, frequency=ds.frequency, years=int(args.get("years", 15)))
-    label = ctx.add("get_seasonality", args, {"dataset_id": dsid, **res}, "ATLAS quant engine (seasonality) on: " + _cite(metas), [_source(m) for m in metas])
+    label = ctx.add("get_seasonality", args, {"dataset_id": dsid, **res}, "Amaru quant engine (seasonality) on: " + _cite(metas), [_source(m) for m in metas])
     return {"evidence_id": label, "dataset_id": dsid, **res}
 
 
@@ -362,7 +362,7 @@ def t_run_forecast(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         ],
         "band": [{"date": p["period"], "low": p.get("p10"), "high": p.get("p90")} for p in res["path"] if "p10" in p],
     }
-    label = ctx.add("run_forecast", args, {"dataset_id": dsid, **res}, "ATLAS quant engine (walk-forward forecast) on: " + _cite(metas), [_source(m) for m in metas], chart)
+    label = ctx.add("run_forecast", args, {"dataset_id": dsid, **res}, "Amaru quant engine (walk-forward forecast) on: " + _cite(metas), [_source(m) for m in metas], chart)
     return {"evidence_id": label, "dataset_id": dsid, **res}
 
 
@@ -378,7 +378,7 @@ def t_run_scenario(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         res = analytics.scenario(asset, driver, shock, series, freqs, units, lookback_years=lb)
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
-    label = ctx.add("run_scenario", args, res, "ATLAS quant engine (historical-beta scenario) on: " + _cite(metas), [_source(m) for m in metas])
+    label = ctx.add("run_scenario", args, res, "Amaru quant engine (historical-beta scenario) on: " + _cite(metas), [_source(m) for m in metas])
     return {"evidence_id": label, **res}
 
 
@@ -557,7 +557,7 @@ def t_get_country_monitor(ctx: ToolContext, args: dict[str, Any]) -> dict[str, A
             s = s.dropna()
             series.append({"name": r["name"], "points": _downsample(s[s.index > s.index[-1] - pd.DateOffset(years=5)])})
         chart = {"type": "line", "title": "Consumer price inflation, year on year (IMF)", "unit": "percent", "series": series}
-    label = ctx.add("get_country_monitor", args, full, "ATLAS summary of IMF and BIS country data: " + _cite(metas), [_source(m) for m in metas], chart)
+    label = ctx.add("get_country_monitor", args, full, "Amaru summary of IMF and BIS country data: " + _cite(metas), [_source(m) for m in metas], chart)
     return {"evidence_id": label, **full}
 
 
@@ -641,7 +641,7 @@ def t_detect_regime(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         raise ToolError(str(exc)) from exc
     chart = {"type": "line", "title": f"{ds.name}: probability of high-volatility regime", "unit": "probability",
              "series": [{"name": "P(high-vol regime)", "points": res.pop("probability_series")}]}
-    label = ctx.add("detect_regime", args, {"dataset_id": dsid, **res}, "ATLAS quant engine (Markov-switching volatility regime) on: " + _cite(metas),
+    label = ctx.add("detect_regime", args, {"dataset_id": dsid, **res}, "Amaru quant engine (Markov-switching volatility regime) on: " + _cite(metas),
                     [_source(m) for m in metas], chart)
     return {"evidence_id": label, "dataset_id": dsid, **res}
 
@@ -662,7 +662,7 @@ def t_analyze_portfolio(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any
     chart = {"type": "line", "title": f"{name or 'Portfolio'}: cumulative value (start = 1)", "unit": "growth of 1",
              "series": [{"name": name or "Portfolio", "points": res.pop("cumulative")}]}
     result = {"portfolio_name": name, **res}
-    label = ctx.add("analyze_portfolio", args, result, "ATLAS quant engine (portfolio risk) on: " + _cite(metas),
+    label = ctx.add("analyze_portfolio", args, result, "Amaru quant engine (portfolio risk) on: " + _cite(metas),
                     [_source(m) for m in metas], chart)
     return {"evidence_id": label, **result}
 
@@ -701,7 +701,7 @@ def t_run_event_study(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
                  {"date": (pd.Timestamp("2000-01-03") + pd.offsets.BDay(p["day"])).date().isoformat(), "value": p["mean_car"]}
                  for p in res["car_path"]]}],
              "x_is_event_time": True}
-    label = ctx.add("run_event_study", args, result, "ATLAS quant engine (event study) on: " + _cite(metas),
+    label = ctx.add("run_event_study", args, result, "Amaru quant engine (event study) on: " + _cite(metas),
                     [_source(m) for m in metas], chart)
     return {"evidence_id": label, **result}
 
@@ -721,7 +721,7 @@ def t_get_economic_calendar(ctx: ToolContext, args: dict[str, Any]) -> dict[str,
                         | ({"datasets": [d["dataset_id"] for d in e["detail"].get("datasets", [])]} if e["kind"] == "data_release" else {})
                         for e in cal["events"]]
     names = {"fomc": "Federal Reserve Board, FOMC meeting calendar", "fred_releases": "FRED release calendar (Federal Reserve Bank of St. Louis)"}
-    citation = "; ".join(f"{names.get(src, src)} — fetched {at}" for src, at in cal["sources"].items()) or "ATLAS calendar store"
+    citation = "; ".join(f"{names.get(src, src)} — fetched {at}" for src, at in cal["sources"].items()) or "Amaru calendar store"
     sources = [{"dataset_id": f"CALENDAR.{src.upper()}", "name": names.get(src, src), "citation": names.get(src, src),
                 "url": calendar.FOMC_URL if src == "fomc" else "https://fred.stlouisfed.org/releases/calendar",
                 "observation_through": None, "ingested_at": at, "freshness": "current", "price_basis": "schedule"}
@@ -813,7 +813,7 @@ def t_scan_scenarios(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     except Exception:  # the comparison is context; never fail the scan over it
         res["changes"] = None
     unique = list({m.dataset_id: m for m in metas}.values())
-    label = ctx.add("scan_scenarios", args, res, "ATLAS scenario scan (rules on stored data; historical-beta effects) on: " + _cite(unique),
+    label = ctx.add("scan_scenarios", args, res, "Amaru scenario scan (rules on stored data; historical-beta effects) on: " + _cite(unique),
                     [_source(m) for m in unique])
     return {"evidence_id": label, **res}
 
@@ -831,7 +831,7 @@ def t_get_business_cycle(ctx: ToolContext, args: dict[str, Any]) -> dict[str, An
     metas = [series_meta(d) for d in cycle.SERIES.values()]
     chart = {"type": "line", "title": "U.S. recession probability, next 12 months", "unit": "%",
              "series": [{"name": "Estimate made at the time", "points": r["path"]}]}
-    label = ctx.add("get_business_cycle", args, res, "ATLAS business-cycle model on: " + _cite(metas), [_source(m) for m in metas], chart)
+    label = ctx.add("get_business_cycle", args, res, "Amaru business-cycle model on: " + _cite(metas), [_source(m) for m in metas], chart)
     return {"evidence_id": label, **res}
 
 
@@ -846,7 +846,7 @@ def t_get_policy_rates(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
     path = full["direction"].pop("path")
     chart = {"type": "line", "title": "Central banks raising minus cutting over 6 months", "unit": "% of banks",
              "series": [{"name": "Raising minus cutting", "points": path}]}
-    label = ctx.add("get_policy_rates", args, full, "ATLAS summary of BIS central bank policy rates: " + _cite(metas), [_source(m) for m in metas], chart)
+    label = ctx.add("get_policy_rates", args, full, "Amaru summary of BIS central bank policy rates: " + _cite(metas), [_source(m) for m in metas], chart)
     return {"evidence_id": label, **full}
 
 
@@ -859,7 +859,7 @@ def t_get_fertilizer_affordability(ctx: ToolContext, args: dict[str, Any]) -> di
         raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap.") from exc
     metas = full.pop("sources")
     chart = {"type": "line", "title": "Tons of crop to buy a ton of fertilizer", "unit": "tons", "series": full.pop("chart")}
-    label = ctx.add("get_fertilizer_affordability", args, full, "ATLAS ratio of fertilizer and crop prices: " + _cite(metas), [_source(m) for m in metas], chart)
+    label = ctx.add("get_fertilizer_affordability", args, full, "Amaru ratio of fertilizer and crop prices: " + _cite(metas), [_source(m) for m in metas], chart)
     return {"evidence_id": label, **full}
 
 
@@ -875,7 +875,7 @@ def t_get_energy_inventories(ctx: ToolContext, args: dict[str, Any]) -> dict[str
         raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap.") from exc
     metas = full.pop("sources")
     chart = {"type": "line", "title": "U.S. stocks against their five-year average for the same week", "unit": "%", "series": full.pop("chart")}
-    label = ctx.add("get_energy_inventories", args, full, "ATLAS summary of EIA weekly energy data: " + _cite(metas), [_source(m) for m in metas], chart)
+    label = ctx.add("get_energy_inventories", args, full, "Amaru summary of EIA weekly energy data: " + _cite(metas), [_source(m) for m in metas], chart)
     return {"evidence_id": label, **full}
 
 
@@ -926,20 +926,20 @@ def _unavailable(kind: str, needed: str) -> Callable[[ToolContext, dict[str, Any
             "reason": f"No {kind} source is connected in this deployment. Requires: {needed}.",
             "instruction": "Report this as a data limitation. Do not substitute remembered or estimated values.",
         }
-        label = ctx.add(f"{kind}_unavailable", args, result, f"ATLAS coverage registry: {kind} not connected", [])
+        label = ctx.add(f"{kind}_unavailable", args, result, f"Amaru coverage registry: {kind} not connected", [])
         return {"evidence_id": label, **result}
     return tool
 
 
 # ---------------------------------------------------------------- registry
 
-_ID = {"type": "string", "description": "Canonical ATLAS dataset id, e.g. CMD.SUGAR.ISA or FX.USDBRL"}
+_ID = {"type": "string", "description": "Canonical Amaru dataset id, e.g. CMD.SUGAR.ISA or FX.USDBRL"}
 _LB = {"type": "number", "description": "Years of history to analyse (default 5)."}
 
 TOOLS: dict[str, dict[str, Any]] = {
     "search_instruments": {
         "fn": t_search_instruments,
-        "description": "Resolve free text (e.g. 'sugar', 'Brazilian real', 'inflation') to canonical ATLAS dataset ids. Empty query lists every registered dataset. Does not create evidence.",
+        "description": "Resolve free text (e.g. 'sugar', 'Brazilian real', 'inflation') to canonical Amaru dataset ids. Empty query lists every registered dataset. Does not create evidence.",
         "schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
     },
     "get_data_status": {

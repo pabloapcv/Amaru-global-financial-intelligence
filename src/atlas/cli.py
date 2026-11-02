@@ -1,4 +1,4 @@
-"""ATLAS command line: `atlas init-db | ingest | status | schedule | serve | research | llm-check`."""
+"""Amaru command line: `atlas init-db | ingest | status | schedule | serve | research | llm-check`."""
 
 from __future__ import annotations
 
@@ -145,7 +145,7 @@ def main(argv: list[str] | None = None) -> None:
         except (ValueError, FileNotFoundError, RuntimeError) as exc:
             raise SystemExit(f"restore refused: {exc}")
         print(f"restored {out['rows']:,} rows in {len(out['tables'])} tables and {out['files']} files "
-              f"(backup from {out['created_at']}, {out['from_dialect']}, ATLAS {out['atlas_version']})")
+              f"(backup from {out['created_at']}, {out['from_dialect']}, Amaru {out['atlas_version']})")
         print(out["note"])
     elif args.cmd == "disable-2fa":
         from atlas import auth

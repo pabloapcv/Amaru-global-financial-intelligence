@@ -1,7 +1,7 @@
 """USDA Foreign Agricultural Service PSD connector (Production, Supply and Distribution).
 
 Uses the public bulk CSV downloads (no API key): one zip per commodity group, refreshed by USDA
-after each monthly WASDE report. Each ATLAS fundamentals dataset is one commodity's
+after each monthly WASDE report. Each Amaru fundamentals dataset is one commodity's
 country-by-market-year balance sheet; the adapter keeps the attributes needed for a supply and
 demand table and, on incremental runs, only the last few market years (USDA revises those).
 """
@@ -22,7 +22,7 @@ BASE = "https://apps.fas.usda.gov/psdonline/downloads"
 FIRST_MARKET_YEAR = 1990
 REVISION_WINDOW = 3  # market years USDA still revises
 MAX_ZIP_BYTES = 50_000_000
-# PSD attribute → ATLAS attribute. Consumption differs by commodity group.
+# PSD attribute → Amaru attribute. Consumption differs by commodity group.
 ATTRIBUTES = {
     "Production": "production", "Imports": "imports", "Exports": "exports", "Beginning Stocks": "beginning_stocks",
     "Ending Stocks": "ending_stocks", "Total Supply": "total_supply", "Domestic Consumption": "consumption",
