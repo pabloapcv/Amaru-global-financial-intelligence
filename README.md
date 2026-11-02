@@ -164,6 +164,8 @@ atlas restore backups/atlas-backup-20261023T153250Z.tar.gz --database-url postgr
 
 Backups are database-neutral (each table as gzipped JSON lines), so a SQLite backup restores into PostgreSQL and back. Restore checks every file's SHA-256 against the manifest, rejects unsafe archive entries, and only writes into an empty database. The key that encrypts two-factor secrets (`ATLAS_SECRET_KEY` or `data/secret.key`) is never included: keep it separately, or users with two-factor sign in with a recovery code and re-enroll. In Docker: `docker compose exec api atlas backup --out /data/backups`.
 
+**Off the server:** with `ATLAS_BACKUP_S3_URL`, its access keys and `ATLAS_BACKUP_ENCRYPTION_KEY` (make one with `atlas backup-key`) set, every backup is encrypted on the server (AES-256-GCM, in chunks that can't be reordered or cut short unnoticed) and uploaded to S3-compatible storage (AWS S3, Cloudflare R2, Backblaze B2, MinIO), then the stored size is checked. Requests are signed with AWS Signature Version 4, the access key needs no delete permission, and `atlas restore` takes the downloaded `.enc` file directly. Lose the encryption key and the copies can't be restored; see [docs/deploy.md](docs/deploy.md#backups).
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every push to `main` and on pull requests: the Python tests on 3.12 and 3.13 (SQLite) and again on TimescaleDB/PostgreSQL 16, a web type-check and production build, and a build of both Docker images with an API smoke test. To run the suite against Postgres locally, set `ATLAS_TEST_DATABASE_URL` (the database is wiped).

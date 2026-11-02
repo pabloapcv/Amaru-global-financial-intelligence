@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 
 from atlas.data.db import init_db, session_scope
 from atlas.instruments import sync_registry
@@ -41,6 +42,8 @@ def main(argv: list[str] | None = None) -> None:
     bk.add_argument("--out", default="backups", help="directory for the archive (default ./backups)")
     bk.add_argument("--no-raw", action="store_true", help="skip raw provider payloads (they can be re-fetched)")
     bk.add_argument("--keep", type=int, default=None, help="afterwards, delete all but the newest N archives in --out")
+    bk.add_argument("--no-upload", action="store_true", help="don't copy it to ATLAS_BACKUP_S3_URL even if that is set")
+    sub.add_parser("backup-key", help="print a new random key for ATLAS_BACKUP_ENCRYPTION_KEY")
     rs2 = sub.add_parser("restore", help="restore a backup archive into an empty database")
     rs2.add_argument("archive")
     rs2.add_argument("--database-url", help="target database (default ATLAS_DATABASE_URL)")
@@ -99,16 +102,35 @@ def main(argv: list[str] | None = None) -> None:
         m = backup.describe(path)
         print(f"{path} ({path.stat().st_size / 1e6:.1f} MB, {sum(m['tables'].values()):,} rows, {len(m['files'])} files)")
         print("Not included: the two-factor encryption key (ATLAS_SECRET_KEY or data/secret.key). Keep it separately.")
+        if not args.no_upload:
+            from atlas import offsite
+
+            try:
+                target = offsite.Target.from_env()
+                if target:
+                    sent = offsite.upload(path, target)
+                    print(f"Encrypted and copied off the server: {sent['url']} ({int(sent['bytes']) / 1e6:.1f} MB)")
+                else:
+                    print("Not copied off the server: set ATLAS_BACKUP_S3_URL (see docs/deploy.md).")
+            except (offsite.OffsiteError, OSError) as exc:  # the local archive still counts; fail loudly for the cron loop
+                print(f"Off-server copy FAILED: {exc}")
+                raise SystemExit(2)
         if args.keep:
             removed = backup.prune(args.out, args.keep)
             if removed:
                 print(f"Deleted {len(removed)} older backup(s); kept the newest {args.keep}.")
+    elif args.cmd == "backup-key":
+        from atlas import offsite
+
+        print(offsite.new_key())
+        print("Set it as ATLAS_BACKUP_ENCRYPTION_KEY and store a copy somewhere other than the bucket: without it the copies can't be restored.",
+              file=sys.stderr)
     elif args.cmd == "restore":
         from atlas import backup
 
         try:
             out = backup.restore(args.archive, args.database_url, object_store=args.object_store)
-        except (ValueError, FileNotFoundError) as exc:
+        except (ValueError, FileNotFoundError, RuntimeError) as exc:
             raise SystemExit(f"restore refused: {exc}")
         print(f"restored {out['rows']:,} rows in {len(out['tables'])} tables and {out['files']} files "
               f"(backup from {out['created_at']}, {out['from_dialect']}, ATLAS {out['atlas_version']})")
