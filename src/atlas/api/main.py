@@ -864,6 +864,17 @@ def fertilizer_affordability() -> dict[str, Any]:
     return {"available": True, **{k: v for k, v in res.items() if k != "sources"}}
 
 
+@api.get("/macro/energy")
+def energy_inventories(kind: str | None = Query(None, pattern="^(oil|gas)$")) -> dict[str, Any]:
+    from atlas import energy
+
+    try:
+        res = energy.overview(kind)
+    except energy.EnergyUnavailable as exc:
+        return {"available": False, "reason": str(exc)}
+    return {"available": True, **{k: v for k, v in res.items() if k != "sources"}}
+
+
 @api.get("/macro/policy-rates")
 def policy_rates(countries: str | None = Query(None, description="Comma-separated ISO3 codes; the global direction always covers every bank.")) -> dict[str, Any]:
     from atlas import policy_rates as rates

@@ -146,6 +146,9 @@ def run(production: bool | None = None, *, check_database: bool = True) -> dict[
             "Publish terms of service and a privacy policy (have a lawyer review them) and set both URLs.")
     if not config.settings.fred_api_key:
         add("info", "FRED key", "not set: the calendar lacks official U.S. release dates", "Optional: set FRED_API_KEY (free).")
+    if not config.settings.eia_api_key:
+        add("info", "EIA key", "not set: weekly energy inventories use the public demo key (about ten calls an hour)",
+            "Optional: set EIA_API_KEY (free at eia.gov/opendata).")
 
     counts = {lv: sum(1 for c in checks if c["level"] == lv) for lv in LEVELS}
     order = {lv: i for i, lv in enumerate(LEVELS)}

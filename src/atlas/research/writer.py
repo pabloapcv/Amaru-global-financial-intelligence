@@ -249,6 +249,27 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             lines.append(f"| {p['crop']} | {p['fertilizer']} | {_fmt(p['tons_of_crop'], 3)} | {_fmt(p['tons_12m_ago'], 3)} | {_fmt(p['median'], 3)} | {p['percentile']} | {p['reading']} | {p['as_of'][:7]} |")
         lines += ["", f"{r['caveat']} [{e['label']}]", ""]
 
+    # Energy inventories ----------------------------------------------------------
+    for e in by_tool.get("get_energy_inventories", []):
+        r = e["result"]
+        lines += ["## U.S. energy inventories", ""]
+        if r["stocks"]:
+            lines += ["| Stocks | Latest | Week change | Five-year average, same week | Versus average | Five-year range | Position | Week |", "|---|---|---|---|---|---|---|---|"]
+            for st in r["stocks"]:
+                lines.append(f"| {st['name']} ({st['unit']}) | {_fmt(st['level'], 1)} | {_fmt(st['weekly_change'], 1)} | {_fmt(st['five_year_average'], 1)} | "
+                             f"{_fmt(st['vs_five_year_average_pct'], 1)}% | {_fmt(st['five_year_low'], 1)} to {_fmt(st['five_year_high'], 1)} | {st['position']} | {st['as_of']} |")
+            lines.append("")
+        if r["spr"]:
+            sp = r["spr"]
+            lines += [f"The Strategic Petroleum Reserve held {_fmt(sp['level'], 1)} million barrels in the week to {sp['as_of']}"
+                      + (f", {_fmt(sp['change_12m'], 1)} million barrels from a year earlier" if sp["change_12m"] is not None else "") + f" [{e['label']}].", ""]
+        if r["flows"]:
+            lines += ["| Flow (4-week average) | Latest | A year earlier | Change | Week |", "|---|---|---|---|---|"]
+            for f in r["flows"]:
+                lines.append(f"| {f['name']} ({f['unit']}) | {_fmt(f['four_week_average'], 1)} | {_fmt(f['four_week_average_year_ago'], 1)} | {_fmt(f['change_vs_year_ago'], 1)} | {f['as_of']} |")
+            lines.append("")
+        lines += [f"{r['caveat']} [{e['label']}]", ""]
+
     # Central banks ---------------------------------------------------------------
     for e in by_tool.get("get_central_bank_tone", []):
         r = e["result"]

@@ -370,7 +370,7 @@ def replay_raw(raw_id: str) -> DatasetResult:
 
 
 FAILURE_RETRY = timedelta(hours=1)
-REFRESH_INTERVAL = {"daily_poll": timedelta(hours=6), "weekly_poll": timedelta(days=7), "none": None}
+REFRESH_INTERVAL = {"daily_poll": timedelta(hours=6), "once_daily": timedelta(days=1), "weekly_poll": timedelta(days=7), "none": None}
 
 
 def due_datasets(now: datetime | None = None) -> list[str]:
