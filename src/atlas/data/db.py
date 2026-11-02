@@ -342,6 +342,11 @@ class ResearchRun(Base):
     error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Durable queue: a worker claims a queued run, keeps its heartbeat fresh, and a run whose worker died is retried once.
+    claimed_by: Mapped[str | None] = mapped_column(String(128))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class ResearchEvidence(Base):
@@ -827,6 +832,10 @@ _ADDED_COLUMNS = [
     ("source_documents", "fetched_at", "TIMESTAMP", None),
     ("source_documents", "first_seen_at", "TIMESTAMP", None),
     ("newsletters", "language", "VARCHAR(2)", "en"),
+    ("research_runs", "claimed_by", "VARCHAR(128)", None),
+    ("research_runs", "heartbeat_at", "TIMESTAMP", None),
+    ("research_runs", "attempts", "INTEGER", "0"),
+    ("research_runs", "cancel_requested_at", "TIMESTAMP", None),
 ]
 
 

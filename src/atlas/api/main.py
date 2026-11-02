@@ -36,6 +36,9 @@ async def lifespan(_: FastAPI):
     init_db()
     with session_scope() as s:
         sync_registry(s)
+    from atlas.research import engine as research_engine
+
+    research_engine.start_workers()  # also picks up research left queued or interrupted by a restart
     if os.getenv("ATLAS_SCHEDULER", "off").lower() == "on":
         from atlas.ingestion.scheduler import run_forever
 

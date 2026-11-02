@@ -1,11 +1,24 @@
-"""Research job orchestration: plan → investigate → write → verify → publish (spec §8.1, §12)."""
+"""Research job orchestration: plan → investigate → write → verify → publish (spec §8.1, §12).
+
+Runs wait in the database, not in memory. Worker threads (ATLAS_RESEARCH_WORKERS per process,
+default 4; 0 for API processes that shouldn't run research, with `atlas worker` elsewhere) claim
+the oldest queued run with a conditional update, so two processes never take the same run. A
+running run's heartbeat is refreshed every HEARTBEAT seconds; one whose heartbeat stops (the
+process died or restarted) is put back in the queue once and fails on the second loss.
+Cancelling sets a flag in the database, so it works from any API replica.
+"""
 
 from __future__ import annotations
 
 import logging
+import os
+import socket
 import threading
-from concurrent.futures import ThreadPoolExecutor
+import time
+from datetime import timedelta
 from typing import Any, Callable
+
+from sqlalchemy import select, update
 
 from atlas.data.db import LOCAL_WORKSPACE, ResearchEvidence, ResearchRun, session_scope, utcnow
 from atlas.instruments import extract_entities, get_dataset
@@ -14,9 +27,17 @@ from atlas.research.planner import build_plan, validate_plan
 
 log = logging.getLogger("atlas.research")
 
-_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="research")
 _cancelled: set[str] = set()
 _lock = threading.Lock()
+WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
+HEARTBEAT = 30  # seconds
+STALE_AFTER = timedelta(minutes=5)  # no heartbeat for this long: the worker is gone
+MAX_ATTEMPTS = 2
+POLL = 2.0  # seconds an idle worker waits before looking at the queue again
+_wake = threading.Event()
+_workers: list[threading.Thread] = []
+_running_here: set[str] = set()
+paused = False  # tests drive the queue by hand while this process's workers sit idle
 
 
 def _progress(run_id: str, message: str) -> None:
@@ -25,7 +46,9 @@ def _progress(run_id: str, message: str) -> None:
         if run is None:
             return
         run.progress = [*(run.progress or []), {"at": utcnow().isoformat(timespec="seconds") + "Z", "message": message}]
-    if run_id in _cancelled:
+        run.heartbeat_at = utcnow()
+        cancelled = run.cancel_requested_at is not None
+    if cancelled or run_id in _cancelled:
         raise RuntimeError("cancelled by user")
 
 
@@ -38,10 +61,11 @@ def _set(run_id: str, **fields: Any) -> None:
 
 
 def create_run(query: str, config: dict[str, Any] | None = None, user_id: str = "local",
-               workspace_id: str = LOCAL_WORKSPACE) -> str:
+               workspace_id: str = LOCAL_WORKSPACE, *, queued: bool = False) -> str:
+    """A run record. Only queued runs are picked up by workers; others are executed by the caller."""
     with session_scope() as s:
         run = ResearchRun(query=query, config=config or {}, user_id=user_id, workspace_id=workspace_id,
-                          status="queued", progress=[], cache_key=cache_key(query, config or {}),
+                          status="queued" if queued else "created", progress=[], cache_key=cache_key(query, config or {}),
                           parent_run_id=(config or {}).get("parent_run_id"))
         s.add(run)
         s.flush()
@@ -50,20 +74,131 @@ def create_run(query: str, config: dict[str, Any] | None = None, user_id: str = 
 
 def submit(query: str, config: dict[str, Any] | None = None, user_id: str = "local",
            workspace_id: str = LOCAL_WORKSPACE) -> str:
-    run_id = create_run(query, config, user_id, workspace_id)
-    _executor.submit(execute_run, run_id)
+    run_id = create_run(query, config, user_id, workspace_id, queued=True)
+    start_workers()
+    _wake.set()
     return run_id
 
 
 def cancel(run_id: str) -> None:
     with _lock:
         _cancelled.add(run_id)
+    with session_scope() as s:
+        s.execute(update(ResearchRun).where(ResearchRun.run_id == run_id, ResearchRun.status.in_(("queued", "running")))
+                  .values(cancel_requested_at=utcnow()))
+        # Still waiting in the queue: nobody will pick it up to notice the flag, so close it now.
+        s.execute(update(ResearchRun).where(ResearchRun.run_id == run_id, ResearchRun.status == "queued")
+                  .values(status="cancelled", error="RuntimeError: cancelled by user", finished_at=utcnow()))
 
 
 def _save_usage(run_id: str, researchers: list) -> None:
     if researchers:
         usage = researchers[0].usage
-        _set(run_id, llm_usage=usage, cost_usd=usage["cost_usd"])
+        with session_scope() as s:
+            run = s.get(ResearchRun, run_id)
+            assert run is not None
+            earlier = float((run.config or {}).get("earlier_attempts_cost_usd") or 0)  # an interrupted attempt still cost money
+            run.llm_usage, run.cost_usd = usage, round(usage["cost_usd"] + earlier, 6)
+
+
+# ---------------------------------------------------------------- durable queue
+
+
+def worker_count() -> int:
+    return max(0, int(os.getenv("ATLAS_RESEARCH_WORKERS", "4")))
+
+
+def claim_next(worker: str = WORKER_ID) -> str | None:
+    """Atomically take the oldest queued run; None when the queue is empty."""
+    with session_scope() as s:
+        for run_id in s.execute(select(ResearchRun.run_id).where(ResearchRun.status == "queued")
+                                .order_by(ResearchRun.created_at).limit(5)).scalars():
+            taken = s.execute(update(ResearchRun).where(ResearchRun.run_id == run_id, ResearchRun.status == "queued")
+                              .values(status="running", claimed_by=worker, heartbeat_at=utcnow(),
+                                      attempts=ResearchRun.attempts + 1)).rowcount  # type: ignore[attr-defined]
+            if taken:
+                return run_id
+    return None
+
+
+def recover_stale(now: Any = None) -> dict[str, int]:
+    """Requeue runs whose worker stopped sending heartbeats; fail them after MAX_ATTEMPTS."""
+    now = now or utcnow()
+    out = {"requeued": 0, "failed": 0}
+    with session_scope() as s:
+        stale = s.execute(select(ResearchRun).where(
+            ResearchRun.status == "running",
+            ((ResearchRun.heartbeat_at < now - STALE_AFTER) | (ResearchRun.heartbeat_at.is_(None) & (ResearchRun.created_at < now - STALE_AFTER))))
+        ).scalars().all()
+        for run in stale:
+            note = {"at": now.isoformat(timespec="seconds") + "Z", "message": "The server running this research stopped"}
+            if run.cancel_requested_at is not None or (run.attempts or 0) >= MAX_ATTEMPTS:
+                run.status, run.finished_at = ("cancelled" if run.cancel_requested_at else "failed"), now
+                run.error = run.error or ("RuntimeError: cancelled by user" if run.cancel_requested_at
+                                          else f"Interrupted: the server running it stopped {run.attempts} times")
+                run.progress = [*(run.progress or []), note]
+                out["failed"] += 1
+                continue
+            for ev in s.execute(select(ResearchEvidence).where(ResearchEvidence.run_id == run.run_id)).scalars():
+                s.delete(ev)
+            run.config = {**(run.config or {}), "earlier_attempts_cost_usd": float(run.cost_usd or 0)}
+            run.status, run.claimed_by, run.heartbeat_at, run.result, run.plan = "queued", None, None, None, None
+            run.progress = [*(run.progress or []), {**note, "message": note["message"] + "; starting it again"}]
+            out["requeued"] += 1
+    return out
+
+
+def _heartbeat_loop() -> None:
+    while True:
+        time.sleep(HEARTBEAT)
+        ids = list(_running_here)
+        if ids:
+            try:
+                with session_scope() as s:
+                    s.execute(update(ResearchRun).where(ResearchRun.run_id.in_(ids), ResearchRun.status == "running")
+                              .values(heartbeat_at=utcnow()))
+            except Exception:  # noqa: BLE001 — a missed beat is retried; a long outage makes the run look stale, which is right
+                log.exception("research heartbeat failed")
+
+
+def work_once(worker: str = WORKER_ID) -> bool:
+    """Run one queued run if there is one. Returns whether it did."""
+    run_id = claim_next(worker)
+    if run_id is None:
+        return False
+    _running_here.add(run_id)
+    try:
+        execute_run(run_id)
+    finally:
+        _running_here.discard(run_id)
+    return True
+
+
+def _worker_loop() -> None:
+    while True:
+        try:
+            if not paused:
+                recover_stale()
+                while not paused and work_once():
+                    pass
+        except Exception:  # noqa: BLE001 — keep the worker alive; the run itself records its own failure
+            log.exception("research worker error")
+        _wake.wait(POLL)
+        _wake.clear()
+
+
+def start_workers(count: int | None = None) -> int:
+    """Start this process's research workers once (and the heartbeat thread). Returns how many run here."""
+    n = worker_count() if count is None else count
+    with _lock:
+        if _workers or n == 0:
+            return len(_workers)
+        threading.Thread(target=_heartbeat_loop, daemon=True, name="research-heartbeat").start()
+        for i in range(n):
+            t = threading.Thread(target=_worker_loop, daemon=True, name=f"research-{i}")
+            t.start()
+            _workers.append(t)
+    return n
 
 
 # ---------------------------------------------------------------- result cache
@@ -171,6 +306,7 @@ def execute_run(run_id: str) -> dict[str, Any]:
         assert run is not None
         query, config, workspace_id = run.query, dict(run.config or {}), run.workspace_id
         run.status = "running"
+        run.heartbeat_at = utcnow()
     researchers: list[llm.LLMResearcher] = []  # kept so token usage is recorded even if the run fails
     try:
         depth = config.get("depth", "standard")
