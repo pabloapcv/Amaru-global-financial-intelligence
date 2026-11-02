@@ -1,4 +1,4 @@
-# Selling ATLAS: an honest assessment
+# Selling Amaru: an honest assessment
 
 *Written 2026-10-22, at commit 17ca8d2. This is a product and business view, not legal advice. Confirm the licensing and regulatory points with a lawyer before charging anyone.*
 
@@ -31,7 +31,7 @@ You can sell it: it is your software, built on permissively licensed open-source
 | UN Comtrade | The free API tier may not allow commercial use; there is a paid tier |
 | Exchange data (CME, ICE): futures, real-time | Not connected. Licences cost thousands per month and would change the pricing completely |
 
-ATLAS now records each dataset's licence class and owner (Data Explorer, provenance, export headers). Setting `ATLAS_COMMERCIAL_MODE=true` switches off the three restricted series so a paid deployment does not redistribute them; "check terms" sources (IMF, UN Comtrade) still need a decision from you. The classification is a best-effort reading of each source's terms as of October 2026, not legal advice.
+Amaru now records each dataset's licence class and owner (Data Explorer, provenance, export headers). Setting `ATLAS_COMMERCIAL_MODE=true` switches off the three restricted series so a paid deployment does not redistribute them; "check terms" sources (IMF, UN Comtrade) still need a decision from you. The classification is a best-effort reading of each source's terms as of October 2026, not legal advice.
 
 ### 2. The data is public and delayed
 
@@ -46,14 +46,14 @@ Commodity prices are monthly IMF averages; for example, sugar's latest value was
 
 ### 4. Nobody has used it
 
-ATLAS was built in roughly a week and has 136 automated tests and passing CI, but no customers. Real users will find gaps that tests don't.
+Amaru was built in roughly a week and has 136 automated tests and passing CI, but no customers. Real users will find gaps that tests don't.
 
 ### 5. Missing commercial basics
 
 - Billing: the Stripe integration is now built (Checkout, Customer Portal, verified webhooks) and only needs your Stripe account, prices and webhook set up
 - Production hosting: the deployment kit is built (HTTPS through Caddy, secure cookies, daily backups, `atlas doctor`; see [deploy.md](deploy.md)). Still needed: a server and a domain
 - Prices: the public `/welcome` page shows plans and limits in three languages; set `ATLAS_PLAN_PRICES` once you've decided on prices
-- Terms of service and a privacy policy. ATLAS links them at sign-up and on public pages once `ATLAS_TERMS_URL` and `ATLAS_PRIVACY_URL` are set (the product side of data rights is built: people can download their data and delete their account, which privacy laws such as GDPR, Brazil's LGPD and California's CCPA expect)
+- Terms of service and a privacy policy. Amaru links them at sign-up and on public pages once `ATLAS_TERMS_URL` and `ATLAS_PRIVACY_URL` are set (the product side of data rights is built: people can download their data and delete their account, which privacy laws such as GDPR, Brazil's LGPD and California's CCPA expect)
 - Backups: `atlas backup` and `atlas restore` are built, and the production setup runs them daily with retention and can encrypt and copy each one to S3-compatible storage. You still need a bucket and to keep the encryption key safe
 - Support
 - A security review (dependency audits run in CI, and `atlas doctor` catches risky configuration, but an outside review is still worth paying for)
@@ -63,7 +63,7 @@ ATLAS was built in roughly a week and has 136 automated tests and passing CI, bu
 Don't compete with Bloomberg, Koyfin or TradingView. Pick a niche where public data is enough and the value is turning it into a finished, verified analysis.
 
 1. **Agricultural trade intelligence for Latin American exporters** (research briefs and reports can now be written in Spanish or Portuguese with Claude), importers, cooperatives, trade associations and the banks that finance them: sugar, coffee, soybeans and corn, plus flows like Bolivia–US. The data it relies on most is government data that allows commercial use. Plausible price: **$200–1,000 per month per company**.
-2. **A paid weekly newsletter or report service** produced with ATLAS. It has the lowest regulatory and licensing risk, and it is the fastest way to test whether anyone will pay. ATLAS can now publish it: a public subscribe page with double opt-in, issues made from verified research, one-click unsubscribe and a public archive. Newsletters can be in Spanish or Portuguese end to end. A weekly scheduled report can draft each issue, or send it automatically when its research passes verification. Charging readers still happens outside ATLAS, for example with a Stripe payment link, after which you invite the paying readers.
+2. **A paid weekly newsletter or report service** produced with Amaru. It has the lowest regulatory and licensing risk, and it is the fastest way to test whether anyone will pay. Amaru can now publish it: a public subscribe page with double opt-in, issues made from verified research, one-click unsubscribe and a public archive. Newsletters can be in Spanish or Portuguese end to end. A weekly scheduled report can draft each issue, or send it automatically when its research passes verification. Charging readers still happens outside Amaru, for example with a Stripe payment link, after which you invite the paying readers.
 3. **University licences** for teaching finance and economics with verified analysis.
 4. **An API for fintechs** that want a verified AI research engine inside their own product. This comes later, once the data licensing for redistribution is settled.
 

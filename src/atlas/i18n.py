@@ -21,7 +21,7 @@ SECTIONS = {
 
 LABELS: dict[str, dict[str, str]] = {
     "en": {
-        "brand": "ATLAS · RESEARCH", "question": "Question", "generated": "Generated", "engine": "Engine", "report": "Report",
+        "brand": "AMARU · RESEARCH", "question": "Question", "generated": "Generated", "engine": "Engine", "report": "Report",
         "verified": "Verification passed: {ok} of {n} numerical claims traced to stored observations or calculations; all citations resolve.",
         "unverified": "Verification warning: {bad} of {n} numerical claims could not be traced to evidence{cites}. Treat those figures as unverified (listed in the appendix).",
         "invalid_citations": "; invalid citations: {ids}",
@@ -33,7 +33,7 @@ LABELS: dict[str, dict[str, str]] = {
         "deterministic_note": "",
     },
     "es": {
-        "brand": "ATLAS · INVESTIGACIÓN", "question": "Pregunta", "generated": "Generado", "engine": "Motor", "report": "Informe",
+        "brand": "AMARU · INVESTIGACIÓN", "question": "Pregunta", "generated": "Generado", "engine": "Motor", "report": "Informe",
         "verified": "Verificación superada: {ok} de {n} cifras se rastrearon hasta observaciones o cálculos almacenados; todas las citas son válidas.",
         "unverified": "Advertencia de verificación: {bad} de {n} cifras no se pudieron rastrear hasta la evidencia{cites}. Trátelas como no verificadas (listadas en el anexo).",
         "invalid_citations": "; citas no válidas: {ids}",
@@ -45,7 +45,7 @@ LABELS: dict[str, dict[str, str]] = {
         "deterministic_note": "*Este informe lo generó el motor determinista, que redacta solo en inglés. Con Claude configurado, el informe se redacta en español.*",
     },
     "pt": {
-        "brand": "ATLAS · PESQUISA", "question": "Pergunta", "generated": "Gerado", "engine": "Motor", "report": "Relatório",
+        "brand": "AMARU · PESQUISA", "question": "Pergunta", "generated": "Gerado", "engine": "Motor", "report": "Relatório",
         "verified": "Verificação aprovada: {ok} de {n} números foram rastreados até observações ou cálculos armazenados; todas as citações são válidas.",
         "unverified": "Aviso de verificação: {bad} de {n} números não puderam ser rastreados até as evidências{cites}. Trate-os como não verificados (listados no anexo).",
         "invalid_citations": "; citações inválidas: {ids}",
@@ -94,7 +94,7 @@ NEWSLETTER: dict[str, dict[str, str]] = {
         "subscribe": "Subscribe", "email_placeholder": "you@example.com",
         "check_inbox": "Check your inbox: we sent a link to confirm your subscription.",
         "free_note": "Free. Unsubscribe with one click from any email. General research based on public data, not personalised investment advice.",
-        "past_issues": "Past issues", "published_with": "Published with ATLAS", "not_found": "This newsletter does not exist.",
+        "past_issues": "Past issues", "published_with": "Published with Amaru", "not_found": "This newsletter does not exist.",
         "issue_not_found": "This issue is not available.", "subscribe_to": "Subscribe to {name}",
     },
     "es": {
@@ -110,7 +110,7 @@ NEWSLETTER: dict[str, dict[str, str]] = {
         "subscribe": "Suscribirme", "email_placeholder": "tu@ejemplo.com",
         "check_inbox": "Revisa tu correo: te enviamos un enlace para confirmar tu suscripción.",
         "free_note": "Gratis. Cancela con un clic desde cualquier correo. Investigación general basada en datos públicos, no asesoramiento de inversión personalizado.",
-        "past_issues": "Ediciones anteriores", "published_with": "Publicado con ATLAS", "not_found": "Este boletín no existe.",
+        "past_issues": "Ediciones anteriores", "published_with": "Publicado con Amaru", "not_found": "Este boletín no existe.",
         "issue_not_found": "Esta edición no está disponible.", "subscribe_to": "Suscríbete a {name}",
     },
     "pt": {
@@ -126,7 +126,7 @@ NEWSLETTER: dict[str, dict[str, str]] = {
         "subscribe": "Inscrever-me", "email_placeholder": "voce@exemplo.com",
         "check_inbox": "Verifique sua caixa de entrada: enviamos um link para confirmar sua inscrição.",
         "free_note": "Grátis. Cancele com um clique em qualquer e-mail. Pesquisa geral baseada em dados públicos, não recomendação de investimento personalizada.",
-        "past_issues": "Edições anteriores", "published_with": "Publicado com ATLAS", "not_found": "Esta newsletter não existe.",
+        "past_issues": "Edições anteriores", "published_with": "Publicado com Amaru", "not_found": "Esta newsletter não existe.",
         "issue_not_found": "Esta edição não está disponível.", "subscribe_to": "Inscreva-se em {name}",
     },
 }

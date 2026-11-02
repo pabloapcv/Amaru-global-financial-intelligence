@@ -110,7 +110,7 @@ export default function Overview() {
       <PageHeader
         title="Global overview"
         subtitle="Latest stored observations from connected public sources. Reference and benchmark prices, published with a lag — not live tradable quotes."
-        actions={<Link href="/research"><button>Ask ATLAS</button></Link>}
+        actions={<Link href="/research"><button>Ask Amaru</button></Link>}
       />
       <GetStarted />
       <ErrorNote error={error} />

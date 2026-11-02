@@ -130,7 +130,7 @@ def test_events_reach_subscribed_webhooks_with_slack_format(secured, receiver):
     alert = _verify(atlas_hook["secret"], by_url["https://hooks.example.test/a"])
     assert alert["event"] == "alert.triggered" and alert["data"]["name"] == "Sugar above" and "Sugar" in alert["data"]["message"]
     slack = json.loads(by_url["https://hooks.slack.test/services/T/B/x"].content)
-    assert set(slack) == {"text"} and "ATLAS alert: Sugar above" in slack["text"]
+    assert set(slack) == {"text"} and "Amaru alert: Sugar above" in slack["text"]
 
     got.clear()
     run_id = engine.create_run("Sugar price outlook", {"engine": "deterministic", "formats": []}, acct["user"]["user_id"], ws)
@@ -153,7 +153,7 @@ def test_failed_deliveries_retry_with_backoff_then_disable(secured, receiver, mo
 
     got, statuses = receiver
     mails = []
-    monkeypatch.setattr(mailer, "send", lambda to, subject, body: (subject == "ATLAS webhook disabled" and mails.append(to)) or True)
+    monkeypatch.setattr(mailer, "send", lambda to, subject, body: (subject == "Amaru webhook disabled" and mails.append(to)) or True)
     acct = _signup(secured, "flaky@int.test", "Flaky")
     ws = acct["workspace"]["workspace_id"]
     hook = secured.post("/api/v1/webhooks", json={"url": "https://hooks.example.test/flaky", "events": ["research.failed"]}).json()

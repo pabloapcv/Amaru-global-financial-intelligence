@@ -36,7 +36,7 @@ function Join() {
 
   return (
     <div className="login-page" style={{ maxWidth: 420, margin: "8vh auto" }}>
-      <div className="brand" style={{ padding: "0 0 12px" }}><span className="brand-mark">◆</span> ATLAS</div>
+      <div className="brand" style={{ padding: "0 0 12px" }}><span className="brand-mark">◆</span> Amaru</div>
       <div className="card">
         <h3 style={{ marginBottom: 12 }}>Join a workspace</h3>
         {failed && <div className="note note-error">{failed}</div>}

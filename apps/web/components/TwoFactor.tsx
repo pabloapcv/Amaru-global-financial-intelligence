@@ -59,7 +59,7 @@ export default function TwoFactor({ account, onChange }: { account: Account; onC
       )}
       {!on && setup && (
         <form onSubmit={enable}>
-          <p style={{ marginTop: 0, fontSize: 13 }}>Add ATLAS to your authenticator app with this key (or <a href={setup.otpauth_uri}>open it in the app</a> on this device), then enter the 6-digit code it shows.</p>
+          <p style={{ marginTop: 0, fontSize: 13 }}>Add Amaru to your authenticator app with this key (or <a href={setup.otpauth_uri}>open it in the app</a> on this device), then enter the 6-digit code it shows.</p>
           <pre style={{ fontSize: 15, letterSpacing: 1, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{setup.secret.match(/.{1,4}/g)?.join(" ")}</pre>
           <div className="row" style={{ flexWrap: "nowrap" }}>
             <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={8} aria-label="Code from your authenticator app" style={{ maxWidth: 140 }} />

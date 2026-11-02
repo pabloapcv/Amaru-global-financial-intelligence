@@ -95,8 +95,8 @@ def invite(principal: Principal, email: str, role: str = "member") -> dict[str, 
         out = {"invitation_id": inv.invitation_id, "email": email, "role": role, "expires_at": _iso(inv.expires_at)}
     base = os.getenv("ATLAS_PUBLIC_URL", "http://localhost:3010").rstrip("/")
     link = f"{base}/join?token={token}"
-    emailed = mailer.send(email, f"You're invited to {ws_name} on ATLAS",
-                          f"{principal.email} invited you to join the workspace \"{ws_name}\" on ATLAS as {role}.\n\n"
+    emailed = mailer.send(email, f"You're invited to {ws_name} on Amaru",
+                          f"{principal.email} invited you to join the workspace \"{ws_name}\" on Amaru as {role}.\n\n"
                           f"Accept the invitation (valid for 7 days): {link}\n\nIf you did not expect this, ignore this email.")
     audit("team.invited", principal.user_id, principal.workspace_id, invitation_id=out["invitation_id"], email=email, role=role)
     return {**out, "link": link, "emailed": emailed}

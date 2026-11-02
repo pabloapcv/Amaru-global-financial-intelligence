@@ -1,6 +1,6 @@
 """Portable backups: `atlas backup` / `atlas restore`.
 
-A backup is one .tar.gz holding a manifest (ATLAS version, time, row counts, SHA-256 of every file),
+A backup is one .tar.gz holding a manifest (Amaru version, time, row counts, SHA-256 of every file),
 every table as gzipped JSON lines (database-neutral, so a SQLite backup restores into PostgreSQL and
 back), the report files and, unless skipped, the raw provider payloads (they can be re-fetched).
 
@@ -88,7 +88,7 @@ def create(out_dir: str | Path, *, include_raw: bool = True) -> Path:
 
 
 def prune(out_dir: str | Path, keep: int) -> list[Path]:
-    """Delete all but the newest `keep` ATLAS backup archives in `out_dir`; returns what was deleted."""
+    """Delete all but the newest `keep` Amaru backup archives in `out_dir`; returns what was deleted."""
     if keep < 1:
         raise ValueError("keep at least one backup")
     archives = sorted(Path(out_dir).glob("atlas-backup-*.tar.gz"))  # names sort by time
@@ -218,5 +218,5 @@ def describe(archive: str | Path) -> dict[str, Any]:
     with tarfile.open(archive, "r:gz") as tar:
         f = tar.extractfile("manifest.json")
         if f is None:
-            raise ValueError("not an ATLAS backup")
+            raise ValueError("not an Amaru backup")
         return json.load(io.TextIOWrapper(f, encoding="utf-8"))

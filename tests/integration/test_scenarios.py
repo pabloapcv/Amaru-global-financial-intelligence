@@ -81,7 +81,7 @@ def test_scans_report_changes_and_notify_scheduled_owners(seeded, monkeypatch):
 
     sent, hooks = [], []
     ws = None  # set below; other tests' background runs may emit for other workspaces
-    monkeypatch.setattr(mailer, "send", lambda to, subject, body, **kw: (subject.startswith("ATLAS scenario agent") and sent.append((to, body))) or True)
+    monkeypatch.setattr(mailer, "send", lambda to, subject, body, **kw: (subject.startswith("Amaru scenario agent") and sent.append((to, body))) or True)
     monkeypatch.setattr(webhooks, "emit", lambda ws_, event, data: (event == "scenarios.changed" and ws_ == ws and hooks.append((ws_, event, data))) or [])
     uid, ws = auth.create_user("watcher@scen.test", "correct horse battery", workspace_name="Watchers")
     config = {"engine": "deterministic", "template": "scenario_outlook", "formats": [], "scenario_universe": ["CMD.CRUDE.BRENT", "EQ.US.SP500"]}

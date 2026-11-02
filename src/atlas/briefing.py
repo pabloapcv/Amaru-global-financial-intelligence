@@ -1,5 +1,5 @@
 """'This week' briefing for the Overview page: scheduled events, the latest official releases and the
-latest USDA balance sheets, from data ATLAS already stores (nothing is fetched on request)."""
+latest USDA balance sheets, from data Amaru already stores (nothing is fetched on request)."""
 
 from __future__ import annotations
 

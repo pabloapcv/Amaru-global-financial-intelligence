@@ -333,7 +333,7 @@ function Research() {
             </ul>
           </Card>
         </div>
-        <div>{runId ? <RunView runId={runId} canRate={!!me && me.auth !== "local"} onDone={refresh} onOpen={(id) => router.push(`/research?run=${id}`)} /> : <Card><p className="muted" style={{ margin: 0 }}>Results appear here. ATLAS resolves instruments, plans the investigation, runs calculations, verifies every number against evidence, and renders a versioned report.</p></Card>}</div>
+        <div>{runId ? <RunView runId={runId} canRate={!!me && me.auth !== "local"} onDone={refresh} onOpen={(id) => router.push(`/research?run=${id}`)} /> : <Card><p className="muted" style={{ margin: 0 }}>Results appear here. Amaru resolves instruments, plans the investigation, runs calculations, verifies every number against evidence, and renders a versioned report.</p></Card>}</div>
       </div>
     </>
   );

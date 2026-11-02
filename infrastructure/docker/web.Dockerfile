@@ -1,4 +1,4 @@
-# ATLAS web app (Next.js standalone build).
+# Amaru web app (Next.js standalone build).
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY apps/web/package.json apps/web/package-lock.json ./

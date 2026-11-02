@@ -28,7 +28,7 @@ def test_good_production_configuration_passes(monkeypatch):
     import atlas.config as config
 
     env = {"ATLAS_PUBLIC_URL": "https://app.example.com", "ATLAS_API_PUBLIC_URL": "https://api.example.com", "ATLAS_SECRET_KEY": "x" * 64,
-           "ATLAS_COOKIE_SECURE": "true", "ATLAS_SMTP_HOST": "smtp.example.com", "ATLAS_SMTP_FROM": "ATLAS <no-reply@example.com>",
+           "ATLAS_COOKIE_SECURE": "true", "ATLAS_SMTP_HOST": "smtp.example.com", "ATLAS_SMTP_FROM": "Amaru <no-reply@example.com>",
            "ATLAS_OPERATOR_EMAILS": "ops@example.com", "ATLAS_METRICS_TOKEN": "t", "ATLAS_REQUIRE_EMAIL_VERIFICATION": "true", "ATLAS_AUTH": "required"}
     for k, v in env.items():
         monkeypatch.setenv(k, v)

@@ -237,9 +237,9 @@ def sign(secret: str, timestamp: int, body: bytes) -> str:
 def _slack_text(event: str, data: dict[str, Any]) -> str:
     link = data.get("research_url")
     if event == "alert.triggered":
-        text = f"*ATLAS alert: {data.get('name')}*\n{data.get('message')}"
+        text = f"*Amaru alert: {data.get('name')}*\n{data.get('message')}"
     elif event == "agent.fired":
-        text = f"*ATLAS agent fired: {data.get('name')}*\n" + "\n".join(f"• {m}" for m in data.get("findings", [])[:6])
+        text = f"*Amaru agent fired: {data.get('name')}*\n" + "\n".join(f"• {m}" for m in data.get("findings", [])[:6])
     elif event == "research.completed":
         text = f"*Research ready: {data.get('title') or data.get('query')}*"
     elif event == "scenarios.changed":
@@ -247,8 +247,8 @@ def _slack_text(event: str, data: dict[str, Any]) -> str:
     elif event == "research.failed":
         text = f"*Research failed:* {data.get('query')}"
     else:
-        text = "ATLAS test message: this webhook is connected."
-    return text + (f"\n<{link}|Open in ATLAS>" if link else "")
+        text = "Amaru test message: this webhook is connected."
+    return text + (f"\n<{link}|Open in Amaru>" if link else "")
 
 
 def attempt(delivery_id: str, now=None) -> str:
@@ -277,7 +277,7 @@ def attempt(delivery_id: str, now=None) -> str:
             body = json.dumps({"text": _slack_text(event, payload["data"])} if fmt == "slack" else payload,
                               separators=(",", ":"), default=str).encode()
             ts = int(time.time())
-            headers = {"Content-Type": "application/json", "User-Agent": "ATLAS-Webhooks/1", "X-Atlas-Event": event,
+            headers = {"Content-Type": "application/json", "User-Agent": "Amaru-Webhooks/1", "X-Atlas-Event": event,
                        "X-Atlas-Delivery": delivery_id, "X-Atlas-Signature": f"t={ts},v1={sign(secret, ts, body)}"}
             with client_factory() as c:
                 r = c.post(url, content=body, headers=headers)
@@ -333,7 +333,7 @@ def _on_disabled(webhook_id: str, workspace_id: str, user_id: str, url: str) -> 
                   .values(status="failed", error="webhook disabled", next_attempt_at=None))
     if to:
         try:
-            mailer.send(to, "ATLAS webhook disabled", f"Deliveries to {url} kept failing, so ATLAS stopped sending to it.\n\n"
+            mailer.send(to, "Amaru webhook disabled", f"Deliveries to {url} kept failing, so Amaru stopped sending to it.\n\n"
                         f"Fix the endpoint, then turn the webhook back on: {public_url('/account')}\n")
         except Exception:
             log.exception("could not email about disabled webhook %s", webhook_id)
@@ -347,7 +347,7 @@ def send_test(p: Principal, webhook_id: str) -> dict[str, Any]:
         s.add(d)
         s.flush()
         d.payload = {"id": d.delivery_id, "event": "ping", "created_at": utcnow().isoformat(timespec="seconds") + "Z",
-                     "workspace_id": p.workspace_id, "data": {"message": "ATLAS test delivery"}}
+                     "workspace_id": p.workspace_id, "data": {"message": "Amaru test delivery"}}
         did = d.delivery_id
     status = attempt(did)
     with session_scope() as s:

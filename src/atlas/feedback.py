@@ -1,7 +1,7 @@
 """Feedback on research answers: readers rate an answer and say what was wrong; operators review it.
 
 Submitting shares the rating, reasons, comment, the question and the answer's title with the people
-who run this ATLAS deployment (the page says so). The answer itself stays in the workspace.
+who run this Amaru deployment (the page says so). The answer itself stays in the workspace.
 Negative feedback emails the operators (ATLAS_OPERATOR_EMAILS) so pilots get quick answers.
 """
 
@@ -99,7 +99,7 @@ def _notify_operators(f: dict[str, Any], run_id: str, workspace: str, reader: st
             + (f"Comment: {f['comment']}\n" if f["comment"] else "") + f"\nReview it in the operator console: {base}/admin\n")
     for email in to:
         try:
-            mailer.send(email, "ATLAS feedback: an answer was marked wrong", body)
+            mailer.send(email, "Amaru feedback: an answer was marked wrong", body)
         except Exception:
             log.exception("could not email operator about feedback %s", f["feedback_id"])
 

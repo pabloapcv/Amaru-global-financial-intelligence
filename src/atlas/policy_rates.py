@@ -70,7 +70,7 @@ def _net_path(series: dict[str, pd.Series]) -> list[dict[str, Any]]:
 def recent_moves(days: int = RECENT_DAYS, stored_since: datetime | None = None, today: date | None = None) -> list[dict[str, Any]]:
     """Moves dated in the past `days`, newest first.
 
-    `stored_since` keeps only moves ATLAS stored or corrected after that time: the date of a move can't say
+    `stored_since` keeps only moves Amaru stored or corrected after that time: the date of a move can't say
     what is new, because the BIS reports some banks weeks late.
     """
     cutoff = (today or date.today()) - timedelta(days=days)

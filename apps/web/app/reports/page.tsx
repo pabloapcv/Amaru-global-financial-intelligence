@@ -148,7 +148,7 @@ function SharePanel({ reportId }: { reportId: string }) {
             <input readOnly value={created} onFocus={(e) => e.target.select()} style={{ minWidth: 0, flex: 1 }} aria-label="Share link" />
             <button className="secondary" onClick={copy}>{copied ? "Copied" : "Copy"}</button>
           </div>
-          <p className="muted" style={{ fontSize: 12, margin: "6px 0 0" }}>Copy it now: ATLAS stores only a hash and cannot show this link again. Anyone with it can view this report (not your workspace) until it expires or you revoke it.</p>
+          <p className="muted" style={{ fontSize: 12, margin: "6px 0 0" }}>Copy it now: Amaru stores only a hash and cannot show this link again. Anyone with it can view this report (not your workspace) until it expires or you revoke it.</p>
         </div>
       )}
       <ErrorNote error={error} />

@@ -125,7 +125,7 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
         "## Scope and methodology", "",
         f"Question: *{query.rstrip('.')}*. Lookback {plan['timeframe']['lookback_years']:g} years; outlook horizon "
         f"{plan['timeframe']['horizon_months']} months. All figures come from stored observations and deterministic "
-        "calculations in the ATLAS quant engine; each claim cites its evidence item. This brief was composed by the "
+        "calculations in the Amaru quant engine; each claim cites its evidence item. This brief was composed by the "
         "deterministic writer, which restates evidence without causal interpretation.", "",
     ]
 

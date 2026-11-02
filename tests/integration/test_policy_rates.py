@@ -131,7 +131,7 @@ def test_a_central_bank_move_fires_an_agent_once_even_if_reported_late(seeded):
                       {"query": "What does this decision mean?", "engine": "deterministic"}, 1, False, "local", "local")
     assert agents.check_agent(a["agent_id"], background=False)["fired"] is False  # moves stored before the agent existed don't count
 
-    # A decision from three weeks ago reaches ATLAS only now, as the BIS's late reporting would.
+    # A decision from three weeks ago reaches Amaru only now, as the BIS's late reporting would.
     moved_on = date.today() - timedelta(days=21)
     ds = get_dataset("BIS.POLICY.PE")
     res = pipeline.ingest_dataset(ds, adapter=type(seeded)(overrides={"CBPOL.PE": rate_rows("PE", moved_on, 7.25, 7.0)}))

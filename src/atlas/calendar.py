@@ -5,7 +5,7 @@ Sources, all official:
 - U.S. statistical release dates from the FRED API, when FRED_API_KEY is set.
 
 Without a FRED key, each tracked U.S. macro series still shows which reference period is due
-next (from its last stored observation and frequency), but no release date: ATLAS never guesses one.
+next (from its last stored observation and frequency), but no release date: Amaru never guesses one.
 """
 
 from __future__ import annotations

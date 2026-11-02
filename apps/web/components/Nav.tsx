@@ -38,7 +38,7 @@ export default function Nav() {
   return (
     <nav className="nav">
       <div className="brand">
-        <span className="brand-mark">◆</span> ATLAS
+        <span className="brand-mark">◆</span> Amaru
       </div>
       <ul>
         {ITEMS.map((it) => {

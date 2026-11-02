@@ -61,13 +61,13 @@ function Login() {
 
   return (
     <div className="login-page" style={{ maxWidth: 400, margin: "8vh auto" }}>
-      <div className="brand" style={{ padding: "0 0 12px" }}><span className="brand-mark">◆</span> ATLAS</div>
+      <div className="brand" style={{ padding: "0 0 12px" }}><span className="brand-mark">◆</span> Amaru</div>
       <div className="card">
         <div className="seg" style={{ marginBottom: 14 }}>
           <button type="button" className={mode === "login" ? "on" : ""} onClick={() => setMode("login")}>Sign in</button>
           {signupAllowed && <button type="button" className={mode === "signup" ? "on" : ""} onClick={() => setMode("signup")}>Create account</button>}
         </div>
-        {!challenge && <p className="muted" style={{ fontSize: 12.5, marginTop: -6 }}>New to ATLAS? <a href="/welcome">See what it does and the plans</a>.</p>}
+        {!challenge && <p className="muted" style={{ fontSize: 12.5, marginTop: -6 }}>New to Amaru? <a href="/welcome">See what it does and the plans</a>.</p>}
         {challenge ? (
           <form onSubmit={submit}>
             <p style={{ marginTop: 0 }}>Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>

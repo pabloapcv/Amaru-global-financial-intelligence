@@ -54,6 +54,6 @@ head -c 5 /tmp/report.pdf | grep -q '%PDF-'   # native PDF renderer present in t
 
 echo "== metrics and web"
 curl -sf "$API/metrics" | grep -q 'atlas_research_runs{status="complete"'
-curl -sf http://localhost:3010/login | grep -q "ATLAS"
+curl -sf http://localhost:3010/login | grep -q "Amaru"
 
 echo "SMOKE TEST PASSED"

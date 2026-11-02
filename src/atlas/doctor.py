@@ -166,7 +166,7 @@ def run(production: bool | None = None, *, check_database: bool = True) -> dict[
 
 def format_text(report: dict[str, Any]) -> str:
     mark = {"error": "✗", "warning": "!", "info": "·", "ok": "✓"}
-    lines = [f"ATLAS doctor ({'production' if report['production'] else 'development'} checks)", ""]
+    lines = [f"Amaru doctor ({'production' if report['production'] else 'development'} checks)", ""]
     for c in report["checks"]:
         lines.append(f"{mark[c['level']]} {c['check']}: {c['found']}")
         if c["fix"] and c["level"] != "ok":
