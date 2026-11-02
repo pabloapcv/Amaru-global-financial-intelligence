@@ -2,7 +2,8 @@
 
 Indexes public press-release feeds from official sources: the Federal Reserve Board, the
 Bureau of Economic Analysis, the CFTC, USDA's Agricultural Marketing Service, the European Central
-Bank and the Bank of England. These are primary-source announcements, not a news
+Bank, the Bank of England and the Banco Central do Brasil (in Portuguese). RSS and Atom feeds are
+both read. These are primary-source announcements, not a news
 wire: commercial news and sell-side research still need a licensed source, and search results
 say so.
 """
@@ -32,16 +33,20 @@ FEEDS = [
     {"source": "usda_ams", "publisher": "USDA Agricultural Marketing Service", "url": "https://www.ams.usda.gov/rss.xml"},
     {"source": "ecb", "publisher": "European Central Bank", "url": "https://www.ecb.europa.eu/rss/press.html"},
     {"source": "boe", "publisher": "Bank of England", "url": "https://www.bankofengland.co.uk/rss/news"},
+    {"source": "bcb", "publisher": "Banco Central do Brasil", "url": "https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/notasImprensa"},
 ]
 REFRESH_HOURS = 6
 COVERAGE = ("Official press releases from the Federal Reserve Board, BEA, CFTC, USDA's Agricultural Marketing Service, "
-            "the European Central Bank and the Bank of England only. "
+            "the European Central Bank, the Bank of England and the Banco Central do Brasil (in Portuguese) only. "
             "No commercial news wire or sell-side research is connected.")
 STOPWORDS = set("""a an and are as at be by can do does for from has have how i in is it its me of on or
 our over so than that the their this to vs was what whats when where which who why will with
 about after against all any between could did during into just like more most much now right should
 some today tell them then there these they those under up us very would you your happening latest
 recent news report analyze analysis main drivers""".split())
+
+
+ATOM = "{http://www.w3.org/2005/Atom}"
 
 
 class FeedError(ValueError):
@@ -81,6 +86,24 @@ def parse_feed(payload: bytes, feed: dict[str, str]) -> list[dict[str, Any]]:
         summary = _clean(_text(item.find("description")))
         out.append({"source": feed["source"], "publisher": feed["publisher"], "title": title, "url": url,
                     "published_at": published, "category": _clean(_text(item.find("category")), 128) or None,
+                    "summary": summary if summary and summary != title else None})
+    for entry in root.iter(f"{ATOM}entry"):
+        links = entry.findall(f"{ATOM}link")
+        link = next((ln for ln in links if ln.get("rel", "alternate") == "alternate"), links[0] if links else None)
+        url = (link.get("href") or "").strip() if link is not None else ""
+        title = _clean(_text(entry.find(f"{ATOM}title")), 500)
+        if not url or not title:
+            continue
+        published = None
+        if stamp := _text(entry.find(f"{ATOM}published")) or _text(entry.find(f"{ATOM}updated")):
+            try:
+                published = datetime.fromisoformat(stamp.replace("Z", "+00:00")).astimezone(timezone.utc).replace(tzinfo=None)
+            except ValueError:
+                published = None
+        summary = _clean(_text(entry.find(f"{ATOM}summary")) or _text(entry.find(f"{ATOM}content")))
+        category = entry.find(f"{ATOM}category")
+        out.append({"source": feed["source"], "publisher": feed["publisher"], "title": title, "url": url, "published_at": published,
+                    "category": _clean(category.get("term") or "", 128) or None if category is not None else None,
                     "summary": summary if summary and summary != title else None})
     return out
 

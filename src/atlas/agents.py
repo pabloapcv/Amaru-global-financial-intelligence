@@ -32,7 +32,7 @@ TRIGGERS: dict[str, dict[str, Any]] = {
     "usda_revision": {"label": "USDA revision", "param": "abs_pct", "default": 2.0,
                       "help": "a new USDA report revises world production or ending stocks of the commodity by ≥ abs_pct %"},
     "official_release": {"label": "Official release", "param": "keywords", "default": "FOMC statement", "kind": "text",
-                         "help": "a new official press release (Fed, BEA, CFTC, USDA AMS, ECB, Bank of England) mentions any of these comma-separated keywords"},
+                         "help": "a new official press release (Fed, BEA, CFTC, USDA AMS, ECB, Bank of England, Banco Central do Brasil) mentions any of these comma-separated keywords"},
     "policy_rate_move": {"label": "Central bank move", "param": "banks", "default": "all", "kind": "text", "placeholder": "Brazil, Mexico (or all)",
                          "help": "the BIS data shows a new policy rate change by any of these comma-separated banks, or by any of the 19 covered for 'all'"},
 }
