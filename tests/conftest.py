@@ -153,9 +153,25 @@ class FakeFred:
         values = 100 * np.exp(np.cumsum(rng.normal(0.002, 0.04, len(dates))))
         return ("\n".join(["month,value"] + [f"{d.date().isoformat()},{v:.3f}" for d, v in zip(dates, values)]) + "\n").encode()
 
+    def _eia(self, symbol: str) -> bytes:
+        import json
+
+        from atlas.ingestion.eia import UNITS
+
+        code = symbol.split(".")[1]
+        rng = np.random.default_rng(abs(hash(symbol)) % 2**32)
+        dates = pd.date_range(end=pd.Timestamp.today().normalize() - pd.Timedelta(days=8), periods=520, freq="W-FRI")
+        season = np.sin(2 * np.pi * dates.dayofyear.to_numpy() / 365.25)
+        level = {"MBBL": 400000.0, "MBBL/D": 10000.0, "%": 90.0, "BCF": 3000.0}[UNITS[code]]
+        values = level * (1 + 0.08 * season + np.cumsum(rng.normal(0, 0.004, len(dates))))
+        rows = [{"period": d.date().isoformat(), "series": code, "units": UNITS[code], "value": round(float(v), 1)} for d, v in zip(dates, values)]
+        return json.dumps({"response": {"total": len(rows), "data": rows}}).encode()
+
     def _series(self, symbol: str) -> bytes:
         if symbol in self.overrides:
             return self.overrides[symbol]
+        if symbol.startswith(("PET.", "NG.")):
+            return self._eia(symbol)
         if symbol.startswith("CMO."):
             return self._pink_sheet(symbol)
         if symbol.startswith("CBPOL."):
@@ -188,7 +204,7 @@ class FakeFred:
 
         self.calls.append((symbol, since))
         payload = self._series(symbol)
-        if since and (":" in symbol or symbol.isdigit() or symbol.startswith(("psd_", "CBPOL."))):
+        if since and (":" in symbol or symbol.isdigit() or symbol.startswith(("psd_", "CBPOL.", "PET.", "NG."))):
             pass  # JSON fakes return full history; idempotent publish handles the overlap
         elif since:
             lines = payload.decode().splitlines()
@@ -198,6 +214,7 @@ class FakeFred:
     def parse(self, symbol, payload):
         from atlas.ingestion.bis import BisAdapter
         from atlas.ingestion.cftc import CftcAdapter
+        from atlas.ingestion.eia import EiaAdapter
         from atlas.ingestion.fred import FredAdapter
         from atlas.ingestion.pinksheet import PinkSheetAdapter
         from atlas.ingestion.worldbank import WorldBankAdapter
@@ -206,7 +223,7 @@ class FakeFred:
 
         from atlas.ingestion.psd import PsdAdapter
 
-        cls = (BisAdapter if symbol.startswith("CBPOL.") else PinkSheetAdapter if symbol.startswith("CMO.") else PsdAdapter if symbol.startswith("psd_") else ComtradeAdapter if _is_trade(symbol)
+        cls = (EiaAdapter if symbol.startswith(("PET.", "NG.")) else BisAdapter if symbol.startswith("CBPOL.") else PinkSheetAdapter if symbol.startswith("CMO.") else PsdAdapter if symbol.startswith("psd_") else ComtradeAdapter if _is_trade(symbol)
                else WorldBankAdapter if ":" in symbol else CftcAdapter if symbol.isdigit() else FredAdapter)
         return cls.parse(cls.__new__(cls), symbol, payload)
 

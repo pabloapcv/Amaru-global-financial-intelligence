@@ -66,6 +66,8 @@ class Settings:
     )
     # Optional free FRED API key: enables official U.S. statistical release dates in the calendar.
     fred_api_key: str = field(default_factory=lambda: os.getenv("FRED_API_KEY", ""))
+    # Optional free EIA API key: without it the public demo key is used, which allows about ten calls an hour.
+    eia_api_key: str = field(default_factory=lambda: os.getenv("EIA_API_KEY", ""))
     # Commercial deployments: switch off datasets whose owners restrict redistribution (see docs/monetization.md).
     commercial_mode: bool = field(default_factory=lambda: os.getenv("ATLAS_COMMERCIAL_MODE", "false").lower() == "true")
     cors_origins: tuple[str, ...] = field(

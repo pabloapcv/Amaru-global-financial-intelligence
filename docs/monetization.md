@@ -85,5 +85,5 @@ Still blocked on decisions or accounts from you:
 
 - a Stripe account (then set the `STRIPE_*` settings; the integration is built)
 - a choice of hosting
-- an EIA API key (energy data)
+- an EIA API key, optional: energy inventories already load with the public demo key, and a free key removes its hourly limit
 - a licensed futures data source, if you need one

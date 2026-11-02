@@ -318,5 +318,18 @@ def resolve(query: str, limit: int = 5) -> list[dict[str, Any]]:
 
 def extract_entities(text: str, min_score: float = 50) -> list[str]:
     """All datasets mentioned by keyword in a longer question (used by the planner)."""
-    hits = resolve(text, limit=50)
-    return [h["dataset_id"] for h in hits if h["score"] >= min_score]
+    hits = [h for h in resolve(text, limit=50) if h["score"] >= min_score]
+    # A keyword only inside a longer matched one names the longer thing: "palm oil" is not crude "oil".
+    words = {h["dataset_id"]: _norm(h["matched"][len("keyword '"):-1]) for h in hits if h["matched"].startswith("keyword '")}
+    q = _norm(text)
+    out = []
+    for h in hits:
+        kw = words.get(h["dataset_id"])
+        longer = [w for w in words.values() if kw and w != kw and re.search(rf"(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])", w)]
+        rest = q
+        for w in longer:
+            rest = re.sub(rf"(?<![a-z0-9]){re.escape(w)}(?![a-z0-9])", " ", rest)
+        if kw and longer and not re.search(rf"(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])", rest):
+            continue
+        out.append(h["dataset_id"])
+    return out

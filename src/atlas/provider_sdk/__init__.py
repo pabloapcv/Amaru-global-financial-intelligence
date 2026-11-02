@@ -58,6 +58,9 @@ class ProviderAdapter(ABC):
         """Public landing page for a dataset."""
 
 
+MAX_RETRY_WAIT = 120
+
+
 def with_retries(
     fn: Callable[[], httpx.Response],
     *,
@@ -67,7 +70,8 @@ def with_retries(
 ) -> httpx.Response:
     """Call `fn` with exponential backoff on transport errors, 429 and 5xx.
 
-    Honors Retry-After when the provider sends one.
+    Honors Retry-After when the provider sends one, unless it asks for more than MAX_RETRY_WAIT
+    seconds: then it fails now rather than hold up the rest of the refresh for hours.
     """
     last_exc: Exception | None = None
     for i in range(attempts):
@@ -76,6 +80,8 @@ def with_retries(
             if resp.status_code == 429 or resp.status_code >= 500:
                 retry_after = resp.headers.get("retry-after")
                 delay = float(retry_after) if retry_after and retry_after.isdigit() else base_delay * 2**i
+                if delay > MAX_RETRY_WAIT:
+                    raise ProviderError(f"HTTP {resp.status_code}: provider asks to retry in {int(delay)}s")
                 last_exc = ProviderError(f"HTTP {resp.status_code}")
                 if i < attempts - 1:
                     sleep(delay)
@@ -94,6 +100,7 @@ def get_adapter(provider_id: str) -> ProviderAdapter:
     from atlas.ingestion.bis import BisAdapter
     from atlas.ingestion.cftc import CftcAdapter
     from atlas.ingestion.comtrade import ComtradeAdapter
+    from atlas.ingestion.eia import EiaAdapter
     from atlas.ingestion.fred import FredAdapter
     from atlas.ingestion.pinksheet import PinkSheetAdapter
     from atlas.ingestion.psd import PsdAdapter
@@ -102,6 +109,7 @@ def get_adapter(provider_id: str) -> ProviderAdapter:
     adapters: dict[str, Callable[[], ProviderAdapter]] = {
         "fred": FredAdapter, "cftc": CftcAdapter, "worldbank": WorldBankAdapter, "comtrade": ComtradeAdapter,
         "usda_psd": PsdAdapter, "bis": BisAdapter, "worldbank_cmo": PinkSheetAdapter,
+        "eia": EiaAdapter,
     }
     if provider_id not in adapters:
         raise ProviderError(f"no adapter registered for provider '{provider_id}'")

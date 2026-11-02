@@ -729,14 +729,17 @@ def _price_vs_stocks(ds, df: pd.DataFrame, basis: str | None = None) -> tuple[di
 
 
 def t_get_fundamentals(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import energy
     from atlas.data.access import get_fundamentals
     from atlas.instruments import fundamentals_for, load_registry
 
     fid = fundamentals_for(str(args["commodity"]))
+    if fid is None and (kind := energy.covers(str(args["commodity"]))):
+        return t_get_energy_inventories(ctx, {"kind": kind})
     if fid is None:
         covered = ", ".join(c["name"].lower() for c in load_registry().get("fundamentals", {}).get("commodities", []))
         return _unavailable("fundamentals", f"a supply-demand source for {args['commodity']} (USDA PSD covers {covered}; "
-                                            "energy and metals need EIA / ICSG / LME data)")(ctx, args)
+                                            "EIA inventories cover crude oil, products and natural gas; metals need ICSG / LME data)")(ctx, args)
     ds = _ds(fid)
     try:
         df, meta = get_fundamentals(fid)
@@ -832,6 +835,22 @@ def t_get_fertilizer_affordability(ctx: ToolContext, args: dict[str, Any]) -> di
     metas = full.pop("sources")
     chart = {"type": "line", "title": "Tons of crop to buy a ton of fertilizer", "unit": "tons", "series": full.pop("chart")}
     label = ctx.add("get_fertilizer_affordability", args, full, "ATLAS ratio of fertilizer and crop prices: " + _cite(metas), [_source(m) for m in metas], chart)
+    return {"evidence_id": label, **full}
+
+
+def t_get_energy_inventories(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from atlas import energy
+
+    kind = args.get("kind") or None
+    if kind not in (None, "oil", "gas"):
+        raise ToolError("kind must be 'oil' or 'gas'")
+    try:
+        full = energy.overview(kind)
+    except energy.EnergyUnavailable as exc:
+        raise ToolError(f"DATA UNAVAILABLE — {exc}. Disclose this gap.") from exc
+    metas = full.pop("sources")
+    chart = {"type": "line", "title": "U.S. stocks against their five-year average for the same week", "unit": "%", "series": full.pop("chart")}
+    label = ctx.add("get_energy_inventories", args, full, "ATLAS summary of EIA weekly energy data: " + _cite(metas), [_source(m) for m in metas], chart)
     return {"evidence_id": label, **full}
 
 
@@ -993,6 +1012,12 @@ TOOLS: dict[str, dict[str, Any]] = {
         "description": "How many tons of corn, wheat, rice, soybeans, sugar or coffee it takes to buy a ton of urea, DAP or potash, ranked against each pair's history. Uses world benchmark prices, not farm-gate costs; say so, and don't call a high reading a forecast.",
         "schema": {"type": "object", "properties": {}},
     },
+    "get_energy_inventories": {
+        "fn": t_get_energy_inventories,
+        "description": "U.S. weekly energy data from the EIA: crude oil (excluding the SPR), gasoline, distillate and natural gas stocks against the average and range of the same week in the previous five years, the weekly change, the Strategic Petroleum Reserve, and 4-week averages of crude production, crude imports and refinery utilization against a year earlier. U.S. only; weekly figures are estimates the EIA later revises. Inventories describe supply and demand, not a price forecast.",
+        "schema": {"type": "object", "properties": {
+            "kind": {"type": "string", "enum": ["oil", "gas"], "description": "Only oil or only natural gas; default both."}}},
+    },
     "get_policy_rates": {
         "fn": t_get_policy_rates,
         "description": "Central bank policy rates from the BIS for 19 currency areas (daily): each bank's rate, its latest move with the date, changes over 3 and 12 months, and whether it has been cutting, hiking or on hold over 6 months, plus how many banks are doing each worldwide. The euro area stands for Germany, France and Italy. Argentina, Bolivia, Ecuador, Uruguay and Paraguay are not covered.",
@@ -1062,7 +1087,7 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "get_fundamentals": {
         "fn": t_get_fundamentals,
-        "description": "USDA supply-and-demand balance sheet for an agricultural commodity (sugar, coffee, corn, wheat, soybeans, cotton, rice): production, consumption, trade, ending stocks and stocks-to-use for recent market years (world, or one country via geography), year-on-year changes, stocks-to-use versus 20 years, top producers/exporters and revisions since the previous USDA report. For world balances with a price series it also fits real price against stocks-to-use across market years and reports the price the USDA projection implies, an 80% band and where the latest price sits (association, not a forecast). The latest market year is a USDA projection. Other commodities return a recorded data gap.",
+        "description": "USDA supply-and-demand balance sheet for an agricultural commodity (sugar, coffee, corn, wheat, soybeans, cotton, rice); for crude oil, oil products and natural gas it returns EIA weekly U.S. inventories instead: production, consumption, trade, ending stocks and stocks-to-use for recent market years (world, or one country via geography), year-on-year changes, stocks-to-use versus 20 years, top producers/exporters and revisions since the previous USDA report. For world balances with a price series it also fits real price against stocks-to-use across market years and reports the price the USDA projection implies, an 80% band and where the latest price sits (association, not a forecast). The latest market year is a USDA projection. Metals and other commodities return a recorded data gap.",
         "schema": {"type": "object", "properties": {
             "commodity": {"type": "string", "description": "Commodity name or price dataset id, e.g. 'sugar' or CMD.CORN.US."},
             "metric": {"type": "string", "description": "Optional focus (e.g. 'ending stocks'); the full balance is always returned."},

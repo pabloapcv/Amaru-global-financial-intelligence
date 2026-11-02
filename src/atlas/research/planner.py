@@ -188,6 +188,12 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
         add("get_policy_rates", **({"countries": country_codes[:20]} if country_codes else {}))
     if re.search(r"fertili[sz]er|fertilizante|\burea\b|\bpotash\b|\bdap\b|input costs?", q):
         add("get_fertilizer_affordability")
+    from atlas import energy
+
+    energy_kind = energy.covers(q) or ("oil" if re.search(r"\benergy\b", q) else None)
+    if re.search(r"\beia\b|strategic petroleum|\bspr\b|gas storage|storage report|refiner|shale", q) \
+            or (energy_kind and re.search(r"inventor|stockpile|\bstocks?\b|storage|suppl|demand|production|fundamental|tight|glut|oversuppl", q)):
+        add("get_energy_inventories", **({"kind": energy_kind} if energy_kind == "gas" and not re.search(r"\b(crude|oil|wti|brent|gasoline)\b", q) else {}))
     us_focus = not country_codes or "USA" in country_codes
     if "macro_overview" in intents and us_focus:
         for e in MACRO_DASHBOARD:
@@ -244,6 +250,8 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
     if any(get_dataset(e).meta.get("asset_class") == "commodity" for e in primary):  # type: ignore[union-attr]
         commodities = [e for e in primary if get_dataset(e).meta.get("asset_class") == "commodity"]  # type: ignore[union-attr]
         for e in commodities[:3] if fundamentals_q else commodities[:1]:
+            if energy.covers(e) and any(st["tool"] == "get_energy_inventories" for st in steps):
+                continue
             add("get_fundamentals", commodity=get_dataset(e).name)  # type: ignore[union-attr]
     from atlas.instruments import fundamentals_for
 
@@ -256,7 +264,7 @@ def build_plan(query: str, *, depth: str = "standard", horizon_months: int | Non
         names = {c["iso3"]: c["name"] for c in _countries()}
         for st in [st for st in steps if st["tool"] == "get_fundamentals"][:2]:
             add("get_fundamentals", commodity=st["args"]["commodity"], geography=names.get(country_codes[0], country_codes[0]))
-        if depth != "quick":
+        if depth != "quick" and primary:
             add("get_futures_curve", underlying=primary[0])
     if re.search(r"\b(calendar|upcoming|next (fed|fomc)|fomc meeting|fed meeting|when (is|does|will)|release dates?|data releases?|scheduled|what to watch)", q) \
             or ("scenario" in intents and _shock(q) and _shock(q)[0].startswith("RATE.")):

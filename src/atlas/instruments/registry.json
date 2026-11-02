@@ -1824,6 +1824,232 @@
         "owner": "Federal Reserve Bank of Chicago (via FRED)",
         "note": "Confirm the Chicago Fed's terms before redistributing commercially."
       }
+    },
+    {
+      "series_id": "US.EIA.CRUDE_STOCKS",
+      "name": "U.S. commercial crude oil stocks (excluding SPR)",
+      "country": "US",
+      "indicator": "crude_stocks",
+      "frequency": "weekly",
+      "unit": "Thousand barrels",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "eia",
+      "provider_symbol": "PET.WCESTUS1.W",
+      "description": "U.S. ending stocks of crude oil excluding the Strategic Petroleum Reserve, weekly (EIA Weekly Petroleum Status Report).",
+      "tags": [
+        "energy",
+        "us",
+        "inventories"
+      ],
+      "keywords": [
+        "crude inventories",
+        "crude oil inventories",
+        "crude stocks",
+        "oil inventories",
+        "oil stocks",
+        "eia inventories"
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data; cite the EIA as the source."
+      },
+      "refresh": "once_daily"
+    },
+    {
+      "series_id": "US.EIA.SPR_STOCKS",
+      "name": "U.S. Strategic Petroleum Reserve stocks",
+      "country": "US",
+      "indicator": "spr_stocks",
+      "frequency": "weekly",
+      "unit": "Thousand barrels",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "eia",
+      "provider_symbol": "PET.WCSSTUS1.W",
+      "description": "Crude oil held in the U.S. Strategic Petroleum Reserve, end of week (EIA).",
+      "tags": [
+        "energy",
+        "us",
+        "inventories"
+      ],
+      "keywords": [
+        "strategic petroleum reserve",
+        "spr"
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data; cite the EIA as the source."
+      },
+      "refresh": "once_daily"
+    },
+    {
+      "series_id": "US.EIA.GASOLINE_STOCKS",
+      "name": "U.S. gasoline stocks",
+      "country": "US",
+      "indicator": "gasoline_stocks",
+      "frequency": "weekly",
+      "unit": "Thousand barrels",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "eia",
+      "provider_symbol": "PET.WGTSTUS1.W",
+      "description": "U.S. ending stocks of total motor gasoline, weekly (EIA).",
+      "tags": [
+        "energy",
+        "us",
+        "inventories"
+      ],
+      "keywords": [
+        "gasoline inventories",
+        "gasoline stocks"
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data; cite the EIA as the source."
+      },
+      "refresh": "once_daily"
+    },
+    {
+      "series_id": "US.EIA.DISTILLATE_STOCKS",
+      "name": "U.S. distillate fuel oil stocks",
+      "country": "US",
+      "indicator": "distillate_stocks",
+      "frequency": "weekly",
+      "unit": "Thousand barrels",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "eia",
+      "provider_symbol": "PET.WDISTUS1.W",
+      "description": "U.S. ending stocks of distillate fuel oil (diesel and heating oil), weekly (EIA).",
+      "tags": [
+        "energy",
+        "us",
+        "inventories"
+      ],
+      "keywords": [
+        "distillate inventories",
+        "diesel inventories",
+        "distillate stocks",
+        "heating oil stocks"
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data; cite the EIA as the source."
+      },
+      "refresh": "once_daily"
+    },
+    {
+      "series_id": "US.EIA.NATGAS_STORAGE",
+      "name": "U.S. natural gas in storage (Lower 48 working gas)",
+      "country": "US",
+      "indicator": "natgas_storage",
+      "frequency": "weekly",
+      "unit": "Billion cubic feet",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "eia",
+      "provider_symbol": "NG.NW2_EPG0_SWO_R48_BCF.W",
+      "description": "Working gas in underground storage in the Lower 48 states, weekly (EIA Weekly Natural Gas Storage Report).",
+      "tags": [
+        "energy",
+        "us",
+        "inventories"
+      ],
+      "keywords": [
+        "natural gas storage",
+        "gas storage",
+        "storage report",
+        "natural gas inventories"
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data; cite the EIA as the source."
+      },
+      "refresh": "once_daily"
+    },
+    {
+      "series_id": "US.EIA.CRUDE_PRODUCTION",
+      "name": "U.S. crude oil production",
+      "country": "US",
+      "indicator": "crude_production",
+      "frequency": "weekly",
+      "unit": "Thousand barrels per day",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "eia",
+      "provider_symbol": "PET.WCRFPUS2.W",
+      "description": "U.S. field production of crude oil, weekly estimate (EIA). Weekly figures are rounded estimates and differ from the monthly survey.",
+      "tags": [
+        "energy",
+        "us",
+        "supply"
+      ],
+      "keywords": [
+        "us oil production",
+        "crude production",
+        "shale output"
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data; cite the EIA as the source."
+      },
+      "refresh": "once_daily"
+    },
+    {
+      "series_id": "US.EIA.CRUDE_IMPORTS",
+      "name": "U.S. crude oil imports",
+      "country": "US",
+      "indicator": "crude_imports",
+      "frequency": "weekly",
+      "unit": "Thousand barrels per day",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "eia",
+      "provider_symbol": "PET.WCRIMUS2.W",
+      "description": "U.S. imports of crude oil, weekly (EIA).",
+      "tags": [
+        "energy",
+        "us",
+        "supply"
+      ],
+      "keywords": [
+        "crude imports",
+        "oil imports"
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data; cite the EIA as the source."
+      },
+      "refresh": "once_daily"
+    },
+    {
+      "series_id": "US.EIA.REFINERY_UTILIZATION",
+      "name": "U.S. refinery utilization",
+      "country": "US",
+      "indicator": "refinery_utilization",
+      "frequency": "weekly",
+      "unit": "percent",
+      "seasonal_adjustment": "NSA",
+      "provider_id": "eia",
+      "provider_symbol": "PET.WPULEUS3.W",
+      "description": "Percent utilization of U.S. refinery operable capacity, weekly (EIA).",
+      "tags": [
+        "energy",
+        "us",
+        "demand"
+      ],
+      "keywords": [
+        "refinery utilization",
+        "refinery runs",
+        "refining"
+      ],
+      "licence": {
+        "class": "public_domain",
+        "owner": "U.S. Energy Information Administration",
+        "note": "U.S. government data; cite the EIA as the source."
+      },
+      "refresh": "once_daily"
     }
   ],
   "positioning": [
