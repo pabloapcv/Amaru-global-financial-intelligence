@@ -118,5 +118,6 @@ Schema changes apply automatically on start.
 ## Scaling notes
 
 - **Scheduler:** one scheduler runs at a time (a database lease enforces this), so extra replicas wait.
+- **Research:** queued research lives in the database, so every replica can take runs and a restart doesn't lose them. Each API process runs up to `ATLAS_RESEARCH_WORKERS` (default 4) at once. To keep long research off the web servers, set it to 0 on the API and add a service running `atlas worker` with the same environment.
 - **API rate limits:** by default each API process counts on its own. With several API replicas, set `ATLAS_RATE_LIMIT_STORE=database` so they share one count in the database (one or two small writes per request).
 - **Reports and raw files:** these live in the `atlas-objects` volume. With several servers, use shared storage.

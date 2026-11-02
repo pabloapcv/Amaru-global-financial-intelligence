@@ -43,6 +43,8 @@ def main(argv: list[str] | None = None) -> None:
     bk.add_argument("--no-raw", action="store_true", help="skip raw provider payloads (they can be re-fetched)")
     bk.add_argument("--keep", type=int, default=None, help="afterwards, delete all but the newest N archives in --out")
     bk.add_argument("--no-upload", action="store_true", help="don't copy it to ATLAS_BACKUP_S3_URL even if that is set")
+    wk = sub.add_parser("worker", help="run research from the shared queue (for API processes started with ATLAS_RESEARCH_WORKERS=0)")
+    wk.add_argument("--threads", type=int, default=None, help="research runs at a time (default ATLAS_RESEARCH_WORKERS or 4)")
     sub.add_parser("backup-key", help="print a new random key for ATLAS_BACKUP_ENCRYPTION_KEY")
     rs2 = sub.add_parser("restore", help="restore a backup archive into an empty database")
     rs2.add_argument("archive")
@@ -119,6 +121,16 @@ def main(argv: list[str] | None = None) -> None:
             removed = backup.prune(args.out, args.keep)
             if removed:
                 print(f"Deleted {len(removed)} older backup(s); kept the newest {args.keep}.")
+    elif args.cmd == "worker":
+        import time
+
+        from atlas.research import engine
+
+        init_db()
+        n = engine.start_workers(args.threads or engine.worker_count() or 4)
+        print(f"research worker {engine.WORKER_ID}: {n} thread(s) on the shared queue")
+        while True:
+            time.sleep(3600)
     elif args.cmd == "backup-key":
         from atlas import offsite
 

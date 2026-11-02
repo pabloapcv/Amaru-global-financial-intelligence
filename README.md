@@ -127,7 +127,7 @@ See [docs/monetization.md](docs/monetization.md) for an honest assessment of wha
   - Document search covers official press releases only (Fed, BEA, CFTC, USDA AMS, ECB, Bank of England). BLS and the main USDA site block automated feed access, and the IMF, Banco Central do Brasil and Banxico feeds were unavailable when tested. There is no news wire or sell-side research.
 - **Stack differences from the spec:**
   - SQLite by default; Postgres/Timescale via `ATLAS_DATABASE_URL`.
-  - A thread pool instead of Celery/Redis, and a polling scheduler instead of Dagster.
+  - A research queue in the database instead of Celery/Redis, and a polling scheduler instead of Dagster. Queued research survives restarts: workers claim runs one at a time, keep a heartbeat, and a run whose server stopped is started again once (its first attempt's Claude cost still counts) and fails if it is lost twice. Cancelling works from any API replica. `ATLAS_RESEARCH_WORKERS` (default 4) sets runs at a time per process; set it to 0 on API processes and run `atlas worker` elsewhere to keep research off the web servers.
   - Plain CSS instead of Tailwind.
   - All interfaces are modular so these can be swapped.
 - **Not built yet:**
