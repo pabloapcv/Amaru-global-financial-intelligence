@@ -102,6 +102,7 @@ def get_adapter(provider_id: str) -> ProviderAdapter:
     from atlas.ingestion.comtrade import ComtradeAdapter
     from atlas.ingestion.eia import EiaAdapter
     from atlas.ingestion.fred import FredAdapter
+    from atlas.ingestion.imf import ImfCpiAdapter, WeoAdapter
     from atlas.ingestion.pinksheet import PinkSheetAdapter
     from atlas.ingestion.psd import PsdAdapter
     from atlas.ingestion.worldbank import WorldBankAdapter
@@ -109,7 +110,7 @@ def get_adapter(provider_id: str) -> ProviderAdapter:
     adapters: dict[str, Callable[[], ProviderAdapter]] = {
         "fred": FredAdapter, "cftc": CftcAdapter, "worldbank": WorldBankAdapter, "comtrade": ComtradeAdapter,
         "usda_psd": PsdAdapter, "bis": BisAdapter, "worldbank_cmo": PinkSheetAdapter,
-        "eia": EiaAdapter,
+        "eia": EiaAdapter, "imf": ImfCpiAdapter, "imf_weo": WeoAdapter,
     }
     if provider_id not in adapters:
         raise ProviderError(f"no adapter registered for provider '{provider_id}'")

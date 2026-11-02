@@ -110,6 +110,20 @@ def datasets() -> dict[str, Dataset]:
             meta={"country": a["code"], "countries": a["countries"], "indicator": "policy_rate", "asset_class": "macro", "refresh": "weekly_poll",
                   "expected_lag_days": STALE_POLICY_RATE_DAYS // 2, "licence": pol.get("licence"), "description": f"Central bank policy rate for {a['name']}, daily (BIS)."},
         )
+    cs = {c["iso3"]: c for c in reg.get("country_macro", {}).get("countries", [])}
+    for spec in reg.get("country_series", {}).get("series", []):
+        for iso3 in spec["countries"]:
+            c = cs[iso3]
+            sid = country_extra_id(spec, iso3)
+            out[sid] = Dataset(
+                dataset_id=sid, kind="macro", name=f"{c['name']}: {spec['name']}", provider_id=spec["provider_id"],
+                provider_symbol=spec["symbol"].format(iso3=iso3, iso2=c["iso2"]), frequency=spec["frequency"], unit=spec["unit"],
+                tags=("country", iso3.lower(), spec["key"].lower()),
+                meta={"country": iso3, "country_name": c["name"], "indicator": spec["key"].lower(), "indicator_key": spec["key"],
+                      "asset_class": "macro", "refresh": "weekly_poll" if spec["frequency"] in ("quarterly", "annual") else "once_daily",
+                      "licence": spec["licence"], "description": spec["description"], "forecast": bool(spec.get("forecast")),
+                      **({"expected_lag_days": spec["expected_lag_days"]} if "expected_lag_days" in spec else {})},
+            )
     names = {c["iso3"]: c["name"] for c in reg.get("country_macro", {}).get("countries", [])} | {"WLD": "World"}
     for rep, par in reg.get("trade_pairs", {}).get("pairs", []):
         tid = trade_dataset_id(rep, par)
@@ -186,6 +200,15 @@ def country_series_id(iso3: str, key: str) -> str:
     return f"WB.{iso3}.{key}"
 
 
+def country_extra_id(spec: dict[str, Any], iso3: str) -> str:
+    """IMF.BRA.CPI_YOY, BIS.BRA.REER, WEO.BRA.WEO_GDP_GROWTH and so on."""
+    return f"{spec['prefix']}.{iso3}.{spec['key']}"
+
+
+def country_series_specs() -> list[dict[str, Any]]:
+    return load_registry().get("country_series", {}).get("series", [])
+
+
 def policy_rate_id(area: str) -> str:
     return f"BIS.POLICY.{area}"
 
@@ -246,7 +269,7 @@ def sync_registry(session: Session) -> int:
             ))
         n += 1
     for ds in datasets().values():
-        if ds.dataset_id.startswith(("WB.", "BIS.")):
+        if ds.dataset_id.startswith(("WB.", "BIS.", "IMF.", "WEO.")):
             session.merge(MacroSeries(
                 series_id=ds.dataset_id, name=ds.name, country=ds.meta["country"], indicator=ds.meta["indicator"],
                 frequency=ds.frequency, unit=ds.unit, seasonal_adjustment=None, provider_id=ds.provider_id,

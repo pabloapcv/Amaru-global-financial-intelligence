@@ -336,6 +336,29 @@ def compose(query: str, plan: dict[str, Any], evidence: list[dict[str, Any]]) ->
             if r.get("stale_values"):
                 lines.append(f"- {len(r['stale_values'])} value(s) are much older than peer data and were excluded from rankings [{e['label']}].")
             lines += ["", f"*Latest available year per country; reference years {', '.join(str(y) for y in r['reference_years'])}. Source: World Bank WDI [{e['label']}].*", ""]
+    for e in by_tool.get("get_country_monitor", []):
+        r = e["result"]
+        fy = r["forecast_years"]
+        lines += ["## Latest country data and IMF forecasts", "",
+                  f"| Country | Inflation, y/y | Real exchange rate, 12m | Credit-to-GDP gap | Real house prices, 12m | IMF growth {fy['this_year']} | IMF growth {fy['next_year']} | IMF inflation {fy['next_year']} |",
+                  "|---|---|---|---|---|---|---|---|"]
+        for c in r["countries"]:
+            inf, fx, gap, hp, f = c["inflation"], c["real_exchange_rate"], c["credit_gap"], c["real_house_prices"], c["imf_forecasts"] or {}
+            growth, cpi = f.get("gdp_growth") or {}, f.get("inflation") or {}
+            lines.append(f"| {c['name']} | {f'{_fmt(inf['yoy_pct'], 1)}% ({inf['month']})' if inf else 'n/a'} | "
+                         f"{f'{_fmt(fx['change_12m_pct'], 1)}% ({fx['month']})' if fx and fx['change_12m_pct'] is not None else 'n/a'} | "
+                         f"{f'{_fmt(gap['pp_of_gdp'], 1)} pp ({gap['quarter']})' if gap else 'n/a'} | "
+                         f"{f'{_fmt(hp['change_12m_pct'], 1)}% ({hp['quarter']})' if hp and hp['change_12m_pct'] is not None else 'n/a'} | "
+                         f"{_fmt(growth.get(str(fy['this_year'])), 1)}% | {_fmt(growth.get(str(fy['next_year'])), 1)}% | {_fmt(cpi.get(str(fy['next_year'])), 1)}% |")
+        lines.append("")
+        booms = [c["name"] for c in r["countries"] if c["credit_gap"] and c["credit_gap"]["above_warning"]]
+        if booms:
+            lines.append(f"- Credit-to-GDP gap above the Basel III warning level of {_fmt(r['credit_gap_warning_pp'], 0)} points: {', '.join(booms)} [{e['label']}].")
+        rising = [c["name"] for c in r["countries"] if c["inflation"] and c["inflation"]["a_year_earlier"] is not None
+                  and c["inflation"]["yoy_pct"] > c["inflation"]["a_year_earlier"]]
+        if rising:
+            lines.append(f"- Inflation is higher than a year earlier in {len(rising)} of {sum(1 for c in r['countries'] if c['inflation'])} countries: {', '.join(rising)} [{e['label']}].")
+        lines += ["", f"{r['caveat']} [{e['label']}]", ""]
     for e in by_tool.get("get_country_profile", []):
         r = e["result"]
         lines += [f"## {r['name']}: economic profile", ""]

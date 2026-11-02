@@ -278,6 +278,7 @@ def ingest_dataset(
                 allow_non_positive=ds.kind in ("macro", "positioning", "fundamentals") or asset_class in NON_POSITIVE_OK,
                 # Level-ratio unit checks are meaningless for series that cross zero (net positions, growth rates).
                 previous_values=None if ds.kind in ("positioning", "trade", "fundamentals") or "percent" in ds.unit else _previous_values(s, ds),
+                allow_future=bool(ds.meta.get("forecast")),  # IMF projections run years ahead
             )
             result.findings = quality.to_json(findings)
             run_row = s.get(PipelineRun, run_id)

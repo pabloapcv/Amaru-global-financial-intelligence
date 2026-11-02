@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import BusinessCycle from "@/components/BusinessCycle";
+import CountryMonitor from "@/components/CountryMonitor";
 import EnergyInventories from "@/components/EnergyInventories";
 import FertilizerAffordability from "@/components/FertilizerAffordability";
 import PolicyRates from "@/components/PolicyRates";
@@ -185,12 +186,13 @@ export default function Economy() {
 
   return (
     <>
-      <PageHeader title="Global economy" subtitle="Economic calendar (Federal Reserve), country comparisons (World Bank WDI), bilateral trade (UN Comtrade), and monthly U.S. series with point-in-time vintages." />
+      <PageHeader title="Global economy" subtitle="Economic calendar (Federal Reserve), country data (IMF, BIS, World Bank WDI), bilateral trade (UN Comtrade), and monthly U.S. series with point-in-time vintages." />
       <ErrorNote error={error} />
       <div className="stack">
         <EconomicCalendar />
         <BusinessCycle />
         <PolicyRates />
+        <CountryMonitor />
         <FertilizerAffordability />
         <EnergyInventories />
         <CountryComparison />

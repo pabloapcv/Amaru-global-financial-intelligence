@@ -35,6 +35,7 @@ def run_checks(
     frequency: str,
     allow_non_positive: bool,
     previous_values: list[float] | None = None,
+    allow_future: bool = False,
 ) -> tuple[list[ParsedPoint], list[Finding], dict[str, Any]]:
     """Validate a parsed batch. Returns (clean points, findings, metrics)."""
     findings: list[Finding] = []
@@ -67,7 +68,7 @@ def run_checks(
         ))
 
     future = [p for p in clean if p.observed_at > date.today() + timedelta(days=1)]
-    if future:
+    if future and not allow_future:
         findings.append(Finding("future_dates", "error", f"{len(future)} observations dated in the future"))
 
     if any(p.dims for p in clean):
