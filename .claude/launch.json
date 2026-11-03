@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "atlas-api",
-      "runtimeExecutable": "/Users/pablopena/atlas/.venv/bin/atlas",
-      "runtimeArgs": ["serve", "--port", "8010"],
+      "runtimeExecutable": "/usr/bin/env",
+      "runtimeArgs": ["ATLAS_SCHEDULER=on", "/Users/pablopena/atlas/.venv/bin/atlas", "serve", "--port", "8010"],
       "port": 8010
     },
     {

@@ -89,10 +89,12 @@ def main(argv: list[str] | None = None) -> None:
 
         print(json.dumps(data_status(), indent=2))
     elif args.cmd == "schedule":
-        from atlas.ingestion.scheduler import run_forever, run_once
+        from atlas.ingestion.scheduler import release, run_forever, run_once
 
         if args.once:
             n = run_once()
+            if n >= 0:
+                release()  # a one-off pass shouldn't keep a running scheduler waiting for the lease to expire
             print("another scheduler is running (it holds the lease); nothing done" if n < 0 else f"refreshed {n} dataset(s)")
         else:
             run_forever()
