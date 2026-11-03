@@ -12,13 +12,13 @@ type Lang = "en" | "es" | "pt";
 const T = {
   en: {
     title: "Financial research you can check",
-    lead: "Ask about commodities, currencies and the economy. Amaru researches with Claude, then traces every number back to official data or a calculation before you see it.",
+    lead: "Research on U.S. markets and the U.S. economy: the Fed, Treasury yields, the dollar, inflation and jobs, energy, and the farm and commodity markets, with 25 other economies for context. Amaru researches with Claude, then traces every number back to official data or a calculation before you see it.",
     start: "Create a free account", signin: "Sign in", invite: "Ask for access",
     features: [
       ["Verified answers", "Every figure is matched to a stored observation or a calculation and every citation must resolve. Figures that can't be traced are flagged, not hidden."],
-      ["Official data, labelled", "FRED, USDA, CFTC, World Bank, UN Comtrade and Federal Reserve and BEA releases, each with its freshness, source and licence."],
-      ["Agricultural fundamentals", "USDA supply-and-demand balances, a price-versus-stocks-to-use model, CFTC positioning and trade flows such as Bolivia–United States."],
-      ["Reports and newsletters", "HTML, PDF and Excel reports on a schedule, and a newsletter for your readers in English, Spanish or Portuguese."],
+      ["Official data, labelled", "Federal Reserve, FRED, BEA, USDA, CFTC and EIA data first, plus the IMF, BIS, World Bank and UN Comtrade, each with its freshness, source and licence."],
+      ["U.S. farm and energy markets", "USDA supply-and-demand balances, a price-versus-stocks-to-use model, CFTC positioning, EIA oil and gas inventories, and U.S. trade with China, Mexico and Canada."],
+      ["Reports and newsletters", "HTML, PDF and Excel reports on a schedule, and a newsletter for your readers, in English or in Spanish or Portuguese."],
       ["Monitoring", "Alerts and agents that run research when data or official releases change, delivered by email, webhook or Slack."],
       ["Built for teams", "Workspaces, roles, two-factor sign-in, an activity log, an API and monthly caps on AI spending."],
     ],
@@ -31,13 +31,13 @@ const T = {
   },
   es: {
     title: "Investigación financiera que puedes comprobar",
-    lead: "Pregunta sobre materias primas, divisas y economía. Amaru investiga con Claude y luego rastrea cada cifra hasta datos oficiales o un cálculo antes de mostrártela.",
+    lead: "Investigación sobre los mercados y la economía de Estados Unidos: la Reserva Federal, los bonos del Tesoro, el dólar, la inflación y el empleo, la energía y los mercados agrícolas y de materias primas, con otras 25 economías como contexto. Amaru investiga con Claude y luego rastrea cada cifra hasta datos oficiales o un cálculo antes de mostrártela.",
     start: "Crear una cuenta gratis", signin: "Iniciar sesión", invite: "Solicitar acceso",
     features: [
       ["Respuestas verificadas", "Cada cifra se compara con una observación almacenada o un cálculo, y cada cita debe ser válida. Las cifras que no se pueden rastrear se señalan, no se ocultan."],
-      ["Datos oficiales, con su etiqueta", "FRED, USDA, CFTC, Banco Mundial, UN Comtrade y comunicados de la Reserva Federal y el BEA, cada uno con su actualidad, fuente y licencia."],
-      ["Fundamentos agrícolas", "Balances de oferta y demanda del USDA, un modelo de precio frente a la relación existencias-uso, posiciones de la CFTC y flujos comerciales como Bolivia–Estados Unidos."],
-      ["Informes y boletines", "Informes en HTML, PDF y Excel programados, y un boletín para tus lectores en español, portugués o inglés."],
+      ["Datos oficiales, con su etiqueta", "Primero datos de la Reserva Federal, FRED, BEA, USDA, CFTC y EIA, además del FMI, el BPI, el Banco Mundial y UN Comtrade, cada uno con su actualidad, fuente y licencia."],
+      ["Mercados agrícolas y energéticos de EE. UU.", "Balances de oferta y demanda del USDA, un modelo de precio frente a la relación existencias-uso, posiciones de la CFTC, inventarios de petróleo y gas de la EIA y el comercio de EE. UU. con China, México y Canadá."],
+      ["Informes y boletines", "Informes en HTML, PDF y Excel programados, y un boletín para tus lectores en inglés, español o portugués."],
       ["Monitoreo", "Alertas y agentes que investigan cuando cambian los datos o los comunicados oficiales, por correo, webhook o Slack."],
       ["Para equipos", "Espacios de trabajo, roles, inicio de sesión en dos pasos, registro de actividad, API y límites mensuales de gasto en IA."],
     ],
@@ -50,13 +50,13 @@ const T = {
   },
   pt: {
     title: "Pesquisa financeira que você pode conferir",
-    lead: "Pergunte sobre commodities, câmbio e economia. O Amaru pesquisa com o Claude e depois rastreia cada número até dados oficiais ou um cálculo antes de mostrá-lo a você.",
+    lead: "Pesquisa sobre os mercados e a economia dos Estados Unidos: o Federal Reserve, os títulos do Tesouro, o dólar, a inflação e o emprego, a energia e os mercados agrícolas e de commodities, com outras 25 economias como contexto. O Amaru pesquisa com o Claude e depois rastreia cada número até dados oficiais ou um cálculo antes de mostrá-lo a você.",
     start: "Criar uma conta grátis", signin: "Entrar", invite: "Solicitar acesso",
     features: [
       ["Respostas verificadas", "Cada número é comparado a uma observação armazenada ou a um cálculo, e cada citação precisa ser válida. Números que não podem ser rastreados são sinalizados, não escondidos."],
-      ["Dados oficiais, identificados", "FRED, USDA, CFTC, Banco Mundial, UN Comtrade e comunicados do Federal Reserve e do BEA, cada um com sua atualização, fonte e licença."],
-      ["Fundamentos agrícolas", "Balanços de oferta e demanda do USDA, um modelo de preço versus relação estoque-consumo, posições da CFTC e fluxos comerciais como Bolívia–Estados Unidos."],
-      ["Relatórios e newsletters", "Relatórios em HTML, PDF e Excel agendados, e uma newsletter para seus leitores em português, espanhol ou inglês."],
+      ["Dados oficiais, identificados", "Primeiro dados do Federal Reserve, FRED, BEA, USDA, CFTC e EIA, além do FMI, do BIS, do Banco Mundial e da UN Comtrade, cada um com sua atualização, fonte e licença."],
+      ["Mercados agrícolas e de energia dos EUA", "Balanços de oferta e demanda do USDA, um modelo de preço versus relação estoque-consumo, posições da CFTC, estoques de petróleo e gás da EIA e o comércio dos EUA com China, México e Canadá."],
+      ["Relatórios e newsletters", "Relatórios em HTML, PDF e Excel agendados, e uma newsletter para seus leitores em inglês, espanhol ou português."],
       ["Monitoramento", "Alertas e agentes que pesquisam quando os dados ou comunicados oficiais mudam, por e-mail, webhook ou Slack."],
       ["Feito para equipes", "Espaços de trabalho, funções, login em duas etapas, registro de atividades, API e limites mensais de gasto com IA."],
     ],

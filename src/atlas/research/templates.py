@@ -42,24 +42,25 @@ def _commodity(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
 
 
 def _macro(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
-    steps: list[tuple[str, dict[str, Any]]] = [
-        ("compare_countries", {"group": "g20", "indicators": ["GDP_GROWTH", "INFLATION", "UNEMPLOYMENT", "CURRENT_ACCOUNT", "DEBT"]}),
-        ("compare_countries", {"group": "latam", "indicators": ["GDP_GROWTH", "INFLATION", "UNEMPLOYMENT"]}),
-    ]
-    steps += [("get_macro_series", {"series_id": s, "lookback_years": 5}) for s in ("US.GDP.REAL", "US.CPI.HEADLINE", "US.CPI.CORE", "US.UNRATE")]
+    # The U.S. comes first; other economies are context.
+    steps: list[tuple[str, dict[str, Any]]] = [("get_macro_series", {"series_id": s, "lookback_years": 5})
+                                               for s in ("US.GDP.REAL", "US.CPI.HEADLINE", "US.CPI.CORE", "US.UNRATE")]
     steps.append(("compare_performance", {"dataset_ids": ["RATE.US.FEDFUNDS", "RATE.UST.2Y", "RATE.UST.10Y", "RATE.UST.10Y.REAL", "FX.USD.BROAD", "EQ.US.SP500"]}))
     steps += [("detect_regime", {"dataset_id": d}) for d in ("FX.USD.BROAD", "RATE.UST.10Y")]
     steps.append(("get_business_cycle", {}))
-    steps.append(("get_policy_rates", {}))
     steps.append(("get_economic_calendar", {"days": 60}))
+    steps.append(("get_energy_inventories", {}))
+    steps.append(("get_policy_rates", {}))
+    steps.append(("compare_countries", {"group": "g20", "indicators": ["GDP_GROWTH", "INFLATION", "UNEMPLOYMENT", "CURRENT_ACCOUNT", "DEBT"]}))
+    steps.append(("compare_countries", {"group": "latam", "indicators": ["GDP_GROWTH", "INFLATION", "UNEMPLOYMENT"]}))
     return steps
 
 
 def _country(plan: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     from atlas.instruments import countries, trade_pairs
 
-    iso = (plan.get("countries") or ["BRA"])[0]
-    groups = next((c["groups"] for c in countries() if c["iso3"] == iso), ["latam"])
+    iso = (plan.get("countries") or ["USA"])[0]
+    groups = next((c["groups"] for c in countries() if c["iso3"] == iso), ["g20"])
     peers_group = "latam" if "latam" in groups else "g20"
     steps: list[tuple[str, dict[str, Any]]] = [
         ("get_country_profile", {"country": iso}),
@@ -116,16 +117,16 @@ TEMPLATES: dict[str, dict[str, Any]] = {
     },
     "global_macro_outlook": {
         "name": "Global Macro Outlook",
-        "description": "Growth, inflation and labor across the G20 and Latin America; U.S. detail; rates, dollar and regimes.",
+        "description": "The U.S. first: growth, inflation, jobs, the Fed, yields, the dollar, recession odds and energy; then the G20 and Latin America for context.",
         "default_query": "Global macro outlook: growth, inflation, rates and the dollar.",
         "depth": "standard", "steps": _macro,
-        "brief": "Write a global macro outlook: regional growth and inflation comparison (flag stale country data), U.S. detail, "
-                 "rates and dollar, volatility regimes, and key risks. Annual World Bank data lags; say which years you compare.",
+        "brief": "Write a global macro outlook led by the United States: U.S. growth, inflation and jobs, the Fed and the yield curve, "
+                 "the dollar, recession odds and energy, then how other economies compare (flag stale country data), volatility regimes, and key risks. Annual World Bank data lags; say which years you compare.",
     },
     "country_intelligence": {
         "name": "Country Intelligence Report",
         "description": "One country's economic profile, peer comparison and trade relationships.",
-        "default_query": "Country intelligence report: Brazil.",
+        "default_query": "Country intelligence report: United States.",
         "depth": "standard", "steps": _country,
         "brief": "Write a country intelligence report: economic profile, how it compares with regional peers, external position "
                  "and reserves, main trade relationships and product concentration, and financial risks.",

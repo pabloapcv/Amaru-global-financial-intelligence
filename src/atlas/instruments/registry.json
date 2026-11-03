@@ -2798,9 +2798,33 @@
     }
   },
   "trade_pairs": {
-    "_comment": "Bilateral trade relationships pre-loaded from UN Comtrade (reporter's declared exports/imports). WLD = all partners.",
+    "_comment": "Bilateral trade relationships pre-loaded from UN Comtrade (reporter's declared exports/imports). WLD = all partners. U.S. pairs come first: the U.S. is the main market.",
     "years": 8,
     "pairs": [
+      [
+        "USA",
+        "WLD"
+      ],
+      [
+        "USA",
+        "CHN"
+      ],
+      [
+        "USA",
+        "MEX"
+      ],
+      [
+        "USA",
+        "CAN"
+      ],
+      [
+        "USA",
+        "JPN"
+      ],
+      [
+        "USA",
+        "DEU"
+      ],
       [
         "BOL",
         "USA"
