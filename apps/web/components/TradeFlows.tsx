@@ -46,7 +46,7 @@ function ProductTable({ title, data }: { title: string; data?: { year: number; t
 
 export default function TradeFlows() {
   const [pairs, setPairs] = useState<Pair[]>([]);
-  const [selected, setSelected] = useState("BOL:USA");
+  const [selected, setSelected] = useState("USA:WLD");
   const [data, setData] = useState<Trade | null>(null);
   const [error, setError] = useState<unknown>(null);
 

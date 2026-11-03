@@ -1,6 +1,6 @@
 # Amaru — Global Financial Intelligence Platform (MVP)
 
-A financial data platform with an AI analyst on top. Amaru continuously ingests market and macro data, stores it with full lineage and point-in-time vintages, and answers research questions with deterministic calculations, cited evidence and verified reports.
+A financial data platform with an AI analyst on top, built around U.S. markets and the U.S. economy: the Fed, Treasury yields, the dollar, U.S. inflation and jobs, energy, and U.S. farm and commodity markets, with 25 other economies (G20 and Latin America) for context. Amaru continuously ingests market and macro data, stores it with full lineage and point-in-time vintages, and answers research questions with deterministic calculations, cited evidence and verified reports.
 
 Amaru was called ATLAS. Internal names keep the old name so existing setups keep working: the `atlas` Python package and command, `ATLAS_*` settings, the `X-Atlas-*` webhook headers, the `atk_` API key prefix and the backup file format.
 
@@ -80,7 +80,7 @@ Run `atlas doctor` on any deployment (add `--production` to apply production rul
 | Spec area | Implementation |
 |---|---|
 | Canonical registry (§5, §7.4) | `src/atlas/instruments/registry.json`: 27 instruments, 6 U.S. macro series, 13 CFTC positioning series, 208 country series (26 countries × 8 WDI indicators), 19 central bank policy rates; NL resolution of instruments and countries |
-| Data sources | FRED (prices, FX, rates, U.S. macro), CFTC Commitments of Traders (weekly positioning), World Bank WDI (annual country data), UN Comtrade (bilateral trade, 12 pre-loaded pairs incl. Bolivia–US), USDA FAS PSD (supply-and-demand balance sheets), BIS (daily central bank policy rates). None needs an API key |
+| Data sources | FRED (prices, FX, rates, U.S. macro), CFTC Commitments of Traders (weekly positioning), World Bank WDI (annual country data), UN Comtrade (bilateral trade, 18 pre-loaded pairs led by U.S. trade with the world, China, Mexico, Canada, Japan and Germany, incl. Bolivia–US), USDA FAS PSD (supply-and-demand balance sheets), BIS (daily central bank policy rates). None needs an API key |
 | Ingestion pipeline (§7) | `src/atlas/ingestion/`: raw payload storage, validation, normalization, idempotent upserts, incremental watermarks, retries/backoff, replay, refresh scheduler |
 | Point-in-time macro (§7.3) | Revised values are stored as new vintages; `get_series(as_of=...)` reproduces past views |
 | Data licensing | Every sourced dataset carries a licence class (public domain, CC BY 4.0, check terms, third-party restricted) with the owner and a note, shown in Data Explorer, instrument provenance and export headers. `ATLAS_COMMERCIAL_MODE=true` switches off restricted series (S&P 500, NASDAQ, VIX): they are not ingested or served, including rows stored earlier, and research discloses them as gaps |

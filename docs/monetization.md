@@ -12,9 +12,9 @@ You can sell it: it is your software, built on permissively licensed open-source
 - **Business-software foundations already in place.** Separate workspaces, teams with roles and invitations, two-factor sign-in (which owners can require), an activity log, quotas, API keys, signed webhooks (including Slack) for plugging alerts and research into a customer's own systems, shareable report links, monthly Claude spending caps and an operator console.
 - **Analysis few competitors offer:**
   - USDA supply-and-demand balances, with a price-versus-stocks model;
-  - CFTC positioning;
-  - Latin American trade flows (for example Bolivia–US);
-  - Fed and U.S. data calendars and official press releases.
+  - CFTC positioning and EIA energy inventories;
+  - Fed and U.S. data calendars, recession odds and official press releases;
+  - U.S. trade flows (with China, Mexico, Canada and others), plus Latin American flows.
 
 ## What blocks selling it today
 
@@ -62,10 +62,11 @@ Amaru was built in roughly a week and has 136 automated tests and passing CI, bu
 
 Don't compete with Bloomberg, Koyfin or TradingView. Pick a niche where public data is enough and the value is turning it into a finished, verified analysis.
 
-1. **Agricultural trade intelligence for Latin American exporters** (research briefs and reports can now be written in Spanish or Portuguese with Claude), importers, cooperatives, trade associations and the banks that finance them: sugar, coffee, soybeans and corn, plus flows like Bolivia–US. The data it relies on most is government data that allows commercial use. Plausible price: **$200–1,000 per month per company**.
-2. **A paid weekly newsletter or report service** produced with Amaru. It has the lowest regulatory and licensing risk, and it is the fastest way to test whether anyone will pay. Amaru can now publish it: a public subscribe page with double opt-in, issues made from verified research, one-click unsubscribe and a public archive. Newsletters can be in Spanish or Portuguese end to end. A weekly scheduled report can draft each issue, or send it automatically when its research passes verification. Charging readers still happens outside Amaru, for example with a Stripe payment link, after which you invite the paying readers.
-3. **University licences** for teaching finance and economics with verified analysis.
-4. **An API for fintechs** that want a verified AI research engine inside their own product. This comes later, once the data licensing for redistribution is settled.
+1. **U.S. agricultural and energy market research** for U.S. farm businesses, grain merchandisers and elevators, ag lenders, commodity-focused advisers and the media that covers them: corn, soybeans, wheat, cattle inputs, crude and natural gas, read against the Fed, the dollar and U.S. data. Almost everything it relies on is U.S. government data (USDA, CFTC, EIA, BEA, the Fed) that allows commercial use, which makes this the cleanest market to sell into. Plausible price: **$200–1,000 per month per company**.
+2. **A paid weekly newsletter or report service** produced with Amaru, in English for U.S. readers first. It has the lowest regulatory and licensing risk, and it is the fastest way to test whether anyone will pay. Amaru can now publish it: a public subscribe page with double opt-in, issues made from verified research, one-click unsubscribe and a public archive. Newsletters can be in Spanish or Portuguese end to end. A weekly scheduled report can draft each issue, or send it automatically when its research passes verification. Charging readers still happens outside Amaru, for example with a Stripe payment link, after which you invite the paying readers.
+3. **Latin American exporters and the banks that finance them** (sugar, coffee, soybeans, corn), as a second market: briefs and reports can be written in Spanish or Portuguese, and U.S. trade with the region is covered.
+4. **University licences** for teaching finance and economics with verified analysis.
+5. **An API for fintechs** that want a verified AI research engine inside their own product. This comes later, once the data licensing for redistribution is settled.
 
 Selling the codebase itself without customers would probably fetch little. Paying users are what make it valuable.
 

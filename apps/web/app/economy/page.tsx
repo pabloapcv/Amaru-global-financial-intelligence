@@ -21,13 +21,13 @@ type Comparison = {
 };
 
 const GROUPS = [
-  { key: "latam", label: "Latin America" },
   { key: "g20", label: "G20" },
+  { key: "latam", label: "Latin America" },
 ];
 
 function CountryComparison() {
   const [indicators, setIndicators] = useState<Indicator[]>([]);
-  const [group, setGroup] = useState("latam");
+  const [group, setGroup] = useState("g20");
   const [focus, setFocus] = useState("GDP_GROWTH");
   const [sortKey, setSortKey] = useState("GDP_GROWTH");
   const [data, setData] = useState<Comparison | null>(null);
@@ -186,17 +186,11 @@ export default function Economy() {
 
   return (
     <>
-      <PageHeader title="Global economy" subtitle="Economic calendar (Federal Reserve), country data (IMF, BIS, World Bank WDI), bilateral trade (UN Comtrade), and monthly U.S. series with point-in-time vintages." />
+      <PageHeader title="Global economy" subtitle="The U.S. economy first: the Fed calendar, recession odds, policy rates, energy stocks and monthly U.S. series with point-in-time vintages; then 25 other economies (IMF, BIS, World Bank) and U.S. trade (UN Comtrade)." />
       <ErrorNote error={error} />
       <div className="stack">
         <EconomicCalendar />
         <BusinessCycle />
-        <PolicyRates />
-        <CountryMonitor />
-        <FertilizerAffordability />
-        <EnergyInventories />
-        <CountryComparison />
-        <TradeFlows />
         <div className="split">
           <Card title="United States · monthly">
             <table>
@@ -212,6 +206,12 @@ export default function Economy() {
           </Card>
           <InstrumentDetail id={selected} defaultYears={10} />
         </div>
+        <EnergyInventories />
+        <FertilizerAffordability />
+        <TradeFlows />
+        <PolicyRates />
+        <CountryMonitor />
+        <CountryComparison />
       </div>
     </>
   );
