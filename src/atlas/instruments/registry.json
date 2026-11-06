@@ -11,7 +11,7 @@
       "unit": "US cents per pound",
       "frequency": "monthly",
       "price_basis": "monthly_average_spot_benchmark",
-      "description": "International Sugar Agreement world raw sugar price, monthly average, from the IMF Primary Commodity Prices dataset via FRED. A physical benchmark — not an ICE Sugar No. 11 futures settlement.",
+      "description": "International Sugar Agreement world raw sugar price, monthly average, from the IMF Primary Commodity Prices dataset via FRED. A physical benchmark \u2014 not an ICE Sugar No. 11 futures settlement.",
       "tags": [
         "softs",
         "agriculture",
@@ -524,7 +524,7 @@
       "keywords": [
         "iron ore",
         "mineral de hierro",
-        "minério de ferro"
+        "min\u00e9rio de ferro"
       ],
       "refresh": "daily_poll",
       "sources": [
@@ -561,7 +561,7 @@
       ],
       "keywords": [
         "tin",
-        "estaño"
+        "esta\u00f1o"
       ],
       "refresh": "daily_poll",
       "sources": [
@@ -820,8 +820,8 @@
       ],
       "keywords": [
         "cotton",
-        "algodón",
-        "algodão"
+        "algod\u00f3n",
+        "algod\u00e3o"
       ],
       "refresh": "daily_poll",
       "sources": [
@@ -898,7 +898,7 @@
       "keywords": [
         "banana",
         "bananas",
-        "plátano",
+        "pl\u00e1tano",
         "banano"
       ],
       "refresh": "daily_poll",
@@ -1579,6 +1579,117 @@
         "class": "third_party_restricted",
         "owner": "Cboe Global Markets",
         "note": "Redistribution requires a licence from Cboe."
+      }
+    },
+    {
+      "instrument_id": "FUT.GC",
+      "name": "Gold Continuous (COMEX)",
+      "asset_class": "commodity",
+      "symbol": "GC",
+      "exchange": "COMEX",
+      "currency": "USD",
+      "unit": "USD per troy oz",
+      "frequency": "daily",
+      "price_basis": "continuous_contract_close",
+      "description": "Gold continuous front-month futures from Stooq (delayed, synthetic roll). Not a settlement price from CME.",
+      "tags": [
+        "precious_metals",
+        "gold",
+        "futures"
+      ],
+      "keywords": [
+        "gold",
+        "gc",
+        "comex gold",
+        "gold futures"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "futures_free",
+          "provider_symbol": "FUT.GC"
+        }
+      ],
+      "coverage_note": "Free delayed data via Stooq. For live CME settlements, implement a licensed adapter.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "Stooq.com",
+        "note": "Free for personal/research use; see Stooq terms. Synthetic continuous contract, not official exchange data."
+      }
+    },
+    {
+      "instrument_id": "FUT.CL",
+      "name": "Crude Oil WTI Continuous (NYMEX)",
+      "asset_class": "commodity",
+      "symbol": "CL",
+      "exchange": "NYMEX",
+      "currency": "USD",
+      "unit": "USD per barrel",
+      "frequency": "daily",
+      "price_basis": "continuous_contract_close",
+      "description": "WTI crude oil continuous front-month futures from Stooq (delayed, synthetic roll). Not a settlement price from CME.",
+      "tags": [
+        "energy",
+        "crude_oil",
+        "oil",
+        "futures"
+      ],
+      "keywords": [
+        "crude",
+        "oil",
+        "wti",
+        "cl",
+        "crude oil futures"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "futures_free",
+          "provider_symbol": "FUT.CL"
+        }
+      ],
+      "coverage_note": "Free delayed data via Stooq. For live NYMEX settlements, implement a licensed adapter.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "Stooq.com",
+        "note": "Free for personal/research use; see Stooq terms. Synthetic continuous contract, not official exchange data."
+      }
+    },
+    {
+      "instrument_id": "FUT.ZC",
+      "name": "Corn Continuous (CBOT)",
+      "asset_class": "commodity",
+      "symbol": "ZC",
+      "exchange": "CBOT",
+      "currency": "USD",
+      "unit": "US cents per bushel",
+      "frequency": "daily",
+      "price_basis": "continuous_contract_close",
+      "description": "Corn continuous front-month futures from Stooq (delayed, synthetic roll). Not a settlement price from CME.",
+      "tags": [
+        "grains",
+        "agriculture",
+        "corn",
+        "futures"
+      ],
+      "keywords": [
+        "corn",
+        "zc",
+        "cbot corn",
+        "corn futures"
+      ],
+      "refresh": "daily_poll",
+      "sources": [
+        {
+          "provider_id": "futures_free",
+          "provider_symbol": "FUT.ZC"
+        }
+      ],
+      "coverage_note": "Free delayed data via Stooq. For live CBOT settlements, implement a licensed adapter.",
+      "licence": {
+        "class": "check_terms",
+        "owner": "Stooq.com",
+        "note": "Free for personal/research use; see Stooq terms. Synthetic continuous contract, not official exchange data."
       }
     }
   ],
