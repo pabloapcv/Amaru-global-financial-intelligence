@@ -68,7 +68,7 @@ class Settings:
     fred_api_key: str = field(default_factory=lambda: os.getenv("FRED_API_KEY", ""))
     # Optional free EIA API key: without it the public demo key is used, which allows about ten calls an hour.
     eia_api_key: str = field(default_factory=lambda: os.getenv("EIA_API_KEY", ""))
-    # Commercial deployments: switch off datasets whose owners restrict redistribution (see docs/monetization.md).
+    # Switch off datasets whose owners restrict redistribution (S&P 500, NASDAQ, VIX).
     commercial_mode: bool = field(default_factory=lambda: os.getenv("ATLAS_COMMERCIAL_MODE", "false").lower() == "true")
     cors_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(
@@ -78,3 +78,12 @@ class Settings:
 
 
 settings = Settings()
+
+
+def legal_links() -> dict[str, str | None]:
+    """Optional published privacy (and terms) URLs, http/https only. Linked from newsletter pages."""
+    out: dict[str, str | None] = {}
+    for key, env in (("terms_url", "ATLAS_TERMS_URL"), ("privacy_url", "ATLAS_PRIVACY_URL")):
+        v = os.getenv(env, "").strip()
+        out[key] = v if v.startswith(("https://", "http://")) and len(v) < 500 else None
+    return out

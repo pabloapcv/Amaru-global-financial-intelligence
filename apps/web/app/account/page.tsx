@@ -1,9 +1,8 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { API_URL, api, type Account } from "@/lib/api";
 import Activity from "@/components/Activity";
-import Billing from "@/components/Billing";
 import Digest from "@/components/Digest";
 import Team from "@/components/Team";
 import TwoFactor from "@/components/TwoFactor";
@@ -63,7 +62,7 @@ export default function AccountPage() {
 
   return (
     <>
-      <PageHeader title="Account" subtitle="Workspace, plan usage and API access." actions={<button className="secondary" onClick={logout}>Sign out</button>} />
+      <PageHeader title="Account" subtitle="Workspace, usage and API access." actions={<button className="secondary" onClick={logout}>Sign out</button>} />
       <ErrorNote error={error} />
       {account && !account.email_verified && (
         <div className="note note-warn" style={{ marginBottom: 14 }}>
@@ -81,7 +80,6 @@ export default function AccountPage() {
               <dt>Email</dt><dd>{account.user.email}</dd>
               <dt>Workspace</dt><dd>{account.workspace?.name}</dd>
               <dt>Role</dt><dd>{account.role}</dd>
-              <dt>Plan</dt><dd>{account.workspace?.plan.replace("_", " ")}</dd>
             </dl>
           </Card>
           <Card title="Usage">
@@ -123,7 +121,6 @@ export default function AccountPage() {
           <div style={{ height: 14 }} />
         </>
       )}
-      {account && account.auth !== "local" && <div style={{ marginBottom: 14 }}><Suspense><Billing /></Suspense></div>}
       {account?.workspace_requires_2fa && !account.two_factor && (
         <div className="note note-warn" style={{ marginBottom: 14 }}>
           {account.workspace?.name} requires two-factor authentication. Turn it on below to use this workspace{account.workspaces && account.workspaces.length > 1 ? ", or switch to another workspace from the navigation" : ""}.

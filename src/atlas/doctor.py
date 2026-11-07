@@ -128,22 +128,18 @@ def run(production: bool | None = None, *, check_database: bool = True) -> dict[
         add(bad if prod else "info", "Webhooks", "ATLAS_WEBHOOKS_ALLOW_PRIVATE lets webhooks reach private addresses and plain http",
             "Leave it off outside local testing.")
 
-    # Billing and data licences
-    stripe = {k: bool(_env(k)) for k in ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_INVESTOR", "STRIPE_PRICE_RESEARCH_PRO", "STRIPE_PRICE_PRO")}
-    if any(stripe.values()) and not all(stripe.values()):
-        add("error", "Billing", "Stripe is partly configured; missing " + ", ".join(k for k, v in stripe.items() if not v),
-            "Set all STRIPE_* settings, or none.")
-    elif all(stripe.values()):
-        add("ok", "Billing", "Stripe configured" + (" (test mode)" if _env("STRIPE_SECRET_KEY").startswith("sk_test_") else ""))
+    # Data licences. Leftover Stripe / plan-price env vars are ignored (billing was removed).
+    leftover_stripe = [k for k in ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_INVESTOR",
+                                   "STRIPE_PRICE_RESEARCH_PRO", "STRIPE_PRICE_PRO", "ATLAS_PLAN_PRICES", "ATLAS_SALES_EMAIL")
+                       if _env(k)]
+    if leftover_stripe:
+        add("info", "Ignored settings", ", ".join(leftover_stripe) + " have no effect",
+            "Payment settings are unused; unset them. Resource limits are changed with atlas set-plan.")
+    if config.settings.commercial_mode:
+        add("ok", "Data licences", "ATLAS_COMMERCIAL_MODE is on: restricted third-party series are not served")
     else:
-        add("info", "Billing", "self-service billing is off; operators change plans", "Set the STRIPE_* settings to sell plans.")
-    selling = all(stripe.values()) or bool(_env("ATLAS_PLAN_PRICES"))
-    if selling and not config.settings.commercial_mode:
-        add("warning", "Data licences", "you are selling plans but ATLAS_COMMERCIAL_MODE is off, so restricted third-party series are served",
-            "Set ATLAS_COMMERCIAL_MODE=true (see docs/monetization.md).")
-    if not _env("ATLAS_TERMS_URL") or not _env("ATLAS_PRIVACY_URL"):
-        add("warning" if prod and selling else "info", "Legal pages", "ATLAS_TERMS_URL and ATLAS_PRIVACY_URL are not both set",
-            "Publish terms of service and a privacy policy (have a lawyer review them) and set both URLs.")
+        add("info", "Data licences", "restricted third-party series (S&P 500, NASDAQ, VIX) are served",
+            "Set ATLAS_COMMERCIAL_MODE=true to switch them off.")
     if not config.settings.fred_api_key:
         add("info", "FRED key", "not set: the calendar lacks official U.S. release dates", "Optional: set FRED_API_KEY (free).")
     from atlas import offsite

@@ -562,7 +562,7 @@ def public_info(slug: str) -> dict[str, Any] | None:
 
 
 def _privacy_url() -> str | None:
-    from atlas.billing import legal_links
+    from atlas.config import legal_links
 
     return legal_links()["privacy_url"]
 

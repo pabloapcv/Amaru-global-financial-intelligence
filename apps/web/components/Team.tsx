@@ -35,7 +35,7 @@ export default function Team() {
   };
 
   return (
-    <Card title={`Team · ${team.seats.used}${team.seats.limit != null ? ` of ${team.seats.limit}` : ""} seats`}>
+    <Card title={`Team · ${team.seats.used}${team.seats.limit != null ? ` of ${team.seats.limit}` : ""} members`}>
       <table>
         <tbody>
           {team.members.map((m) => (
@@ -50,7 +50,7 @@ export default function Team() {
               </td>
               <td className="num">
                 {team.role === "owner" && !m.you && (
-                  <button className="secondary" style={{ marginRight: 6 }} onClick={() => { if (window.confirm(`Make ${m.email} the owner? You become an admin; only the new owner can change billing, roles and security policy.`)) call(api("/api/v1/team/transfer-ownership", { method: "POST", body: JSON.stringify({ user_id: m.user_id }) })).then(() => window.location.reload()); }}>Make owner</button>
+                  <button className="secondary" style={{ marginRight: 6 }} onClick={() => { if (window.confirm(`Make ${m.email} the owner? You become an admin; only the new owner can change roles and security policy.`)) call(api("/api/v1/team/transfer-ownership", { method: "POST", body: JSON.stringify({ user_id: m.user_id }) })).then(() => window.location.reload()); }}>Make owner</button>
                 )}
                 {m.role !== "owner" && (m.you || (manager && (team.role === "owner" || m.role === "member"))) && (
                   <button className="secondary" onClick={() => { if (window.confirm(m.you ? "Leave this workspace?" : `Remove ${m.email}? Their sessions and API keys for this workspace stop working.`)) call(api(`/api/v1/team/members/${m.user_id}`, { method: "DELETE" })).then(() => m.you && (window.location.href = "/")); }}>
@@ -84,7 +84,7 @@ export default function Team() {
           <button type="submit" disabled={full}>Invite</button>
         </form>
       )}
-      {manager && full && <p className="muted" style={{ fontSize: 12 }}>All seats are in use. Revoke an invitation, remove a member or move to a larger plan.</p>}
+      {manager && full && <p className="muted" style={{ fontSize: 12 }}>All member slots are in use. Revoke an invitation or remove a member.</p>}
       {created && (
         <div className="note" style={{ marginTop: 10 }}>
           {created.emailed ? `Invitation emailed to ${created.email}. ` : `Email is not configured, so send ${created.email} this link yourself. `}It works once and expires in 7 days.

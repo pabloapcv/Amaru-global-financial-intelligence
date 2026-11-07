@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "atlas"
 version = "0.1.0"
-description = "Amaru — Global Financial Intelligence Platform (MVP)"
+description = "Amaru — open financial research platform (personal research project)"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

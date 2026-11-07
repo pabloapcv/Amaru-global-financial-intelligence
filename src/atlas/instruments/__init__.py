@@ -53,7 +53,7 @@ def datasets() -> dict[str, Dataset]:
         src = inst["sources"][0] if inst["sources"] else {}
         lic = inst.get("licence") or {}
         if commercial and lic.get("class") == "third_party_restricted":
-            # Showing these to paying users is redistribution: off until a licence is in place.
+            # Redistributing these series needs the owner's licence: leave them off until then.
             src = {}
             inst = {**inst, "coverage_note": f"Not available in this commercial deployment: {lic.get('note')}"}
         out[inst["instrument_id"]] = Dataset(

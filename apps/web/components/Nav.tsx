@@ -63,7 +63,7 @@ export default function Nav() {
       {account && (
         <Link href="/account" className={`nav-account ${path.startsWith("/account") ? "active" : ""}`}>
           <span>{account.user.name || account.user.email}</span>
-          <small>{account.workspace?.name} · {account.workspace?.plan.replace("_", " ")}</small>
+          <small>{account.workspace?.name}</small>
         </Link>
       )}
       {account?.workspaces && account.workspaces.length > 1 && (
