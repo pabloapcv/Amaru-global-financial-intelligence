@@ -535,9 +535,10 @@ class Workspace(Base):
     plan: Mapped[str] = mapped_column(String(32), default="explorer")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     require_2fa: Mapped[bool | None] = mapped_column(default=False)  # members must use two-factor authentication
+    # Unused leftovers from the removed Stripe integration; kept so existing databases still load.
     stripe_customer_id: Mapped[str | None] = mapped_column(String(64), index=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(64))
-    billing_status: Mapped[str | None] = mapped_column(String(32))  # Stripe subscription status
+    billing_status: Mapped[str | None] = mapped_column(String(32))
     suspended_at: Mapped[datetime | None] = mapped_column(DateTime)  # set by an operator; blocks all access
 
 
@@ -676,7 +677,7 @@ class RateLimitWindow(Base):
 
 
 class StripeEvent(Base):
-    """Stripe webhook events already processed (Stripe retries deliveries; each is applied once)."""
+    """Unused leftover table from the removed Stripe integration; kept so existing databases still load."""
 
     __tablename__ = "stripe_events"
 

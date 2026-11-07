@@ -1,4 +1,4 @@
-"""Accounts, workspaces, sessions, API keys and plan quotas (spec §15, §18).
+"""Accounts, workspaces, sessions, API keys and resource quotas (spec §15, §18).
 
 Security notes:
 - Passwords are hashed with scrypt (stdlib) and a per-user salt.
@@ -53,7 +53,7 @@ API_KEY_PREFIX = "atk_"
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MIN_PASSWORD = 10
 
-# Plan limits (spec §18 tiers). None = unlimited.
+# Named resource-limit sets (not paid tiers). None = unlimited.
 PLANS: dict[str, dict[str, int | None]] = {
     "explorer": {"requests_per_minute": 60, "seats": 1, "llm_budget_usd_per_month": 2, "agents": 1, "research_per_day": 10, "llm_research_per_day": 3, "schedules": 1, "alerts": 5, "api_keys": 1, "webhooks": 1, "newsletter_subscribers": 100},
     "investor": {"requests_per_minute": 120, "seats": 2, "llm_budget_usd_per_month": 15, "agents": 3, "research_per_day": 50, "llm_research_per_day": 20, "schedules": 3, "alerts": 25, "api_keys": 2, "webhooks": 2, "newsletter_subscribers": 1000},

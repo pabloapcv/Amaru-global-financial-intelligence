@@ -3,8 +3,8 @@ import Nav from "@/components/Nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Amaru — Financial Intelligence",
-  description: "Evidence-grounded market and macro research",
+  title: "Amaru — financial research platform",
+  description: "Open research project: verified, evidence-grounded market and macro analysis",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

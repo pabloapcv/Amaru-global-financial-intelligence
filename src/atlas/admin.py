@@ -1,5 +1,5 @@
-"""Operator console: every workspace's plan, members, usage, Claude spend and billing status, plus plan
-changes and suspension. Operators are listed in ATLAS_OPERATOR_EMAILS and must use two-factor
+"""Operator console: every workspace's members, usage, Claude spend and resource-limit set, plus
+limit changes and suspension. Operators are listed in ATLAS_OPERATOR_EMAILS and must use two-factor
 authentication. The console shows metadata and usage only, never research content; every action is
 audited in the affected workspace.
 """
@@ -36,7 +36,7 @@ def workspaces() -> list[dict[str, Any]]:
                 "workspace_id": ws.workspace_id, "name": ws.name, "plan": ws.plan, "created_at": _iso(ws.created_at),
                 "members": len(m), "owner": next((e for e, r in m if r == "owner"), None),
                 "research_runs_30d": runs.get(ws.workspace_id, 0), "last_activity_at": _iso(active.get(ws.workspace_id)),
-                "billing_status": ws.billing_status, "suspended_at": _iso(ws.suspended_at), "requires_2fa": bool(ws.require_2fa),
+                "suspended_at": _iso(ws.suspended_at), "requires_2fa": bool(ws.require_2fa),
             })
     for w in out:
         w["claude_spend_month_usd"] = round(llm_spend_this_month(w["workspace_id"]), 2)
@@ -56,7 +56,6 @@ def overview() -> dict[str, Any]:
 
     fb = feedback.summary()
     return {"workspaces": len(rows), "users": users, "research_runs_7d": runs_7d,
-            "paying_workspaces": sum(1 for w in rows if w["billing_status"] in ("active", "trialing", "past_due")),
             "by_plan": {p: sum(1 for w in rows if w["plan"] == p) for p in PLANS},
             "claude_spend_month_usd": round(sum(w["claude_spend_month_usd"] for w in rows), 2),
             "suspended": sum(1 for w in rows if w["suspended_at"]),

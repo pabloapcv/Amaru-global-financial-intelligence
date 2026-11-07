@@ -753,19 +753,6 @@ def test_owners_transfer_before_deleting_and_shared_work_stays(secured):
         assert s.get(ResearchRun, shared_run) is not None and s.get(Workspace, ws) is not None  # shared work stays
 
 
-def test_live_subscription_blocks_deleting_its_only_member(secured):
-    from atlas.data.db import Workspace, session_scope
-
-    me = _signup(secured, "subscriber@privacy.test", "Paid solo")
-    with session_scope() as s:
-        w = s.get(Workspace, me["workspace"]["workspace_id"])
-        w.billing_status, w.stripe_subscription_id = "active", "sub_live"
-    check = secured.get("/api/v1/account/deletion-check").json()
-    assert not check["can_delete"] and "cancel the paid subscription" in check["blockers"][0]
-    r = secured.post("/api/v1/account/delete", json={"password": "correct horse battery", "confirm_email": "subscriber@privacy.test"})
-    assert r.status_code == 409
-
-
 def test_api_rate_limits_by_plan(secured, monkeypatch):
     from atlas import ratelimit
 
@@ -924,17 +911,12 @@ def select_schedule(workspace_id):
     return select(ReportSchedule).where(ReportSchedule.workspace_id == workspace_id)
 
 
-def test_public_plans_need_no_sign_in_and_show_configured_prices(secured, monkeypatch):
-    monkeypatch.setenv("ATLAS_PLAN_PRICES", "investor=49, research_pro=199,pro=oops,platinum=5")
-    monkeypatch.setenv("ATLAS_SALES_EMAIL", "sales@atlas.test")
-    monkeypatch.setenv("ATLAS_ALLOW_SIGNUP", "false")
-    r = secured.get("/api/v1/public/plans")
-    assert r.status_code == 200
-    body = r.json()
-    prices = {p["key"]: p["price_per_month"] for p in body["plans"]}
-    assert prices == {"explorer": 0.0, "investor": 49.0, "research_pro": 199.0, "pro": None}  # unparseable or unknown entries are ignored
-    assert body["currency"] == "USD" and body["sales_email"] == "sales@atlas.test" and body["signup_allowed"] is False
-    assert next(p for p in body["plans"] if p["key"] == "investor")["limits"] == auth.PLANS["investor"]
+def test_billing_and_pricing_routes_are_gone(secured):
+    assert secured.get("/api/v1/public/plans").status_code == 404
+    assert secured.get("/api/v1/billing").status_code == 404
+    assert secured.post("/api/v1/billing/checkout", json={"plan": "investor"}).status_code == 404
+    assert secured.post("/api/v1/billing/portal").status_code == 404
+    assert secured.post("/api/v1/billing/webhook", json={"id": "evt"}).status_code == 404
 
 
 def test_research_feedback_reaches_operators_and_is_private_and_deletable(secured, monkeypatch):
@@ -1022,8 +1004,6 @@ def test_legal_links_are_published_only_when_safe(secured, monkeypatch):
     monkeypatch.setenv("ATLAS_PRIVACY_URL", "javascript:alert(1)")
     h = secured.get("/health").json()
     assert h["terms_url"] == "https://example.com/terms" and h["privacy_url"] is None
-    p = secured.get("/api/v1/public/plans").json()
-    assert p["terms_url"] == "https://example.com/terms" and p["privacy_url"] is None
 
 
 def test_shared_rate_limit_store_counts_across_replicas(isolated_env, monkeypatch):

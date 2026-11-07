@@ -3214,7 +3214,7 @@
     "licence": {
       "class": "check_terms",
       "owner": "Bank for International Settlements",
-      "note": "The BIS must be cited as the source, and including its statistics in a commercial product must not add to what users are charged. Confirm the current terms with the BIS before selling access."
+      "note": "The BIS must be cited as the source, and including its statistics must not increase any charge for access. Confirm the current terms with the BIS before redistributing."
     }
   },
   "country_series": {
@@ -3259,7 +3259,7 @@
         "licence": {
           "class": "check_terms",
           "owner": "International Monetary Fund",
-          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data; confirm its copyright and usage terms before redistributing."
         },
         "description": "Consumer price index, % change from the same month a year earlier, as computed by the IMF from national CPIs (IMF.STA:CPI)."
       },
@@ -3298,7 +3298,7 @@
         "licence": {
           "class": "check_terms",
           "owner": "Bank for International Settlements",
-          "note": "The BIS must be cited as the source, and including its statistics in a commercial product must not add to what users are charged. Confirm the current terms with the BIS before selling access."
+          "note": "The BIS must be cited as the source, and including its statistics must not increase any charge for access. Confirm the current terms with the BIS before redistributing."
         },
         "description": "BIS real effective exchange rate against a broad basket of 64 economies, monthly average, 2020 = 100. A rise means the currency got stronger after adjusting for inflation."
       },
@@ -3336,7 +3336,7 @@
         "licence": {
           "class": "check_terms",
           "owner": "Bank for International Settlements",
-          "note": "The BIS must be cited as the source, and including its statistics in a commercial product must not add to what users are charged. Confirm the current terms with the BIS before selling access."
+          "note": "The BIS must be cited as the source, and including its statistics must not increase any charge for access. Confirm the current terms with the BIS before redistributing."
         },
         "expected_lag_days": 420,
         "description": "BIS credit-to-GDP gap: credit to the private non-financial sector as a share of GDP minus its long-run (HP-filter) trend, in percentage points. Above 10 is the Basel III warning level for a credit boom; the trend is re-estimated as data arrive, so recent values get revised."
@@ -3374,7 +3374,7 @@
         "licence": {
           "class": "check_terms",
           "owner": "Bank for International Settlements",
-          "note": "The BIS must be cited as the source, and including its statistics in a commercial product must not add to what users are charged. Confirm the current terms with the BIS before selling access."
+          "note": "The BIS must be cited as the source, and including its statistics must not increase any charge for access. Confirm the current terms with the BIS before redistributing."
         },
         "expected_lag_days": 300,
         "description": "BIS selected residential property prices, deflated by consumer prices, 2010 = 100. National sources differ in coverage (some cover only the capital or new homes)."
@@ -3418,7 +3418,7 @@
         "licence": {
           "class": "check_terms",
           "owner": "International Monetary Fund",
-          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data; confirm its copyright and usage terms before redistributing."
         },
         "forecast": true,
         "description": "IMF World Economic Outlook: real GDP growth, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."
@@ -3462,7 +3462,7 @@
         "licence": {
           "class": "check_terms",
           "owner": "International Monetary Fund",
-          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data; confirm its copyright and usage terms before redistributing."
         },
         "forecast": true,
         "description": "IMF World Economic Outlook: average consumer price inflation, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."
@@ -3506,7 +3506,7 @@
         "licence": {
           "class": "check_terms",
           "owner": "International Monetary Fund",
-          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data; confirm its copyright and usage terms before redistributing."
         },
         "forecast": true,
         "description": "IMF World Economic Outlook: unemployment rate, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."
@@ -3550,7 +3550,7 @@
         "licence": {
           "class": "check_terms",
           "owner": "International Monetary Fund",
-          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data; confirm its copyright and usage terms before redistributing."
         },
         "forecast": true,
         "description": "IMF World Economic Outlook: general government gross debt, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."
@@ -3594,7 +3594,7 @@
         "licence": {
           "class": "check_terms",
           "owner": "International Monetary Fund",
-          "note": "Cite the IMF as the source. The IMF allows reuse of its data, but confirm its copyright and usage terms before selling access."
+          "note": "Cite the IMF as the source. The IMF allows reuse of its data; confirm its copyright and usage terms before redistributing."
         },
         "forecast": true,
         "description": "IMF World Economic Outlook: current account balance, actuals and IMF projections for the next five years. Years from the current one onward are projections; recent past years can be IMF estimates."

@@ -2,6 +2,8 @@
 
 This guide puts Amaru on one Linux server with HTTPS, PostgreSQL (TimescaleDB), the scheduler and daily backups. It works with any provider that gives you a virtual machine: Hetzner, DigitalOcean, AWS Lightsail, a Google Cloud VM, and so on.
 
+Amaru is a personal research project, not a hosted product. These steps are for running your own instance.
+
 ## What you need
 
 - A server with 2 vCPUs, 4 GB RAM and 40 GB of disk (Ubuntu 24.04 or similar), with Docker Engine and Docker Compose 2.24 or later.
@@ -13,7 +15,7 @@ This guide puts Amaru on one Linux server with HTTPS, PostgreSQL (TimescaleDB), 
 ## 1. Configure
 
 ```bash
-git clone https://github.com/pabloapcv/atlas-fin.git atlas && cd atlas
+git clone https://github.com/pabloapcv/Amaru-global-financial-intelligence.git atlas && cd atlas
 cp .env.example .env
 ```
 
@@ -31,14 +33,10 @@ Set at least these in `.env`:
 | `ATLAS_METRICS_TOKEN` | a random token, if you scrape `/metrics` |
 | `ATLAS_REQUIRE_EMAIL_VERIFICATION` | `true` |
 
-When you sell plans, also set:
+Optional:
 
-- `ATLAS_COMMERCIAL_MODE=true`
-- the `STRIPE_*` settings
-- `ATLAS_PLAN_PRICES`
-- `ATLAS_TERMS_URL` and `ATLAS_PRIVACY_URL`
-
-See [monetization.md](monetization.md) for why.
+- `ATLAS_COMMERCIAL_MODE=true` switches off third-party series whose owners restrict redistribution (S&P 500, NASDAQ, VIX).
+- `ATLAS_PRIVACY_URL` is linked from public newsletter pages if you publish one.
 
 The production overlay sets these for you from `ATLAS_DOMAIN`, so don't set them yourself: `ATLAS_PUBLIC_URL`, `ATLAS_API_PUBLIC_URL`, `ATLAS_CORS_ORIGINS` and `ATLAS_COOKIE_SECURE`.
 
@@ -66,7 +64,7 @@ atlas-prod exec api atlas create-user you@example.com --plan pro
 
 Then sign in at `https://atlas.example.com`, turn on two-factor sign-in on the Account page, and open the operator console. Its Configuration card repeats the doctor's report.
 
-To sell, see [monetization.md](monetization.md). The Stripe webhook endpoint is `https://api.atlas.example.com/api/v1/billing/webhook`.
+`--plan pro` raises local resource caps (research runs, Claude budget, seats). It is not a paid tier.
 
 ## Backups
 

@@ -1,8 +1,8 @@
 """Workspace teams: invitations, members and roles.
 
 Owners and admins invite people by email with a role (admin or member). An invitation is a
-single-use token (only its hash is stored) that expires after 7 days and counts against the plan's
-seats while open. It is accepted by signing up with the invited email, or by signing in to an
+single-use token (only its hash is stored) that expires after 7 days and counts against the
+workspace's member-slot cap while open. It is accepted by signing up with the invited email, or by signing in to an
 account with that email. The owner cannot be removed or demoted; removing someone also ends
 their sessions in the workspace and revokes their API keys for it.
 """

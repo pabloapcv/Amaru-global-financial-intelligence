@@ -4,8 +4,7 @@ Deleting an account removes the user, their credentials and memberships, and eve
 they are the only member together with all of its data (research, reports and their files, share
 links, portfolios, alerts, agents, schedules, watchlist, invitations, keys, audit trail). Workspaces
 shared with others keep their content; the person's audit entries there are de-identified. An
-owner of a shared workspace must transfer ownership first, and a workspace with a live paid
-subscription must cancel it first.
+owner of a shared workspace must transfer ownership first.
 """
 
 from __future__ import annotations
@@ -45,9 +44,6 @@ from atlas.data.db import (
     Workspace,
     session_scope,
 )
-
-LIVE_BILLING = {"active", "trialing", "past_due"}
-
 
 def _iso(d) -> str | None:
     return d.isoformat(timespec="seconds") + "Z" if d else None
@@ -141,8 +137,6 @@ def deletion_blockers(user_id: str) -> tuple[list[str], list[str]]:
             members = s.execute(select(func.count()).select_from(Membership).where(Membership.workspace_id == m.workspace_id)).scalar()
             name = ws.name if ws else m.workspace_id
             if members == 1:
-                if ws and ws.billing_status in LIVE_BILLING and ws.stripe_subscription_id:
-                    problems.append(f"cancel the paid subscription of '{name}' first (Manage billing)")
                 purge.append(name)
             elif m.role == "owner":
                 problems.append(f"transfer ownership of '{name}' to another member first")

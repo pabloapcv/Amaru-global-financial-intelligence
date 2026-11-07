@@ -34,16 +34,13 @@ Please report suspected vulnerabilities privately to the maintainer (pabloapcv o
 - Subscriptions are double opt-in. The form doesn't reveal who is subscribed, and unsubscribe links are signed.
 - Issue content has raw HTML escaped and only http(s) and mailto links kept.
 
-**Payments**
-- Workspace plans change only through signed and timestamped Stripe webhooks, each applied once.
-
 **Limits**
-- Per-minute API rate limits and daily quotas by plan.
+- Per-minute API rate limits and daily resource quotas per workspace.
 - Monthly Claude spending caps.
 
 **Auditing**
 - Owners and admins can review and export their workspace's activity log.
-- The operator console needs an allow-listed email, a browser session and two-factor sign-in. It shows metadata, plus feedback readers chose to send, and every plan change, suspension or feedback resolution is audited.
+- The operator console needs an allow-listed email, a browser session and two-factor sign-in. It shows metadata, plus feedback readers chose to send, and every resource-limit change, suspension or feedback resolution is audited.
 
 **Personal data**
 - People can download their data and delete their account.

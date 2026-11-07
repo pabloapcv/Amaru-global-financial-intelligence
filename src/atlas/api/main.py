@@ -56,7 +56,7 @@ alerts, schedules and portfolios are private to it. Market and macro data are sh
 **Research jobs** are asynchronous: `POST /api/v1/research` returns `202` with a `run_id`; poll
 `GET /api/v1/research/{run_id}` until `status` is `complete`, then download the report.
 
-**Limits.** Plan quotas apply (HTTP 429 when exceeded). Data are public reference/benchmark series
+**Limits.** Workspace resource caps apply (HTTP 429 when exceeded). Data are public reference/benchmark series
 published with a lag, not live tradable quotes. Research and decision support only, not investment advice.
 """
 
@@ -384,7 +384,7 @@ def readiness() -> Response:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    from atlas.billing import legal_links
+    from atlas.config import legal_links
 
     return {"status": "ok", "version": __version__, "llm_configured": llm.available(), "llm_model": settings.llm_model,
             "auth_required": auth.auth_required(), "signup_allowed": auth.signup_allowed(),
@@ -1216,14 +1216,6 @@ def _client_throttle(request: Request, what: str) -> None:
         raise HTTPException(429, "too many requests; try again later") from exc
 
 
-@app.get(f"{V1}/public/plans", include_in_schema=False)
-def public_plans() -> dict[str, Any]:
-    """Plans and their limits for the public pricing page (no sign-in)."""
-    from atlas import billing
-
-    return billing.public_plans()
-
-
 @app.get(f"{V1}/public/newsletters/{{slug}}", include_in_schema=False)
 def public_newsletter(slug: str) -> dict[str, Any]:
     from atlas import newsletters
@@ -1283,64 +1275,6 @@ def newsletter_unsubscribe(s: str, sig: str, request: Request) -> Response:
     if done is None:
         return _plain_page(i18n.newsletter_text(_page_lang(request), "unsubscribe_invalid"), 400, _page_lang(request))
     return _plain_page(i18n.newsletter_text(done["language"], "unsubscribed", name=done["name"] or "Amaru"), lang=i18n.lang(done["language"]))
-
-
-# ---------------------------------------------------------------- billing
-
-
-class CheckoutRequest(BaseModel):
-    plan: Literal["investor", "research_pro", "pro"]
-
-
-@api.get("/billing")
-def billing_summary(p: Principal = Depends(principal)) -> dict[str, Any]:
-    from atlas import billing
-
-    return billing.summary(p)
-
-
-def _billing_call(fn, *args) -> dict[str, Any]:
-    from atlas import billing
-
-    try:
-        return {"url": fn(*args)}
-    except PermissionError as exc:
-        raise HTTPException(403, str(exc)) from exc
-    except billing.NotConfigured as exc:
-        raise HTTPException(503, str(exc)) from exc
-    except billing.BillingError as exc:
-        raise HTTPException(409, str(exc)) from exc
-
-
-@api.post("/billing/checkout")
-def billing_checkout(req: CheckoutRequest, p: Principal = Depends(require_verified)) -> dict[str, Any]:
-    from atlas import billing
-
-    return _billing_call(billing.checkout, p, req.plan)
-
-
-@api.post("/billing/portal")
-def billing_portal(p: Principal = Depends(principal)) -> dict[str, Any]:
-    from atlas import billing
-
-    return _billing_call(billing.portal, p)
-
-
-@app.post(f"{V1}/billing/webhook", include_in_schema=False)
-async def stripe_webhook(request: Request) -> dict[str, Any]:
-    """Stripe events. Only signed payloads are accepted; each event is applied once."""
-    import json
-
-    from atlas import billing
-
-    payload = await request.body()
-    if not billing.verify_signature(payload, request.headers.get("stripe-signature"), os.getenv("STRIPE_WEBHOOK_SECRET", "")):
-        raise HTTPException(400, "invalid signature")
-    try:
-        event = json.loads(payload)
-    except ValueError as exc:
-        raise HTTPException(400, "invalid payload") from exc
-    return {"received": True, "result": billing.handle_event(event)}
 
 
 # ---------------------------------------------------------------- two-factor authentication
@@ -1611,7 +1545,7 @@ def create_research(req: ResearchRequest, p: Principal = Depends(require_verifie
             raise HTTPException(409, "a follow-up needs a completed run")
         config["parent_run_id"] = req.parent_run_id
 
-    def quotas() -> None:  # only charged when new research actually runs (cache hits are free)
+    def quotas() -> None:  # only counted when new research actually runs (cache hits skip this)
         _quota(p.workspace_id, "research_per_day")
         if req.engine == "llm":
             _quota(p.workspace_id, "llm_research_per_day")
